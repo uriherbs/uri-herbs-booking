@@ -715,7 +715,7 @@ function CustomerStep({ form, onChange, errors }) {
           <input
             type="text" placeholder="e.g. Sophie Martin"
             value={form.name} onChange={e => onChange("name", e.target.value)}
-            style={inputStyle(errors.name)}
+            style={inputStyle(errors.name) as React.CSSProperties}
           />
           {errors.name && <div style={errorStyle}>{errors.name}</div>}
         </div>
