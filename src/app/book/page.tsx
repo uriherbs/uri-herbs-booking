@@ -991,8 +991,7 @@ export default function BookingFlow() {
 
   const updateForm = useCallback((field, value) => {
     setForm(f => ({ ...f, [field]: value }));
-    setErrors(e => ({ ...e, [field]: null, age: field === "ageConfirmed" ? null : e.age, submit: null }));
-  }, []);
+setErrors(e => ({ ...e, [field]: null }));  }, []);
 
   const validateStep3 = () => {
     const e = {};
