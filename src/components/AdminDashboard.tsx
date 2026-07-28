@@ -605,7 +605,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
     setPendingAction(time);
     try {
       await adminToggleSlotBlock(
-        dateStr, time, activeTab, !isCurrentlyBlocked,
+        dateStr, time, activeTab as any, !isCurrentlyBlocked,
         !isCurrentlyBlocked ? (window.prompt("Reason for blocking (optional):") || undefined) : undefined
       );
     } catch (err) {
