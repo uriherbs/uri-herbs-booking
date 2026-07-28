@@ -1167,7 +1167,7 @@ const validateStep3 = () => {
                 borderRadius: 10, padding: "12px 14px",
                 fontFamily: "'DM Sans'", fontSize: 13, color: C.coral, lineHeight: 1.5,
               }}>
-                {errors.submit}
+                {(errors as any).submit}
               </div>
             </div>
           )}
