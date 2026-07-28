@@ -1160,7 +1160,7 @@ const validateStep3 = () => {
       {step === 2 && (
         <>
           <CustomerStep form={form} onChange={updateForm} errors={errors}/>
-          {errors.submit && (
+         {(errors as any).submit && (
             <div style={{ padding: "0 16px", marginTop: -8 }}>
               <div style={{
                 background: C.coralLight, border: `1px solid rgba(192,122,110,0.3)`,
