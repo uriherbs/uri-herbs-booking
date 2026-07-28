@@ -1211,3 +1211,4 @@ const validateStep3 = () => {    if (!form.name.trim()) e.name = "Please enter y
     </div>
   );
 }
+}
