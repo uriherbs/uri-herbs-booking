@@ -1097,7 +1097,7 @@ const validateStep3 = () => {
               fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.forest,
               display: "flex", alignItems: "center", gap: 6, justifyContent: "center",
             }}>
-              <LeafSVG size={18} color={C.sage}/> Uri Herbs
+              <LeafSVG size={18} color={C.sage} style={{}} /> Uri Herbs
             </div>
           </div>
           <div style={{ width: 60 }}/>
