@@ -146,8 +146,7 @@ export async function createBooking(
   }
 
   if (errors.length > 0) {
-    throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as BookingError;
-  }
+throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as any;  }
 
   // ── Normalize time format (accept '10:00' or '10:00:00') ──
   const normalizedTime = req.start_time.length === 5
