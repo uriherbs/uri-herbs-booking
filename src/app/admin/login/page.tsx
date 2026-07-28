@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { requestPasswordReset } from '@/lib/auth';
-
+export const dynamic = 'force-dynamic';
 const C = {
   sage: '#6B8F71', forest: '#2D4639', parchment: '#F5F2EC', white: '#FFFFFF',
   gold: '#A89068', bark: '#5C4A3D', barkLight: '#8A7668', sand: '#E8E2D8',
