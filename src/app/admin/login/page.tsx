@@ -84,7 +84,7 @@ export default function AdminLoginPage() {
   });
 
   return (
-<Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.parchment }}>Loading...</div>
+<Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.parchment }}>Loading...</div>}>
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: C.parchment, fontFamily: "'DM Sans', sans-serif", padding: 20,
