@@ -685,7 +685,7 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
 // ════════════════════════════════════════════════════════════
 
 function CustomerStep({ form, onChange, errors }) {
-  const inputStyle = (hasError) => ({
+  const inputStyle = (hasError: boolean): React.CSSProperties => ({
     width: "100%", boxSizing: "border-box",
     fontFamily: "'DM Sans'", fontSize: 16, // 16px prevents iOS zoom
     padding: "12px 14px", borderRadius: 10,
