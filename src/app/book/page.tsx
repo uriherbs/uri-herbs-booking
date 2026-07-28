@@ -197,7 +197,7 @@ function StepVine({ currentStep }) {
                 boxShadow: active ? `0 0 0 4px ${C.sageLight}` : "none",
               }}>
                 {done ? <CheckSVG size={14}/> :
-                  active ? <LeafSVG size={16} color={C.sage}/> :
+                 active ? <LeafSVG size={16} color={C.sage} style={{}} /> :
                   <span style={{ fontSize: 10, color: C.barkLight, fontFamily: "'DM Sans'" }}>{i + 1}</span>
                 }
               </div>
