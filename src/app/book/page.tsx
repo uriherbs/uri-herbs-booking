@@ -993,14 +993,12 @@ export default function BookingFlow() {
     setForm(f => ({ ...f, [field]: value }));
 setErrors(e => ({ ...e, [field]: null }));  }, []);
 
-  const validateStep3 = () => {
-const validateStep3 = () => {    if (!form.name.trim()) e.name = "Please enter your name";
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
-    if (!form.ageConfirmed) e.age = "Please confirm the age requirement";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
+const validateStep3 = () => {
+  const e: Record<string, string> = {};
+  if (!form.name.trim()) e.name = "Please enter your name";
+  if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
+  if (!form.ageConfirmed) e.age = "Please confirm the age requirement";
+  setErrors(e);
   const handleNext = async () => {
     if (step === 2) {
       if (!validateStep3()) return;
