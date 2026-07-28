@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { requestPasswordReset } from '@/lib/auth';
@@ -84,6 +84,7 @@ export default function AdminLoginPage() {
   });
 
   return (
+<Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.parchment }}>Loading...</div>
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: C.parchment, fontFamily: "'DM Sans', sans-serif", padding: 20,
@@ -215,5 +216,6 @@ export default function AdminLoginPage() {
         </div>
       </div>
     </div>
+ </Suspense>
   );
 }
