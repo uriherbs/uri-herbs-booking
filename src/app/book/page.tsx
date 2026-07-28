@@ -994,8 +994,7 @@ export default function BookingFlow() {
 setErrors(e => ({ ...e, [field]: null }));  }, []);
 
   const validateStep3 = () => {
-    const e = {};
-    if (!form.name.trim()) e.name = "Please enter your name";
+const validateStep3 = () => {    if (!form.name.trim()) e.name = "Please enter your name";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
     if (!form.ageConfirmed) e.age = "Please confirm the age requirement";
     setErrors(e);
