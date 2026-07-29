@@ -1210,4 +1210,3 @@ const validateStep3 = () => {
   );
 }
 }
-export default BookingFlow;
