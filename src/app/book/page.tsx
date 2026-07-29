@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { getPackages } from "@/lib/booking-service";
 import { useAvailableSlots, useCalendarAvailability, useCreateBooking } from "@/lib/hooks";
 
@@ -950,7 +950,7 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
 // MAIN APP
 // ════════════════════════════════════════════════════════════
 
- function BookingFlowContent() {
+export default function BookingFlow() {
   const [step, setStep] = useState(0);
   const [packages, setPackages] = useState([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
@@ -1209,11 +1209,4 @@ const validateStep3 = () => {
     </div>
   );
 }
-}
-export default function BookingFlow() {
-  return (
-    <Suspense fallback={<div style={{ padding: '50px', textAlign: 'center', fontFamily: "'DM Sans'", color: '#2D4639' }}>Loading booking...</div>}>
-      <BookingFlowContent />
-    </Suspense>
-  );
 }
