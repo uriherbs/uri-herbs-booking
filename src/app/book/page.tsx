@@ -789,11 +789,6 @@ function CustomerStep({ form, onChange, errors }) {
 // ════════════════════════════════════════════════════════════
 
 function ConfirmationStep({ pkg, result, form, onReset }) {
-  // `result` is the real BookingConfirmation returned by create_booking() —
-  // using its fields (rather than re-deriving from client-side selectedDate/
-  // selectedTime/participants) means this screen always reflects what was
-  // actually persisted, including the server-assigned instructor_group and
-  // the server-computed total_price_thb, not a client guess of either.
   const dateObj = new Date(result.slot_date + "T00:00:00");
   const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];
   const monthName = MONTHS[dateObj.getMonth()];
@@ -960,7 +955,7 @@ export default function BookingFlow() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "", ageConfirmed: false });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { submit, submitting, error: submitError, result, reset: resetBooking } = useCreateBooking();
 
@@ -989,16 +984,25 @@ export default function BookingFlow() {
 
   const pkg = packages.find(p => p.slug === selectedPkg);
 
-  const updateForm = useCallback((field, value) => {
+  const updateForm = useCallback((field: string, value: any) => {
     setForm(f => ({ ...f, [field]: value }));
-setErrors(e => ({ ...e, [field]: null }));  }, []);
+    setErrors(e => ({
+      ...e,
+      [field]: null,
+      age: field === "ageConfirmed" ? null : e.age,
+      submit: null,
+    }));
+  }, []);
 
-const validateStep3 = () => {
-  const e: Record<string, string> = {};
-  if (!form.name.trim()) e.name = "Please enter your name";
-  if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
-  if (!form.ageConfirmed) e.age = "Please confirm the age requirement";
-  setErrors(e);
+  const validateStep3 = () => {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = "Please enter your name";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
+    if (!form.ageConfirmed) e.age = "Please confirm the age requirement";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const handleNext = async () => {
     if (step === 2) {
       if (!validateStep3()) return;
@@ -1020,7 +1024,7 @@ const validateStep3 = () => {
           // pattern ("Family group — 1 child (age 14)"). Add a real checkbox here if/when
           // this needs to be structured data instead of a note staff read manually.
         });
-      } catch (err) {
+      } catch (err: any) {
         // useCreateBooking already captured this in `submitError` — surface
         // it inline near the button rather than silently failing to advance.
         // Common case: someone else took the last spot while this person
@@ -1160,14 +1164,14 @@ const validateStep3 = () => {
       {step === 2 && (
         <>
           <CustomerStep form={form} onChange={updateForm} errors={errors}/>
-         {(errors as any).submit && (
+          {errors.submit && (
             <div style={{ padding: "0 16px", marginTop: -8 }}>
               <div style={{
                 background: C.coralLight, border: `1px solid rgba(192,122,110,0.3)`,
                 borderRadius: 10, padding: "12px 14px",
                 fontFamily: "'DM Sans'", fontSize: 13, color: C.coral, lineHeight: 1.5,
               }}>
-                {(errors as any).submit}
+                {errors.submit}
               </div>
             </div>
           )}
@@ -1208,5 +1212,4 @@ const validateStep3 = () => {
       )}
     </div>
   );
-}
 }
