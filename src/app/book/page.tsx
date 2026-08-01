@@ -1046,7 +1046,7 @@ export default function BookingFlow() {
           num_participants: participants,
           customer_name: form.name,
           customer_email: form.email || undefined,
-          customer_phone: form.phone ? `${form.phoneCountryCode}${form.phone}` : undefined,
+        customer_phone: form.phone ? `${form.phoneCountryCode}${form.phone.replace(/^0+/, '')}` : undefined,
           customer_notes: form.notes || undefined,
           has_minors: false, // no dedicated "group includes a minor" field in this form yet —
           // ageConfirmed is required for EVERY booking (not just ones with minors), so it
