@@ -90,6 +90,25 @@ const PACKAGE_META = {
 
 const CATEGORY_FALLBACK = { category: "single", icon: "🌿", tagline: "", takeaway: "", accent: "#6B8F71" };
 
+const COUNTRY_CODES = [
+  { code: "+66", flag: "🇹🇭", name: "Thailand" },
+  { code: "+1", flag: "🇺🇸", name: "USA/Canada" },
+  { code: "+44", flag: "🇬🇧", name: "UK" },
+  { code: "+972", flag: "🇮🇱", name: "Israel" },
+  { code: "+49", flag: "🇩🇪", name: "Germany" },
+  { code: "+33", flag: "🇫🇷", name: "France" },
+  { code: "+61", flag: "🇦🇺", name: "Australia" },
+  { code: "+81", flag: "🇯🇵", name: "Japan" },
+  { code: "+82", flag: "🇰🇷", name: "South Korea" },
+  { code: "+86", flag: "🇨🇳", name: "China" },
+  { code: "+65", flag: "🇸🇬", name: "Singapore" },
+  { code: "+91", flag: "🇮🇳", name: "India" },
+  { code: "+31", flag: "🇳🇱", name: "Netherlands" },
+  { code: "+34", flag: "🇪🇸", name: "Spain" },
+  { code: "+39", flag: "🇮🇹", name: "Italy" },
+  { code: "+7", flag: "🇷🇺", name: "Russia" },
+];
+
 // Merges a live DB package row with its presentation metadata
 function mergePackage(dbPkg) {
   const meta = PACKAGE_META[dbPkg.slug] || CATEGORY_FALLBACK;
@@ -731,12 +750,24 @@ function CustomerStep({ form, onChange, errors }) {
         </div>
 
         <div>
-          <label style={labelStyle}>Phone / WhatsApp / LINE</label>
-          <input
-            type="tel" placeholder="For day-of contact (optional)"
-            value={form.phone} onChange={e => onChange("phone", e.target.value)}
-            style={inputStyle(false)}
-          />
+          <label style={labelStyle}>Phone / WhatsApp</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <select
+              value={form.phoneCountryCode}
+              onChange={e => onChange("phoneCountryCode", e.target.value)}
+              style={{ ...inputStyle(false), width: 110, flexShrink: 0, cursor: "pointer" }}
+            >
+              {COUNTRY_CODES.map(c => (
+                <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+              ))}
+            </select>
+            <input
+              type="tel" placeholder="812345678" inputMode="numeric"
+              value={form.phone}
+              onChange={e => onChange("phone", e.target.value.replace(/[^\d]/g, ""))}
+              style={{ ...inputStyle(false), flex: 1 }}
+            />
+          </div>
         </div>
 
         <div>
@@ -954,7 +985,7 @@ export default function BookingFlow() {
   const [participants, setParticipants] = useState(1);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "", ageConfirmed: false });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "", ageConfirmed: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { submit, submitting, error: submitError, result, reset: resetBooking } = useCreateBooking();
@@ -1015,7 +1046,7 @@ export default function BookingFlow() {
           num_participants: participants,
           customer_name: form.name,
           customer_email: form.email || undefined,
-          customer_phone: form.phone || undefined,
+          customer_phone: form.phone ? `${form.phoneCountryCode}${form.phone}` : undefined,
           customer_notes: form.notes || undefined,
           has_minors: false, // no dedicated "group includes a minor" field in this form yet —
           // ageConfirmed is required for EVERY booking (not just ones with minors), so it
@@ -1047,7 +1078,7 @@ export default function BookingFlow() {
   const handleReset = () => {
     setStep(0); setSelectedPkg(null); setParticipants(1);
     setSelectedDate(null); setSelectedTime(null);
-    setForm({ name: "", email: "", phone: "", notes: "", ageConfirmed: false });
+    setForm({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "", ageConfirmed: false });
     setErrors({}); resetBooking();
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
