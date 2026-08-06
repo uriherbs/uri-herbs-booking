@@ -13,6 +13,8 @@
 
 import { ProtectedRoute } from '@/lib/protected-route';
 
+export const dynamic = 'force-dynamic';
+
 export default function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
 }
