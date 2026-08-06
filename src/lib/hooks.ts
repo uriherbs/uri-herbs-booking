@@ -446,3 +446,59 @@ export async function adminToggleSlotBlock(
   });
   if (error) throw new Error(error.message);
 }
+
+// ─────────────────────────────────────────────────
+// 7. useAdminMonthSummary  (admin dashboard: month calendar view)
+// ─────────────────────────────────────────────────
+// Lightweight aggregate query for the month-grid view — one row per
+// date with total booked/capacity across both calendars, so the
+// calendar can show a fill-level dot per day without fetching every
+// individual booking. Falls back to no entry for dates with no
+// daily_slots rows yet (e.g. Sundays when the herbal calendar is
+// closed — the UI should just render those as empty/closed days).
+
+export interface MonthSummaryRow {
+    slot_date: string;
+    total_booked: number;
+    total_capacity: number;
+    blocked_count: number;
+}
+
+export function useAdminMonthSummary(year: number, month: number /* 1-12 */) {
+    const [summary, setSummary] = useState<Record<string, MonthSummaryRow>>({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const refresh = useCallback(async () => {
+          setLoading(true);
+          setError(null);
+          try {
+                  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+                  const lastDay = new Date(year, month, 0).getDate();
+                  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+                  const { data, error: rpcError } = await supabase.rpc('admin_month_summary', {
+                            p_start: start,
+                            p_end: end,
+                  });
+                  if (rpcError) throw new Error(rpcError.message);
+
+                  const map: Record<string, MonthSummaryRow> = {};
+                  (data ?? []).forEach((row: MonthSummaryRow) => {
+                            map[row.slot_date] = row;
+                  });
+                  setSummary(map);
+          } catch (err: any) {
+                  setError(err.message || 'Failed to load month summary');
+          } finally {
+                  setLoading(false);
+          }
+    }, [year, month]);
+
+    useEffect(() => {
+          refresh();
+    }, [refresh]);
+
+    return { summary, loading, error, refresh };
+}
+
