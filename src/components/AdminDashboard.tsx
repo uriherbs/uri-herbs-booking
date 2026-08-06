@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import {
   useAdminDayData,
+  useAdminMonthSummary,
   adminUpdateBookingStatus,
   adminToggleSlotBlock,
 } from "@/lib/hooks";
@@ -171,7 +172,8 @@ const Icons = {
       <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/>
     </svg>
   ),
-};
+calendar: (sz = 16, col = C.forest) => (<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>),
+  };
 
 // ════════════════════════════════════════════════════════════
 // HELPER COMPONENTS
