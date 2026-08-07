@@ -329,6 +329,7 @@ export interface SendEmailParams {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string; // e.g. the contact form sender, so Mali can just hit Reply
 }
 
 export async function sendEmailViaResend(
@@ -347,6 +348,7 @@ export async function sendEmailViaResend(
       subject: params.subject,
       html: params.html,
       text: params.text,
+      ...(params.replyTo ? { reply_to: params.replyTo } : {}),
     }),
   });
 
@@ -356,4 +358,105 @@ export async function sendEmailViaResend(
   }
 
   return response.json();
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 5. CONTACT FORM EMAIL  (site's /contact page → Mali's inbox)
+// ───────────────────────────────────────────────────────────
+
+export interface ContactMessageData {
+  name: string;
+  email: string;
+  message: string;
+}
+
+// Minimal HTML-escaping — this data comes straight from an
+// anonymous public form, so it must not be interpolated raw into
+// the email's HTML body.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function buildContactEmailHtml(data: ContactMessageData): string {
+  const safeName = escapeHtml(data.name);
+  const safeEmail = escapeHtml(data.email);
+  const safeMessage = escapeHtml(data.message).replace(/\n/g, '<br/>');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0; padding:0; background-color:#F5F2EC; font-family: Georgia, 'Times New Roman', serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F2EC; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; max-width:480px; width:100%;">
+
+          <tr>
+            <td style="background-color:#2D4639; padding: 28px 24px; text-align:center;">
+              <div style="font-size:26px; margin-bottom:6px;">🌿</div>
+              <div style="font-family: Georgia, serif; font-size:20px; font-weight:bold; color:#ffffff;">
+                ${SHOP_NAME}
+              </div>
+              <div style="font-family: Arial, sans-serif; font-size:12px; color:#B8CCC0; margin-top:4px;">
+                New message from the Contact page
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1.5px solid #E8E2D8; border-radius:12px; overflow:hidden; margin-bottom: 18px;">
+                <tr>
+                  <td style="padding:14px 18px; border-bottom:1px solid #E8E2D8;">
+                    <div style="font-family: Arial, sans-serif; font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">From</div>
+                    <div style="font-family: Arial, sans-serif; font-size:14px; color:#2D4639;">${safeName}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 18px;">
+                    <div style="font-family: Arial, sans-serif; font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Email</div>
+                    <a href="mailto:${safeEmail}" style="font-family: Arial, sans-serif; font-size:14px; color:#5B7FA6; text-decoration:none;">${safeEmail}</a>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="font-family: Arial, sans-serif; font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Message</div>
+              <p style="font-family: Arial, sans-serif; font-size:14px; color:#5C4A3D; line-height:1.7; margin:0; white-space:pre-wrap;">${safeMessage}</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background-color:#FAF7F0; padding:16px 24px; text-align:center;">
+              <div style="font-family: Arial, sans-serif; font-size:11px; color:#8A7668;">
+                Reply directly to this email to respond to ${safeName}.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+}
+
+export function buildContactEmailText(data: ContactMessageData): string {
+  return `
+New message from the Contact page — ${SHOP_NAME}
+
+From: ${data.name}
+Email: ${data.email}
+
+Message:
+${data.message}
+`.trim();
 }
