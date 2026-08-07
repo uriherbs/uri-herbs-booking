@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getWorkshopPageData } from '@/lib/workshop-content-service';
+import SiteHeader from '@/components/SiteHeader';
 import * as React from 'react';
 
 const C = { sage: '#6B8F71', sageDark: '#4A7050', sageLight: '#E7EFEA', forest: '#2D4639', parchment: '#F8F5EF', gold: '#A89068', bark: '#5C4A3D', barkLight: '#8A7668' };
@@ -35,10 +36,7 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
   return E('div', { style: { background: C.parchment, fontFamily: "'DM Sans', sans-serif" } },
                E('style', null, `@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@700&family=DM+Sans:wght@400;600;700&display=swap'); * { box-sizing: border-box; } a { text-decoration: none; } .wblock { display: grid; gap: 24px; margin-bottom: 48px; } @media (min-width: 760px) { .wblock { grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; } .wblock.rev .wimg { order: 2; } }`),
 
-               E('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '18px 24px', maxWidth: 1000, margin: '0 auto' } },
-                       E(Link, { href: '/', style: { fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.forest } }, 'Uri Herbs Workshop'),
-                       E(Link, { href: '/book', style: { background: C.sage, color: '#fff', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14 } }, 'Book a Workshop')
-                     ),
+               E(SiteHeader),
 
                E('div', { style: { position: 'relative', height: '48vw', minHeight: 300, maxHeight: 480 } },
                        w.hero_image_url ? E('img', { src: w.hero_image_url, alt: w.name, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }) : null,
@@ -68,7 +66,7 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
 
                E('div', { style: { maxWidth: 1000, margin: '0 auto', padding: '16px 24px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' } },
                        w.price_thb != null ? E('div', { style: { fontFamily: "'Crimson Pro'", fontSize: 30, fontWeight: 700, color: C.gold } },
-                                                       '\u0e3f' + w.price_thb.toLocaleString(),
+                                                       '฿' + w.price_thb.toLocaleString(),
                                                        E('span', { style: { fontSize: 14, fontWeight: 400, color: C.barkLight, marginLeft: 8 } }, 'per person, ' + w.duration_minutes + ' min')
                                                      ) : null,
                        E(Link, { href: '/book', style: { background: C.forest, color: '#fff', padding: '15px 34px', borderRadius: 12, fontWeight: 700, fontSize: 16 } }, 'Book This Workshop')

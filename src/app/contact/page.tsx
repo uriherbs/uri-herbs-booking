@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import SiteHeader from '@/components/SiteHeader';
 
 // ══════════════════════════════════════════════════════════════════
 // DESIGN TOKENS — same palette as the rest of the site
@@ -188,15 +188,7 @@ export default function ContactPage() {
         input:focus, textarea:focus { outline: none; border-color: ${C.sage}; }
       `}</style>
 
-      {/* Header — matches the workshop page pattern */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', maxWidth: 1000, margin: '0 auto' }}>
-        <Link href="/" style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.forest }}>
-          Uri Herbs Workshop
-        </Link>
-        <Link href="/book" style={{ background: C.sage, color: '#fff', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14 }}>
-          Book a Workshop
-        </Link>
-      </div>
+      <SiteHeader />
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 24px 72px' }}>
         <div style={{ width: 32, height: 3, background: C.gold, marginBottom: 14 }} />
