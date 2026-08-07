@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   useAdminDayData,
   useAdminMonthSummary,
@@ -8,9 +9,9 @@ import {
   adminToggleSlotBlock,
 } from "@/lib/hooks";
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (shared with booking flow, slightly cooler for admin)
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 const C = {
   sage:       "#6B8F71",
@@ -34,11 +35,11 @@ const C = {
   blueLight:  "#E8F0F8",
 };
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // SCHEDULE CONSTANTS (fixed operating hours — the actual truth
 // for which slots exist lives server-side in package_time_rules;
 // this is just the display grid the dashboard renders bookings into)
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 const HERBAL_BLOCKS = [
   { time: "10:00", end: "11:00", session: "morning" },
@@ -111,9 +112,9 @@ function mapBooking(row) {
   };
 }
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // SVG ICONS
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 const Icons = {
   leaf: (sz = 16, col = C.sage) => (
@@ -173,11 +174,12 @@ const Icons = {
     </svg>
   ),
 calendar: (sz = 16, col = C.forest) => (<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>),
+  edit: (sz = 15, col = "#fff") => (<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>),
   };
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // HELPER COMPONENTS
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 function formatTime12(t) {
   const h = parseInt(t.split(":")[0]);
@@ -244,9 +246,9 @@ function StatusBadge({ status, type }) {
   );
 }
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // BOOKING ROW — individual participant with action toggles
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 function BookingRow({ booking, onUpdate }) {
   const [expanded, setExpanded] = useState(false);
@@ -420,9 +422,9 @@ function BookingRow({ booking, onUpdate }) {
   );
 }
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // SLOT CARD — one hourly block with all its bookings
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking }) {
   const [open, setOpen] = useState(bookings.length > 0);
@@ -519,11 +521,11 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
     </div>
   );
 }
-function MonthCalendar({ initialDate, onSelectDate }) { const [viewYear, setViewYear] = useState(initialDate.getFullYear()); const [viewMonth, setViewMonth] = useState(initialDate.getMonth() + 1); const { summary, loading, error } = useAdminMonthSummary(viewYear, viewMonth); const monthLabel = new Date(viewYear, viewMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }); const firstOfMonth = new Date(viewYear, viewMonth - 1, 1); const startWeekday = firstOfMonth.getDay(); const daysInMonth = new Date(viewYear, viewMonth, 0).getDate(); const todayStr = new Date().toISOString().slice(0, 10); const cells = []; for (let i = 0; i < startWeekday; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d); const goPrevMonth = () => { if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }; const goNextMonth = () => { if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }; const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]; const dotFor = (row) => { if (!row) return null; if (row.blocked_count > 0 && row.total_booked === 0) return C.barkLight; const ratio = row.total_capacity > 0 ? row.total_booked / row.total_capacity : 0; if (ratio >= 1) return C.coral; if (ratio > 0) return C.gold; return C.sageLight; }; return React.createElement("div", { style: { background: C.white, borderBottom: `1px solid ${C.sand}`, padding: "14px 16px 18px" } }, React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 } }, React.createElement("button", { onClick: goPrevMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevLeft()), React.createElement("div", { style: { fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest } }, monthLabel), React.createElement("button", { onClick: goNextMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevRight())), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 } }, weekdayLabels.map((w, i) => React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 11, fontWeight: 600, color: C.barkLight } }, w))), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 } }, cells.map((d, i) => { if (d === null) return React.createElement("div", { key: "blank-" + i }); const dateStr = viewYear + "-" + String(viewMonth).padStart(2, "0") + "-" + String(d).padStart(2, "0"); const row = summary[dateStr]; const isToday = dateStr === todayStr; const isClosed = !row; const dot = dotFor(row); return React.createElement("button", { key: dateStr, onClick: () => !isClosed && onSelectDate(new Date(viewYear, viewMonth - 1, d)), disabled: isClosed, style: { aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, border: isToday ? `1.5px solid ${C.sage}` : "1px solid transparent", borderRadius: 10, background: isToday ? C.sagePale : "transparent", cursor: isClosed ? "default" : "pointer", opacity: isClosed ? 0.35 : 1, fontFamily: "'DM Sans'" } }, React.createElement("span", { style: { fontSize: 13, fontWeight: isToday ? 700 : 500, color: C.forest } }, d), dot && React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: dot } })); })), loading && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.barkLight, marginTop: 10 } }, "Loading\u2026"), error && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.coral, marginTop: 10 } }, error), React.createElement("div", { style: { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 14, marginTop: 14, fontSize: 11, color: C.barkLight } }, React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.sageLight, display: "inline-block" } }), "Open"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.gold, display: "inline-block" } }), "Booked"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.coral, display: "inline-block" } }), "Full"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.barkLight, display: "inline-block" } }), "Blocked")));  }
+function MonthCalendar({ initialDate, onSelectDate }) { const [viewYear, setViewYear] = useState(initialDate.getFullYear()); const [viewMonth, setViewMonth] = useState(initialDate.getMonth() + 1); const { summary, loading, error } = useAdminMonthSummary(viewYear, viewMonth); const monthLabel = new Date(viewYear, viewMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }); const firstOfMonth = new Date(viewYear, viewMonth - 1, 1); const startWeekday = firstOfMonth.getDay(); const daysInMonth = new Date(viewYear, viewMonth, 0).getDate(); const todayStr = new Date().toISOString().slice(0, 10); const cells = []; for (let i = 0; i < startWeekday; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d); const goPrevMonth = () => { if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }; const goNextMonth = () => { if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }; const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]; const dotFor = (row) => { if (!row) return null; if (row.blocked_count > 0 && row.total_booked === 0) return C.barkLight; const ratio = row.total_capacity > 0 ? row.total_booked / row.total_capacity : 0; if (ratio >= 1) return C.coral; if (ratio > 0) return C.gold; return C.sageLight; }; return React.createElement("div", { style: { background: C.white, borderBottom: `1px solid ${C.sand}`, padding: "14px 16px 18px" } }, React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 } }, React.createElement("button", { onClick: goPrevMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevLeft()), React.createElement("div", { style: { fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest } }, monthLabel), React.createElement("button", { onClick: goNextMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevRight())), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 } }, weekdayLabels.map((w, i) => React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 11, fontWeight: 600, color: C.barkLight } }, w))), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 } }, cells.map((d, i) => { if (d === null) return React.createElement("div", { key: "blank-" + i }); const dateStr = viewYear + "-" + String(viewMonth).padStart(2, "0") + "-" + String(d).padStart(2, "0"); const row = summary[dateStr]; const isToday = dateStr === todayStr; const isClosed = !row; const dot = dotFor(row); return React.createElement("button", { key: dateStr, onClick: () => !isClosed && onSelectDate(new Date(viewYear, viewMonth - 1, d)), disabled: isClosed, style: { aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, border: isToday ? `1.5px solid ${C.sage}` : "1px solid transparent", borderRadius: 10, background: isToday ? C.sagePale : "transparent", cursor: isClosed ? "default" : "pointer", opacity: isClosed ? 0.35 : 1, fontFamily: "'DM Sans'" } }, React.createElement("span", { style: { fontSize: 13, fontWeight: isToday ? 700 : 500, color: C.forest } }, d), dot && React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: dot } })); })), loading && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.barkLight, marginTop: 10 } }, "Loading…"), error && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.coral, marginTop: 10 } }, error), React.createElement("div", { style: { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 14, marginTop: 14, fontSize: 11, color: C.barkLight } }, React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.sageLight, display: "inline-block" } }), "Open"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.gold, display: "inline-block" } }), "Booked"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.coral, display: "inline-block" } }), "Full"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.barkLight, display: "inline-block" } }), "Blocked")));  }
 
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 // MAIN ADMIN DASHBOARD
-// ════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 
 export default function AdminDashboard({ adminName, onSignOut }) {
   const [dayOffset, setDayOffset] = useState(0);
@@ -655,6 +657,16 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               fontFamily: "'DM Sans'", fontSize: 12, color: "rgba(255,255,255,0.7)",
             }}>{adminName}</span>
           )}
+          <Link
+            href="/admin/content"
+            title="Workshop Content"
+            style={{
+              background: "rgba(255,255,255,0.12)", borderRadius: 20,
+              width: 30, height: 30,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+            {Icons.edit(14)}
+          </Link>
           <button
             onClick={handleSignOut}
             title="Sign out"
