@@ -672,7 +672,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
       {/* Day navigation */}
       <div style={{
         background: C.white, borderBottom: `1px solid ${C.sand}`,
-        padding: "12px 16px",
+        padding: "12px 16px", position: "relative",
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <button onClick={() => setDayOffset(d => d - 1)} disabled={dayOffset <= 0} style={{
