@@ -529,6 +529,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
   const [dayOffset, setDayOffset] = useState(0);
   const [activeTab, setActiveTab] = useState("herbal");
   const [pendingAction, setPendingAction] = useState(null); // booking/slot id currently mid-request, for button disabling
+    const [showMonthView, setShowMonthView] = useState(false);
 
   // Compute the actual calendar date from dayOffset (today + N days)
   const viewDate = useMemo(() => {
@@ -689,7 +690,9 @@ export default function AdminDashboard({ adminName, onSignOut }) {
         <button onClick={() => setDayOffset(d => d + 1)} style={{
           background: "none", border: "none", cursor: "pointer", padding: 4,
         }}>{Icons.chevRight()}</button>
+        {React.createElement("button", { onClick: () => setShowMonthView(v => !v), style: { position: "absolute", right: 16, background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.calendar(15, showMonthView ? C.sage : C.barkLight))}
       </div>
+      {showMonthView && React.createElement(MonthCalendar, { initialDate: viewDate, onSelectDate: (picked) => { const now = new Date(); const diffDays = Math.round((Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate()) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000); setDayOffset(diffDays); setShowMonthView(false); } })}
 
       {error && (
         <div style={{
