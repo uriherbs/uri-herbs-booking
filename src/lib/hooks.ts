@@ -18,6 +18,10 @@ import {
   getCalendarAvailability,
   createBooking,
 } from './booking-service';
+import {
+  listWorkshopsForAdmin,
+  getWorkshopForAdmin,
+} from './admin-content-service';
 import type {
   AvailableSlot,
   CalendarDay,
@@ -25,11 +29,15 @@ import type {
   CreateBookingRequest,
   BookingError,
 } from './types';
+import type {
+  AdminWorkshopSummary,
+  AdminWorkshopDetail,
+} from './admin-content-service';
 
 
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // 1. useAvailableSlots  (time grid for a single date)
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // Fetches available slots AND subscribes to realtime changes on
 // daily_slots for that date. If another customer books a spot
 // while this user is viewing the page, the capacity bar updates
@@ -98,9 +106,9 @@ export function useAvailableSlots(
 }
 
 
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // 2. useCalendarAvailability  (date picker, month view)
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // Fetches open/limited/full/closed status for a date range.
 // Also subscribes to realtime updates so the calendar dots
 // (green/gold/gray) reflect live bookings from other users.
@@ -173,9 +181,9 @@ export function useCalendarAvailability(
 }
 
 
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // 3. useCreateBooking  (submit + confirmation state)
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // Wraps createBooking() with loading/error/result state, ready
 // to bind directly to the "Confirm Booking" button.
 //
@@ -218,9 +226,9 @@ export function useCreateBooking() {
 }
 
 
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // 4. useSlotCapacityLive  (single-slot live counter, optional)
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // Lightweight hook for showing "X spots left" on a single card
 // without re-fetching the whole availability list. Useful for a
 // "hot slot" badge on a landing page hero.
@@ -283,9 +291,9 @@ export function useSlotCapacityLive(
 }
 
 
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // 5. useAdminDayData  (admin dashboard: bookings + slots for a day)
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // Fetches everything the admin dashboard needs for one date —
 // individual bookings (joined with their package for name/duration/
 // calendar) plus the authoritative daily_slots rows (for is_blocked
@@ -410,9 +418,9 @@ export function useAdminDayData(date: string | null) {
   return { bookings, slots, loading, error, refresh };
 }
 
-// ────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────
 // 6. Admin action helpers — thin wrappers around the RPCs
-// ────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────
 // Not hooks themselves (no internal state) — just typed, reusable
 // functions the dashboard's button handlers call directly, then
 // rely on useAdminDayData's realtime subscription to reflect the
@@ -447,9 +455,9 @@ export async function adminToggleSlotBlock(
   if (error) throw new Error(error.message);
 }
 
-// ─────────────────────────────────────────────────
+// ──────────────────────────────────────────
 // 7. useAdminMonthSummary  (admin dashboard: month calendar view)
-// ─────────────────────────────────────────────────
+// ──────────────────────────────────────────
 // Lightweight aggregate query for the month-grid view — one row per
 // date with total booked/capacity across both calendars, so the
 // calendar can show a fill-level dot per day without fetching every
@@ -502,3 +510,64 @@ export function useAdminMonthSummary(year: number, month: number /* 1-12 */) {
     return { summary, loading, error, refresh };
 }
 
+// ───────────────────────────────────────────────────────────
+// 8. useAdminWorkshopList  (CMS: workshop content list screen)
+// ───────────────────────────────────────────────────────────
+
+export function useAdminWorkshopList() {
+  const [workshops, setWorkshops] = useState<AdminWorkshopSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listWorkshopsForAdmin();
+      setWorkshops(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load workshops');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { workshops, loading, error, refresh };
+}
+
+// ───────────────────────────────────────────────────────────
+// 9. useAdminWorkshopEditor  (CMS: workshop edit screen — initial load)
+// ───────────────────────────────────────────────────────────
+// Just the fetch — the edit screen owns its own local form state
+// (draft edits) separately, so it can show unsaved changes before
+// calling saveWorkshopContent() itself.
+
+export function useAdminWorkshopEditor(slug: string | null) {
+  const [workshop, setWorkshop] = useState<AdminWorkshopDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!slug) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getWorkshopForAdmin(slug);
+      setWorkshop(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load workshop');
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { workshop, loading, error, refresh };
+}
