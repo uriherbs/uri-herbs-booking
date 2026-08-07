@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getWorkshopPageData } from '@/lib/workshop-content-service';
 import SiteHeader from '@/components/SiteHeader';
+import LeafFrame from '@/components/LeafFrame';
 import * as React from 'react';
 
 const C = { sage: '#6B8F71', sageDark: '#4A7050', sageLight: '#E7EFEA', forest: '#2D4639', parchment: '#F8F5EF', gold: '#A89068', bark: '#5C4A3D', barkLight: '#8A7668' };
@@ -13,9 +14,10 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
 
   const blocks = w.content_blocks.map((b, i) =>
         E('div', { key: b.id, className: 'wblock ' + (i % 2 ? 'rev' : '') },
-                b.image_url ? E('div', { className: 'wimg', style: { borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3' } },
-                                        E('img', { src: b.image_url, alt: b.title, style: { width: '100%', height: '100%', objectFit: 'cover' } })
-
+                b.image_url ? E(LeafFrame, { className: 'wimg' },
+                                        E('div', { style: { borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3' } },
+                                                E('img', { src: b.image_url, alt: b.title, style: { width: '100%', height: '100%', objectFit: 'cover' } })
+                                        )
                                      ) : null,
                 E('div', null,
                           E('div', { style: { width: 32, height: 3, background: C.gold, marginBottom: 14 } }),
@@ -38,12 +40,16 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
 
                E(SiteHeader),
 
-               E('div', { style: { position: 'relative', height: '48vw', minHeight: 300, maxHeight: 480 } },
-                       w.hero_image_url ? E('img', { src: w.hero_image_url, alt: w.name, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }) : null,
-                       E('div', { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(45,70,57,0) 40%, rgba(20,30,24,.75) 100%)' } }),
-                       E('div', { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 24px 32px', maxWidth: 1000, margin: '0 auto' } },
-                                 E('h1', { style: { fontFamily: "'Crimson Pro'", fontWeight: 700, color: '#fff', fontSize: 'clamp(32px,6vw,52px)', margin: 0 } }, w.name)
-                               )
+               E('div', { style: { maxWidth: 1000, margin: '0 auto', padding: '20px 24px 0' } },
+                       E(LeafFrame, { cornerSize: 76, inset: 18 },
+                               E('div', { style: { position: 'relative', height: '42vw', minHeight: 280, maxHeight: 440, borderRadius: 20, overflow: 'hidden' } },
+                                       w.hero_image_url ? E('img', { src: w.hero_image_url, alt: w.name, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }) : null,
+                                       E('div', { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(45,70,57,0) 40%, rgba(20,30,24,.75) 100%)' } }),
+                                       E('div', { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 28px 28px' } },
+                                                 E('h1', { style: { fontFamily: "'Crimson Pro'", fontWeight: 700, color: '#fff', fontSize: 'clamp(32px,6vw,52px)', margin: 0 } }, w.name)
+                                               )
+                                     )
+                             )
                      ),
 
                w.intro_paragraph ? E('div', { style: { maxWidth: 700, margin: '0 auto', padding: '44px 24px 8px' } },
