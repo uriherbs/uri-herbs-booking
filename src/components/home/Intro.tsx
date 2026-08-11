@@ -2,15 +2,13 @@
 // src/components/home/Intro.tsx
 // ============================================================
 // "Every workshop is a small ritual…" section. Layout/copy ported
-// from the uri-herbs-v0-design mockup (components/home/intro.tsx).
-// That mockup paired the copy with a photo of hands working fresh
-// herbs; this project has no photography yet, so the image slot is
-// a placeholder wrapped in LeafFrame — the same signature corner-leaf
-// motif the mockup used elsewhere (blog post images).
-//
-// TODO(design): swap the placeholder <div> below for a real photo
-// once one exists, e.g.:
-//   <img src="/intro-hands.jpg" alt="…" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+// from the uri-herbs-v0-design mockup (components/home/intro.tsx),
+// which paired the copy with a photo of hands working fresh herbs.
+// Wrapped in LeafFrame — the same signature corner-leaf motif the
+// mockup used elsewhere (blog post images) — rather than the mockup's
+// plain rounded card, since we don't have a matching photo library to
+// lean on yet and the motif helps the placeholder read as "on brand"
+// rather than generic stock art.
 // ============================================================
 
 import { PillButton } from '@/components/PillButton';
@@ -32,17 +30,20 @@ export function Intro() {
       <div className="home-intro-grid">
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <LeafFrame>
-            {/* Fixed px size rather than width:'100%' — LeafFrame's
+            {/* TODO(design): AI-generated placeholder photo, carried
+                over from the uri-herbs-v0-design mockup
+                (public/intro-hands.png there). Swap for a real photo
+                of hands working fresh herbs once the studio shoots
+                one — same filename works, just replace
+                public/intro-hands.png.
+                Fixed px width rather than '100%' — LeafFrame's
                 wrapper is an inline-block sized to its content, so a
                 percentage width here would resolve against an
                 indefinite containing block and collapse to 0. */}
-            <div
-              style={{
-                width: 380,
-                maxWidth: '80vw',
-                aspectRatio: '4 / 3',
-                background: `linear-gradient(135deg, ${C.sage} 0%, ${C.sageDark} 100%)`,
-              }}
+            <img
+              src="/intro-hands.png"
+              alt="Hands working with fresh herbs at a rustic garden workbench"
+              style={{ display: 'block', width: 380, maxWidth: '80vw', aspectRatio: '4 / 3', objectFit: 'cover' }}
             />
           </LeafFrame>
         </div>

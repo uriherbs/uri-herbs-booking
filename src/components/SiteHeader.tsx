@@ -39,12 +39,6 @@ const NAV_LINKS = [
   { href: '/blog', label: 'Blog' },
 ];
 
-const LeafSVG = ({ size = 18, color = C.sage }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} opacity="0.85">
-    <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22.5C7.76 17.66 9.41 12.67 18 11.18V14C21.78 10.58 20 2 20 2S13.21 4.58 17 8Z" />
-  </svg>
-);
-
 const MenuSVG = ({ color = C.forest }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
     <path d="M3 6h18M3 12h18M3 18h18" />
@@ -102,7 +96,18 @@ export default function SiteHeader() {
           display: 'flex', alignItems: 'center', gap: 8,
           fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.forest, textDecoration: 'none',
         }}>
-          <LeafSVG /> Uri Herbs Workshop
+          {/* TODO(design): logo file carried over as-is from the
+              uri-herbs-v0-design mockup (public/uri-herbs-logo.jpg
+              there) — confirm with the studio whether this is the
+              real brand logo or another AI-generated placeholder
+              before launch, and replace public/uri-herbs-logo.jpg if
+              so. Was a plain leaf icon before this change. */}
+          <img
+            src="/uri-herbs-logo.jpg"
+            alt="Uri Herbs Workshop logo"
+            style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }}
+          />
+          Uri Herbs Workshop
         </Link>
 
         {/* Desktop nav */}

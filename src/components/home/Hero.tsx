@@ -3,15 +3,7 @@
 // ============================================================
 // Homepage hero. Ported from the layout/copy of the
 // uri-herbs-v0-design mockup (components/home/hero.tsx), which
-// sat on top of a photographed mural background. This project has
-// no photography in `public/` yet, so the mural is replaced with a
-// hand-built sage/forest gradient + a scattered leaf-sprig pattern
-// (reusing the same leaf silhouette as LeafFrame) instead of an
-// <img>.
-//
-// TODO(design): once real photography exists, swap the gradient
-// <div> below for something like:
-//   <img src="/hero-mural.jpg" alt="…" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }} />
+// sat on top of a photographed mural background.
 // ============================================================
 
 import { PillButton } from '@/components/PillButton';
@@ -23,35 +15,28 @@ const HIGHLIGHTS = [
   { value: 'Thai', label: 'Herbal tradition' },
 ];
 
-function LeafSprig({ style, rotate = 0 }: { style: React.CSSProperties; rotate?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style={style}>
-      <path
-        d={`M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22.5C7.76 17.66 9.41 12.67 18 11.18V14C21.78 10.58 20 2 20 2S13.21 4.58 17 8Z`}
-        fill="#FFFFFF"
-        fillOpacity={0.16}
-        transform={`rotate(${rotate} 12 12)`}
-      />
-    </svg>
-  );
-}
-
 export function Hero() {
   return (
     <section style={{ padding: '12px 12px 0' }}>
-      <div
-        style={{
-          position: 'relative',
-          overflow: 'hidden',
-          borderRadius: 32,
-          background: `radial-gradient(circle at 15% 20%, ${C.sage} 0%, transparent 45%), radial-gradient(circle at 85% 0%, ${C.gold} 0%, transparent 35%), linear-gradient(160deg, ${C.forest} 0%, ${C.sageDark} 60%, ${C.sage} 100%)`,
-        }}
-      >
-        {/* Decorative scattered leaves, standing in for a photographed mural */}
-        <LeafSprig style={{ position: 'absolute', width: 90, height: 90, top: 30, left: '8%' }} rotate={-15} />
-        <LeafSprig style={{ position: 'absolute', width: 60, height: 60, top: '55%', left: '22%' }} rotate={20} />
-        <LeafSprig style={{ position: 'absolute', width: 120, height: 120, bottom: -10, right: '6%' }} rotate={200} />
-        <LeafSprig style={{ position: 'absolute', width: 70, height: 70, top: 60, right: '28%' }} rotate={150} />
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 32 }}>
+        {/* TODO(design): AI-generated placeholder mural, carried over
+            from the uri-herbs-v0-design mockup (public/hero-mural.png
+            there). Swap for a real photo of the workshop's entrance
+            mural once the studio shoots one — same filename works,
+            just replace public/hero-mural.png. */}
+        <img
+          src="/hero-mural.png"
+          alt="Hand-painted mural of terraced green herb fields and blue mountains, inspired by the workshop entrance wall"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `linear-gradient(to top, rgba(45,70,57,0.8) 0%, rgba(45,70,57,0.25) 55%, rgba(45,70,57,0.4) 100%)`,
+          }}
+        />
 
         {/* Content */}
         <div
