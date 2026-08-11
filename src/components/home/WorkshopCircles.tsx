@@ -17,25 +17,7 @@
 import Link from 'next/link';
 import { getActiveWorkshopSummaries } from '@/lib/workshop-content-service';
 import { C, FONT_DISPLAY, FONT_BODY } from '@/lib/theme';
-
-// TODO(design): AI-generated placeholder photos, carried over from
-// the uri-herbs-v0-design mockup's public/workshop-*.png files. Swap
-// each file in public/ for a real studio photo once one exists — no
-// code change needed here.
-//
-// Keyed by slug rather than just cycled by position — confirmed
-// against the real `workshops` table (Supabase) that these 4 slugs
-// are exactly the mockup's, so each workshop gets the placeholder
-// photo that actually matches its craft (tea-blending workshop shows
-// the tea-blending placeholder, etc.), not just "a" placeholder.
-// PLACEHOLDER_FALLBACK_IMAGES is only for a future 5th/unlisted slug.
-const PLACEHOLDER_IMAGE_BY_SLUG: Record<string, string> = {
-  'tea-blending': '/workshop-tea-blending.png',
-  'ya-dom-inhaler': '/workshop-ya-dom.png',
-  'herbal-massage-ball': '/workshop-massage-ball.png',
-  'skincare-aromatherapy': '/workshop-skincare-aromatherapy.png',
-};
-const PLACEHOLDER_FALLBACK_IMAGES = Object.values(PLACEHOLDER_IMAGE_BY_SLUG);
+import { getPlaceholderWorkshopImage } from '@/lib/workshop-placeholder-images';
 
 // Fixed display order requested for this teaser grid — matches the
 // order these 4 workshops appear everywhere else on the site.
@@ -126,19 +108,10 @@ export async function WorkshopCircles() {
             }}
           >
             <div style={{ position: 'relative', aspectRatio: '4 / 3', overflow: 'hidden' }}>
-              {/* Deliberately NOT using w.hero_image_url here, even
-                  though the field exists on the row: as of writing,
-                  one workshop ("Tea Blending") has a hero_image_url
-                  set to what looks like a stray/wrong asset (a design
-                  file, not a workshop photo), while the other 3 have
-                  none. Preferring hero_image_url when present would
-                  show 1 broken-looking image next to 3 placeholder
-                  photos — worse than showing 4 consistent
-                  placeholders. Once real, verified photos exist for
-                  ALL 4 workshops, switch this back to
-                  `w.hero_image_url || PLACEHOLDER_IMAGE_BY_SLUG[w.slug]`. */}
+              {/* See src/lib/workshop-placeholder-images.ts for why
+                  this deliberately doesn't use w.hero_image_url. */}
               <img
-                src={PLACEHOLDER_IMAGE_BY_SLUG[w.slug] || PLACEHOLDER_FALLBACK_IMAGES[i % PLACEHOLDER_FALLBACK_IMAGES.length]}
+                src={getPlaceholderWorkshopImage(w.slug, i)}
                 alt={`${w.name} workshop`}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />

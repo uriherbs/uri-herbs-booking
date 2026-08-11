@@ -1,75 +1,228 @@
+// ============================================================
+// src/app/workshops/[slug]/page.tsx
+// ============================================================
+// Single workshop content page — hero, intro, alternating content
+// blocks, "you'll take home" callout, gallery, price + booking CTA.
+//
+// This is a visual/layout upgrade only. All data wiring is
+// unchanged: still getWorkshopPageData(slug) from
+// workshop-content-service.ts (real hero/intro/content_blocks/
+// gallery/price from Supabase), still notFound() on a bad slug.
+// Previously written with React.createElement (an `E` helper) —
+// rewritten here as plain JSX, matching every other page in the
+// project; behavior is identical, only the authoring style changed.
+//
+// Layout/typography ported from the closest analog in the
+// uri-herbs-v0-design mockup: it has no dedicated workshop page, but
+// its blog post page (app/blog/[slug]/page.tsx +
+// components/blog/post-content.tsx) is the same shape — a single
+// centered column with a "back" link, an eyebrow label + serif
+// title, a LeafFrame-wrapped hero image, and flowing body content —
+// so that page's visual language is what's reused here.
+// ============================================================
+
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getWorkshopPageData } from '@/lib/workshop-content-service';
+import { getPlaceholderWorkshopImage } from '@/lib/workshop-placeholder-images';
 import SiteHeader from '@/components/SiteHeader';
-import * as React from 'react';
+import { LeafFrame } from '@/components/LeafFrame';
+import { PillButton } from '@/components/PillButton';
+import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
-const C = { sage: '#6B8F71', sageDark: '#4A7050', sageLight: '#E7EFEA', forest: '#2D4639', parchment: '#F8F5EF', gold: '#A89068', bark: '#5C4A3D', barkLight: '#8A7668' };
-const E = React.createElement;
+const ArrowLeftSVG = () => (
+  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 12H5M12 19l-7-7 7-7" />
+  </svg>
+);
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const w = await getWorkshopPageData(params.slug);
+  if (!w) return {};
+  return {
+    title: `${w.name} — Uri Herbs Workshop`,
+    description: w.intro_paragraph || w.description || undefined,
+  };
+}
 
 export default async function WorkshopPage({ params }: { params: { slug: string } }) {
-    const w = await getWorkshopPageData(params.slug);
-    if (!w) notFound();
+  const w = await getWorkshopPageData(params.slug);
+  if (!w) notFound();
 
-  const blocks = w.content_blocks.map((b, i) =>
-        E('div', { key: b.id, className: 'wblock ' + (i % 2 ? 'rev' : '') },
-                b.image_url ? E('div', { className: 'wimg', style: { borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3' } },
-                                        E('img', { src: b.image_url, alt: b.title, style: { width: '100%', height: '100%', objectFit: 'cover' } })
+  // See src/lib/workshop-placeholder-images.ts for why this
+  // deliberately doesn't use w.hero_image_url.
+  const heroImage = getPlaceholderWorkshopImage(w.slug, 0);
 
-                                     ) : null,
-                E('div', null,
-                          E('div', { style: { width: 32, height: 3, background: C.gold, marginBottom: 14 } }),
-                          E('h2', { style: { fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, margin: '0 0 12px' } }, b.title),
-                          E('p', { style: { fontSize: 16, lineHeight: 1.75, color: C.bark, margin: 0 } }, b.body)
-                        )
-              )
-                                        );
+  return (
+    <div style={{ background: C.parchment, minHeight: '100vh' }}>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            ${FONT_IMPORT}
+            * { box-sizing: border-box; }
+            .wblock { display: grid; gap: 24px; margin-bottom: 40px; align-items: center; }
+            @media (min-width: 700px) {
+              .wblock { grid-template-columns: 1fr 1fr; gap: 40px; }
+              .wblock.rev .wblock-img { order: 2; }
+            }
+            .gallery-item { border-radius: 14px; overflow: hidden; aspect-ratio: 1; }
+          `,
+        }}
+      />
 
-  const galleryItems = w.gallery.map((g) =>
-        E('div', { key: g.id, style: { borderRadius: 12, overflow: 'hidden', aspectRatio: '1' } },
-                g.media_type === 'video'
-                  ? E('video', { src: g.media_url, style: { width: '100%', height: '100%', objectFit: 'cover' }, muted: true, loop: true, playsInline: true })
-                  : E('img', { src: g.media_url, alt: '', style: { width: '100%', height: '100%', objectFit: 'cover' } })
-              )
-                                       );
+      <SiteHeader />
 
-  return E('div', { style: { background: C.parchment, fontFamily: "'DM Sans', sans-serif" } },
-               E('style', null, `@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@700&family=DM+Sans:wght@400;600;700&display=swap'); * { box-sizing: border-box; } a { text-decoration: none; } .wblock { display: grid; gap: 24px; margin-bottom: 48px; } @media (min-width: 760px) { .wblock { grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; } .wblock.rev .wimg { order: 2; } }`),
+      <main style={{ maxWidth: 880, margin: '0 auto', padding: '40px 20px 80px' }}>
+        <Link
+          href="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: FONT_BODY,
+            fontSize: 14,
+            fontWeight: 600,
+            color: C.barkLight,
+            textDecoration: 'none',
+          }}
+        >
+          <ArrowLeftSVG /> Back to Workshops
+        </Link>
 
-               E(SiteHeader),
+        <div style={{ marginTop: 24 }}>
+          <p style={{ margin: 0, fontFamily: FONT_BODY, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.gold }}>
+            Our Workshops
+          </p>
+          <h1 style={{ margin: '8px 0 0', fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 'clamp(30px,5vw,44px)', color: C.forest, lineHeight: 1.1 }}>
+            {w.name}
+          </h1>
+          {w.duration_minutes && (
+            <p style={{ margin: '10px 0 0', fontFamily: FONT_BODY, fontSize: 14, color: C.barkLight }}>
+              {w.duration_minutes}-minute workshop
+            </p>
+          )}
+        </div>
 
-               E('div', { style: { position: 'relative', height: '48vw', minHeight: 300, maxHeight: 480 } },
-                       w.hero_image_url ? E('img', { src: w.hero_image_url, alt: w.name, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }) : null,
-                       E('div', { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(45,70,57,0) 40%, rgba(20,30,24,.75) 100%)' } }),
-                       E('div', { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 24px 32px', maxWidth: 1000, margin: '0 auto' } },
-                                 E('h1', { style: { fontFamily: "'Crimson Pro'", fontWeight: 700, color: '#fff', fontSize: 'clamp(32px,6vw,52px)', margin: 0 } }, w.name)
-                               )
-                     ),
+        <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center' }}>
+          {/* TODO(design): AI-generated placeholder photo (see
+              src/lib/workshop-placeholder-images.ts). Swap the
+              relevant public/workshop-*.png file for a real studio
+              photo once one exists — no code change needed here. */}
+          <LeafFrame>
+            <img
+              src={heroImage}
+              alt={w.name}
+              style={{ display: 'block', width: 640, maxWidth: '82vw', aspectRatio: '16 / 10', objectFit: 'cover' }}
+            />
+          </LeafFrame>
+        </div>
 
-               w.intro_paragraph ? E('div', { style: { maxWidth: 700, margin: '0 auto', padding: '44px 24px 8px' } },
-                                           E('p', { style: { fontFamily: "'Crimson Pro'", fontSize: 21, lineHeight: 1.6, color: C.bark, margin: 0 } }, w.intro_paragraph)
-                                         ) : null,
+        {w.intro_paragraph && (
+          <p
+            style={{
+              margin: '40px auto 0',
+              maxWidth: 640,
+              fontFamily: FONT_DISPLAY,
+              fontStyle: 'italic',
+              fontWeight: 500,
+              fontSize: 'clamp(19px,2.4vw,23px)',
+              lineHeight: 1.6,
+              color: C.forest,
+              textAlign: 'center',
+            }}
+          >
+            {w.intro_paragraph}
+          </p>
+        )}
 
-               E('div', { style: { maxWidth: 1000, margin: '0 auto', padding: '32px 24px 0' } }, blocks),
+        {w.content_blocks.length > 0 && (
+          <div style={{ marginTop: 56 }}>
+            {w.content_blocks.map((b, i) => (
+              <div key={b.id} className={`wblock ${i % 2 ? 'rev' : ''}`}>
+                {b.image_url && (
+                  <div className="wblock-img" style={{ borderRadius: 20, overflow: 'hidden', aspectRatio: '4 / 3' }}>
+                    <img src={b.image_url} alt={b.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                )}
+                <div>
+                  <div style={{ width: 32, height: 3, background: C.gold, marginBottom: 14 }} />
+                  <h2 style={{ margin: '0 0 12px', fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 24, color: C.forest }}>
+                    {b.title}
+                  </h2>
+                  <p style={{ margin: 0, fontFamily: FONT_BODY, fontSize: 15, lineHeight: 1.75, color: C.bark }}>
+                    {b.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-               w.takeaway_description ? E('div', { style: { maxWidth: 1000, margin: '0 auto', padding: '8px 24px 44px' } },
-                                                E('div', { style: { background: C.sageLight, borderRadius: 16, padding: '22px 26px', borderLeft: '4px solid ' + C.sage } },
-                                                          E('div', { style: { fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: C.sageDark, marginBottom: 6 } }, "You'll take home"),
-                                                          E('p', { style: { fontSize: 16, color: C.forest, margin: 0, lineHeight: 1.6 } }, w.takeaway_description)
-                                                        )
-                                              ) : null,
+        {w.takeaway_description && (
+          <div
+            style={{
+              background: C.sageLight,
+              borderRadius: 18,
+              padding: '24px 26px',
+              borderLeft: `4px solid ${C.sage}`,
+            }}
+          >
+            <p style={{ margin: '0 0 6px', fontFamily: FONT_BODY, fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.sageDark }}>
+              You&rsquo;ll take home
+            </p>
+            <p style={{ margin: 0, fontFamily: FONT_BODY, fontSize: 15, lineHeight: 1.6, color: C.forest }}>
+              {w.takeaway_description}
+            </p>
+          </div>
+        )}
 
-               w.gallery.length > 0 ? E('div', { style: { maxWidth: 1000, margin: '0 auto', padding: '8px 24px 44px' } },
-                                              E('h2', { style: { fontFamily: "'Crimson Pro'", fontSize: 22, fontWeight: 700, color: C.forest, marginBottom: 18 } }, 'Gallery'),
-                                              E('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 } }, galleryItems)
-                                            ) : null,
+        {w.gallery.length > 0 && (
+          <div style={{ marginTop: 44 }}>
+            <h2 style={{ margin: '0 0 18px', fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 22, color: C.forest }}>
+              Gallery
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+              {w.gallery.map((g) => (
+                <div key={g.id} className="gallery-item">
+                  {g.media_type === 'video' ? (
+                    <video src={g.media_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted loop playsInline />
+                  ) : (
+                    <img src={g.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-               E('div', { style: { maxWidth: 1000, margin: '0 auto', padding: '16px 24px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' } },
-                       w.price_thb != null ? E('div', { style: { fontFamily: "'Crimson Pro'", fontSize: 30, fontWeight: 700, color: C.gold } },
-                                                       '฿' + w.price_thb.toLocaleString(),
-                                                       E('span', { style: { fontSize: 14, fontWeight: 400, color: C.barkLight, marginLeft: 8 } }, 'per person, ' + w.duration_minutes + ' min')
-                                                     ) : null,
-                       E(Link, { href: '/book', style: { background: C.forest, color: '#fff', padding: '15px 34px', borderRadius: 12, fontWeight: 700, fontSize: 16 } }, 'Book This Workshop')
-                     )
-             );
+        <div
+          style={{
+            marginTop: 48,
+            paddingTop: 28,
+            borderTop: `1px solid ${C.sand}`,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 20,
+          }}
+        >
+          {w.price_thb != null ? (
+            <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 30, color: C.forest }}>
+              ฿{w.price_thb.toLocaleString()}
+              <span style={{ marginLeft: 8, fontFamily: FONT_BODY, fontWeight: 400, fontSize: 14, color: C.barkLight }}>
+                per person{w.duration_minutes ? `, ${w.duration_minutes} min` : ''}
+              </span>
+            </div>
+          ) : (
+            <div />
+          )}
+          <PillButton href="/book" size="lg">
+            Book This Workshop
+          </PillButton>
+        </div>
+      </main>
+    </div>
+  );
 }
