@@ -84,7 +84,12 @@ export function Hero() {
           >
             Nature provides,
             <br />
-            <span style={{ color: C.gold }}>you create.</span>
+            {/* Same white as the line above — matches the v0 source
+                (components/home/hero.tsx), which used `text-secondary`
+                here (a near-white #e5eddd, not gold). This port
+                previously used C.gold (#A89068), a much darker,
+                low-contrast tan that was hard to read over the photo. */}
+            <span style={{ color: C.white }}>you create.</span>
           </h1>
 
           <p
