@@ -23,21 +23,40 @@ import { C, FONT_DISPLAY, FONT_BODY } from '@/lib/theme';
 // each file in public/ for a real studio photo once one exists — no
 // code change needed here.
 //
-// Earlier version of this fallback matched by the *mockup's* slugs
-// (its lib/site.ts) — tea-blending, ya-dom-inhaler, etc. — which
-// silently fell through to the plain gradient below for any real
-// Supabase workshop whose slug didn't happen to match one of those
-// exact strings. In practice this project's real slugs don't match
-// the mockup's, so every live workshop without a hero_image_url was
-// rendering the gradient, not a placeholder photo. Cycling through
-// these 4 by position instead guarantees every card without a real
-// photo still gets *some* on-brand placeholder.
-const PLACEHOLDER_WORKSHOP_IMAGES = [
-  '/workshop-tea-blending.png',
-  '/workshop-ya-dom.png',
-  '/workshop-massage-ball.png',
-  '/workshop-skincare-aromatherapy.png',
-];
+// Keyed by slug rather than just cycled by position — confirmed
+// against the real `workshops` table (Supabase) that these 4 slugs
+// are exactly the mockup's, so each workshop gets the placeholder
+// photo that actually matches its craft (tea-blending workshop shows
+// the tea-blending placeholder, etc.), not just "a" placeholder.
+// PLACEHOLDER_FALLBACK_IMAGES is only for a future 5th/unlisted slug.
+const PLACEHOLDER_IMAGE_BY_SLUG: Record<string, string> = {
+  'tea-blending': '/workshop-tea-blending.png',
+  'ya-dom-inhaler': '/workshop-ya-dom.png',
+  'herbal-massage-ball': '/workshop-massage-ball.png',
+  'skincare-aromatherapy': '/workshop-skincare-aromatherapy.png',
+};
+const PLACEHOLDER_FALLBACK_IMAGES = Object.values(PLACEHOLDER_IMAGE_BY_SLUG);
+
+// Fixed display order requested for this teaser grid — matches the
+// order these 4 workshops appear everywhere else on the site.
+// Skincare & Aromatherapy is deliberately last: it's priced/booked as
+// its own separate item rather than as one of the 3 interchangeable
+// single workshops.
+const WORKSHOP_ORDER = ['tea-blending', 'ya-dom-inhaler', 'herbal-massage-ball', 'skincare-aromatherapy'];
+
+function sortByFixedOrder<T extends { slug: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const ai = WORKSHOP_ORDER.indexOf(a.slug);
+    const bi = WORKSHOP_ORDER.indexOf(b.slug);
+    // Unlisted slugs (e.g. a future 5th workshop) sort after all 4
+    // known ones, in their original (alphabetical-by-name) order,
+    // rather than disappearing or jumping to the front.
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
 
 // Uses `stroke="currentColor"` so the CSS hover rule below (which
 // can't win against an inline `style` override) can recolor it via
@@ -62,6 +81,8 @@ export async function WorkshopCircles() {
   }
 
   if (workshops.length === 0) return null;
+
+  workshops = sortByFixedOrder(workshops);
 
   return (
     <section style={{ maxWidth: 1080, margin: '0 auto', padding: '56px 20px' }}>
@@ -105,21 +126,22 @@ export async function WorkshopCircles() {
             }}
           >
             <div style={{ position: 'relative', aspectRatio: '4 / 3', overflow: 'hidden' }}>
-              {w.hero_image_url || PLACEHOLDER_WORKSHOP_IMAGES.length > 0 ? (
-                <img
-                  src={w.hero_image_url || PLACEHOLDER_WORKSHOP_IMAGES[i % PLACEHOLDER_WORKSHOP_IMAGES.length]}
-                  alt={`${w.name} workshop`}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    background: `linear-gradient(135deg, ${C.sageLight} 0%, ${C.sage} 100%)`,
-                  }}
-                />
-              )}
+              {/* Deliberately NOT using w.hero_image_url here, even
+                  though the field exists on the row: as of writing,
+                  one workshop ("Tea Blending") has a hero_image_url
+                  set to what looks like a stray/wrong asset (a design
+                  file, not a workshop photo), while the other 3 have
+                  none. Preferring hero_image_url when present would
+                  show 1 broken-looking image next to 3 placeholder
+                  photos — worse than showing 4 consistent
+                  placeholders. Once real, verified photos exist for
+                  ALL 4 workshops, switch this back to
+                  `w.hero_image_url || PLACEHOLDER_IMAGE_BY_SLUG[w.slug]`. */}
+              <img
+                src={PLACEHOLDER_IMAGE_BY_SLUG[w.slug] || PLACEHOLDER_FALLBACK_IMAGES[i % PLACEHOLDER_FALLBACK_IMAGES.length]}
+                alt={`${w.name} workshop`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
 
             <div style={{ display: 'flex', flex: 1, flexDirection: 'column', padding: 20 }}>
