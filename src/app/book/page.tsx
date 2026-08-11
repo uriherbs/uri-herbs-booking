@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getPackages } from "@/lib/booking-service";
 import { useAvailableSlots, useCalendarAvailability, useCreateBooking } from "@/lib/hooks";
 
@@ -167,6 +169,10 @@ const MapPinSVG = ({ size = 14, color = C.barkLight }) => (
 
 const ChevronLeftSVG = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.forest} strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+);
+
+const CloseSVG = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.forest} strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
 );
 
 const ChevronRightSVG = () => (
@@ -979,6 +985,7 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
 // ════════════════════════════════════════════════════════════
 
 export default function BookingFlow() {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [packages, setPackages] = useState([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
@@ -1077,6 +1084,18 @@ export default function BookingFlow() {
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
+  // Only confirms when there's actually something to lose: step 2 is
+  // the "Your Details" form (name/email/phone typed in but not yet
+  // submitted). Steps 0–1 haven't collected personal info yet, and
+  // step 3 only renders after a booking already succeeded, so leaving
+  // from either is safe without asking.
+  const handleExit = () => {
+    if (step === 2 && !window.confirm("Leave without finishing your booking? Your details won't be saved.")) {
+      return;
+    }
+    router.push('/');
+  };
+
   const handleReset = () => {
     setStep(0); setSelectedPkg(null); setParticipants(1);
     setSelectedDate(null); setSelectedTime(null);
@@ -1105,41 +1124,71 @@ export default function BookingFlow() {
       background: C.parchment, fontFamily: "'DM Sans', sans-serif",
       position: "relative",
     }}>
-      {/* Google Fonts */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        input:focus, textarea:focus { border-color: ${C.sage} !important; box-shadow: 0 0 0 3px ${C.sageLight}; }
-        button:active { transform: scale(0.98); }
-        ::placeholder { color: ${C.barkLight}; opacity: 0.6; }
-      `}</style>
+      {/* Google Fonts. dangerouslySetInnerHTML, not a text child — the
+          URL below has `&` and (unquoted now) no `'` either, but React
+          HTML-escapes text children in every element the same way,
+          while <style> is a "raw text" element browsers never
+          entity-decode. A literal `&amp;` server-rendered there
+          doesn't match the raw `&` client-side hydration writes, and
+          that mismatch was silently forcing this whole page to
+          discard its SSR HTML and re-render from scratch on every
+          load — including whatever the user had already clicked in
+          the ~1 React tick before the swap happened. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
+            * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+            input:focus, textarea:focus { border-color: ${C.sage} !important; box-shadow: 0 0 0 3px ${C.sageLight}; }
+            button:active { transform: scale(0.98); }
+            ::placeholder { color: ${C.barkLight}; opacity: 0.6; }
+          `,
+        }}
+      />
 
-      {/* Header */}
-      <div style={{
-        background: C.white, padding: "16px 16px 0",
-        borderBottom: step === 0 ? `1px solid ${C.sand}` : "none",
-      }}>
+      {/* Header — deliberately minimal: just the site identity (left,
+          links home) and an exit control (right). No Home/Contact/Blog
+          nav here, unlike SiteHeader — this is a checkout-style flow,
+          not a marketing page. Per-step "Back" (previous step, not
+          exit) lives in its own row below instead of cluttering this
+          one with a third element. */}
+      <div style={{ background: C.white, padding: "12px 16px", borderBottom: `1px solid ${C.sand}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {step > 0 && step < 3 ? (
-            <button onClick={handleBack} style={{
-              background: "none", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 4,
-              fontFamily: "'DM Sans'", fontSize: 14, color: C.sage, fontWeight: 500, padding: "4px 0",
-            }}>
-              <ChevronLeftSVG/> Back
-            </button>
-          ) : <div/>}
-          <div style={{ textAlign: "center" }}>
-            <div style={{
-              fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.forest,
-              display: "flex", alignItems: "center", gap: 6, justifyContent: "center",
-            }}>
-              <LeafSVG size={18} color={C.sage} style={{}} /> Uri Herbs
-            </div>
-          </div>
-          <div style={{ width: 60 }}/>
+          <Link href="/" style={{
+            display: "flex", alignItems: "center", gap: 8, textDecoration: "none",
+            fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest,
+          }}>
+            <img
+              src="/uri-herbs-logo.jpg"
+              alt=""
+              style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover" }}
+            />
+            Uri Herbs Workshop
+          </Link>
+          <button
+            onClick={handleExit}
+            aria-label="Close booking"
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 4,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <CloseSVG/>
+          </button>
         </div>
       </div>
+
+      {step > 0 && step < 3 && (
+        <div style={{ padding: "10px 16px 0" }}>
+          <button onClick={handleBack} style={{
+            background: "none", border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+            fontFamily: "'DM Sans'", fontSize: 14, color: C.sage, fontWeight: 500, padding: "4px 0",
+          }}>
+            <ChevronLeftSVG/> Back
+          </button>
+        </div>
+      )}
 
       {/* Step Progress */}
       {step < 3 && <StepVine currentStep={step}/>}
