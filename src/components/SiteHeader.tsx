@@ -23,6 +23,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { PillButton } from '@/components/PillButton';
 
 const C = {
   sage: '#6B8F71',
@@ -63,19 +64,38 @@ export default function SiteHeader() {
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname?.startsWith(href));
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 50, background: C.white, borderBottom: `1px solid ${C.sand}` }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@700&family=DM+Sans:wght@500;600;700&display=swap');
-        .site-nav-desktop { display: none; }
-        .site-nav-hamburger-btn { display: flex; }
-        .site-nav-link { text-decoration: none; transition: color 0.15s; }
-        .site-nav-link:hover { color: ${C.sage} !important; }
-        @media (min-width: 761px) {
-          .site-nav-desktop { display: flex; }
-          .site-nav-hamburger-btn { display: none; }
-          .site-nav-mobile-panel { display: none !important; }
-        }
-      `}</style>
+    <header
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        background: 'rgba(255,255,255,0.85)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        borderBottom: `1px solid ${C.sand}`,
+      }}
+    >
+      {/* dangerouslySetInnerHTML, not a text child — the Google
+          Fonts URL has `&` in it, which React would HTML-escape as
+          a literal child. <style> is a "raw text" element the
+          browser never entity-decodes, so that escaped text would
+          mismatch what hydration writes and break the page. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@700&family=DM+Sans:wght@500;600;700&display=swap);
+            .site-nav-desktop { display: none; }
+            .site-nav-hamburger-btn { display: flex; }
+            .site-nav-link { text-decoration: none; transition: color 0.15s; }
+            .site-nav-link:hover { color: ${C.sage} !important; }
+            @media (min-width: 761px) {
+              .site-nav-desktop { display: flex; }
+              .site-nav-hamburger-btn { display: none; }
+              .site-nav-mobile-panel { display: none !important; }
+            }
+          `,
+        }}
+      />
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" onClick={() => setOpen(false)} style={{
@@ -97,9 +117,7 @@ export default function SiteHeader() {
               {l.label}
             </Link>
           ))}
-          <Link href="/book" style={{ background: C.sage, color: '#fff', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
-            Book a Workshop
-          </Link>
+          <PillButton href="/book">Book a Workshop</PillButton>
         </nav>
 
         {/* Mobile hamburger */}
@@ -117,7 +135,7 @@ export default function SiteHeader() {
       {/* Mobile stacked panel */}
       {open && (
         <nav className="site-nav-mobile-panel" style={{ borderTop: `1px solid ${C.sand}`, padding: '10px 24px 20px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {[{ href: '/', label: 'Home' }, { href: '/book', label: 'Book a Workshop' }, { href: '/contact', label: 'Contact' }, { href: '/blog', label: 'Blog' }].map((l) => (
+          {NAV_LINKS.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -131,6 +149,11 @@ export default function SiteHeader() {
               {l.label}
             </Link>
           ))}
+          <div style={{ paddingTop: 14 }} onClick={() => setOpen(false)}>
+            <PillButton href="/book" style={{ width: '100%' }}>
+              Book a Workshop
+            </PillButton>
+          </div>
         </nav>
       )}
     </header>

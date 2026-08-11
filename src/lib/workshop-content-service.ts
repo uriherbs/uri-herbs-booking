@@ -45,6 +45,28 @@ export interface WorkshopPageData {
       gallery: WorkshopGalleryItem[];
 }
 
+export interface WorkshopSummary {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      hero_image_url: string | null;
+}
+
+// Lightweight listing used by the homepage's workshop grid — same
+// public, cookie-free client as getWorkshopPageData below, just a
+// narrower select with no per-workshop content_blocks/gallery joins.
+export async function getActiveWorkshopSummaries(): Promise<WorkshopSummary[]> {
+      const { data, error } = await publicClient
+        .from('workshops')
+        .select('id, name, slug, description, hero_image_url')
+        .eq('is_active', true)
+        .order('name');
+
+  if (error) throw new Error(`Failed to load workshops: ${error.message}`);
+      return data ?? [];
+}
+
 // Returns null if no workshop matches the slug (caller should 404).
 export async function getWorkshopPageData(slug: string): Promise<WorkshopPageData | null> {
       const { data: workshop, error } = await publicClient

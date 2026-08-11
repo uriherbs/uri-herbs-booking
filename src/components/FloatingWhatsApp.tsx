@@ -45,6 +45,7 @@ export default function FloatingWhatsApp() {
       <style>{`
         .floating-whatsapp-btn:hover { transform: scale(1.06); }
         .floating-whatsapp-btn:active { transform: scale(0.96); }
+        .floating-whatsapp-btn:focus-visible { outline: 3px solid rgba(107,143,113,0.5); outline-offset: 2px; }
         @media (max-width: 480px) {
           .floating-whatsapp-btn { bottom: 92px !important; right: 14px !important; width: 50px !important; height: 50px !important; }
         }
