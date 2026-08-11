@@ -19,23 +19,25 @@ import { getActiveWorkshopSummaries } from '@/lib/workshop-content-service';
 import { C, FONT_DISPLAY, FONT_BODY } from '@/lib/theme';
 
 // TODO(design): AI-generated placeholder photos, carried over from
-// the uri-herbs-v0-design mockup's public/workshop-*.png files and
-// its lib/site.ts WORKSHOPS array. Swap each file in public/ for a
-// real studio photo once one exists — no code change needed here.
+// the uri-herbs-v0-design mockup's public/workshop-*.png files. Swap
+// each file in public/ for a real studio photo once one exists — no
+// code change needed here.
 //
-// Keyed by the *mockup's* slugs (its lib/site.ts), not necessarily
-// this project's real `workshops.slug` values in Supabase — used
-// only as a best-effort visual fallback when a live workshop has no
-// hero_image_url yet and happens to share one of these slugs. Any
-// other workshop without a photo still falls back to the plain
-// gradient below rather than risk showing a mismatched photo (e.g.
-// the tea-blending shot on an unrelated workshop).
-const PLACEHOLDER_IMAGE_BY_SLUG: Record<string, string> = {
-  'tea-blending': '/workshop-tea-blending.png',
-  'ya-dom-inhaler': '/workshop-ya-dom.png',
-  'herbal-massage-ball': '/workshop-massage-ball.png',
-  'skincare-aromatherapy': '/workshop-skincare-aromatherapy.png',
-};
+// Earlier version of this fallback matched by the *mockup's* slugs
+// (its lib/site.ts) — tea-blending, ya-dom-inhaler, etc. — which
+// silently fell through to the plain gradient below for any real
+// Supabase workshop whose slug didn't happen to match one of those
+// exact strings. In practice this project's real slugs don't match
+// the mockup's, so every live workshop without a hero_image_url was
+// rendering the gradient, not a placeholder photo. Cycling through
+// these 4 by position instead guarantees every card without a real
+// photo still gets *some* on-brand placeholder.
+const PLACEHOLDER_WORKSHOP_IMAGES = [
+  '/workshop-tea-blending.png',
+  '/workshop-ya-dom.png',
+  '/workshop-massage-ball.png',
+  '/workshop-skincare-aromatherapy.png',
+];
 
 // Uses `stroke="currentColor"` so the CSS hover rule below (which
 // can't win against an inline `style` override) can recolor it via
@@ -87,7 +89,7 @@ export async function WorkshopCircles() {
       </div>
 
       <div className="home-workshop-grid" style={{ marginTop: 40 }}>
-        {workshops.map((w) => (
+        {workshops.map((w, i) => (
           <Link
             key={w.id}
             href={`/workshops/${w.slug}`}
@@ -103,9 +105,9 @@ export async function WorkshopCircles() {
             }}
           >
             <div style={{ position: 'relative', aspectRatio: '4 / 3', overflow: 'hidden' }}>
-              {w.hero_image_url || PLACEHOLDER_IMAGE_BY_SLUG[w.slug] ? (
+              {w.hero_image_url || PLACEHOLDER_WORKSHOP_IMAGES.length > 0 ? (
                 <img
-                  src={w.hero_image_url || PLACEHOLDER_IMAGE_BY_SLUG[w.slug]}
+                  src={w.hero_image_url || PLACEHOLDER_WORKSHOP_IMAGES[i % PLACEHOLDER_WORKSHOP_IMAGES.length]}
                   alt={`${w.name} workshop`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />

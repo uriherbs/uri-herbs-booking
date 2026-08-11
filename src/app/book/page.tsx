@@ -312,10 +312,12 @@ function PackageCard({ pkg, selected, onSelect, participants }) {
 }
 
 function PackageStep({ packages, selected, onSelect, participants, onParticipantsChange }) {
+  // Most expensive/longest first, per business request — highest-value
+  // option gets first look before the customer scrolls past it.
   const categories = [
-    { key: "single", title: "Single Workshop", subtitle: "1 Hour" },
-    { key: "combo", title: "Combo Packages", subtitle: "2 Hours" },
     { key: "journey", title: "The Full Journey", subtitle: "3 Hours • All workshops included" },
+    { key: "combo", title: "Combo Packages", subtitle: "2 Hours" },
+    { key: "single", title: "Single Workshop", subtitle: "1 Hour" },
     { key: "aromatherapy", title: "Aromatherapy Mastery", subtitle: "2 Hours • Mon–Thu only" },
   ];
 
