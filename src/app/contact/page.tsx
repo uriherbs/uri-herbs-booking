@@ -27,7 +27,24 @@ const SHOP_PHONE_DISPLAY = '+66 64 334 9890';
 const SHOP_PHONE_TEL = '+66643349890';
 const SHOP_EMAIL = 'uherbhouse@gmail.com';
 const SHOP_HOURS = 'Mon – Sat · 09:00 – 17:00';
-const MAPS_EMBED_SRC = `https://maps.google.com/maps?q=${encodeURIComponent(SHOP_ADDRESS)}&output=embed`;
+
+// Verified directly against Google Maps (place: "Uri Herbs Workshop").
+// Geocoding the free-text address above used to send the pin to a
+// neighboring business (The Moon Eatery / SALT & FIRE Rooftop Bar)
+// instead of the actual location — using the coordinates directly
+// sidesteps that fuzzy address-matching problem entirely.
+const SHOP_LAT = 18.794052;
+const SHOP_LNG = 98.9915941;
+// No Maps Embed API key configured in this project (same key-less
+// pattern the old address-based embed already used), so the embed
+// uses the coordinate-based `q=lat,lng&output=embed` shorthand rather
+// than the full `pb=` embed format, which requires one.
+const MAPS_EMBED_SRC = `https://maps.google.com/maps?q=${SHOP_LAT},${SHOP_LNG}&z=17&output=embed`;
+// The user's own verified short link for "open in the Maps app" —
+// reused as-is rather than reconstructed from the Place ID, since
+// that ID is in Google's internal CID (0x…:0x…) format, not the
+// `ChIJ…` Place ID the Maps URLs API's query_place_id expects.
+const SHOP_MAPS_URL = 'https://maps.app.goo.gl/gyANPQcP2yrVz2Xw5';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -176,17 +193,27 @@ export default function ContactPage() {
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
-        a { text-decoration: none; }
-        .contact-grid { display: grid; gap: 28px; grid-template-columns: 1fr; }
-        @media (min-width: 820px) {
-          .contact-grid { grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
-        }
-        input, textarea { font-family: 'DM Sans', sans-serif; }
-        input:focus, textarea:focus { outline: none; border-color: ${C.sage}; }
-      `}</style>
+      {/* dangerouslySetInnerHTML, not a text child — the Google Fonts
+          URL has `&` in it, which React would HTML-escape as a
+          literal child. <style> is a "raw text" element the browser
+          never entity-decodes, so that escaped text mismatches what
+          hydration writes and breaks the page (same bug already fixed
+          elsewhere on this branch — home page, SiteHeader, /book). */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
+            * { box-sizing: border-box; }
+            a { text-decoration: none; }
+            .contact-grid { display: grid; gap: 28px; grid-template-columns: 1fr; }
+            @media (min-width: 820px) {
+              .contact-grid { grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+            }
+            input, textarea { font-family: 'DM Sans', sans-serif; }
+            input:focus, textarea:focus { outline: none; border-color: ${C.sage}; }
+          `,
+        }}
+      />
 
       <SiteHeader />
 
@@ -207,7 +234,9 @@ export default function ContactPage() {
               padding: 26, display: 'flex', flexDirection: 'column', gap: 22, marginBottom: 20,
             }}>
               <InfoRow icon={<PinSVG />} label="Address">
-                {SHOP_ADDRESS}
+                <a href={SHOP_MAPS_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
+                  {SHOP_ADDRESS}
+                </a>
               </InfoRow>
               <InfoRow icon={<ClockSVG />} label="Opening Hours">
                 {SHOP_HOURS}
@@ -247,16 +276,31 @@ export default function ContactPage() {
               </div>
             </div>
 
-            <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.sand}`, height: 300 }}>
-              <iframe
-                title="Uri Herbs Workshop location"
-                src={MAPS_EMBED_SRC}
-                width="100%"
-                height="100%"
-                style={{ border: 0, display: 'block' }}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
+            <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.sand}`, background: C.white }}>
+              <div style={{ height: 300 }}>
+                <iframe
+                  title="Uri Herbs Workshop location"
+                  src={MAPS_EMBED_SRC}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0, display: 'block' }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+              <a
+                href={SHOP_MAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '12px 16px', borderTop: `1px solid ${C.sand}`,
+                  fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 600, color: C.sageDark,
+                  textDecoration: 'none',
+                }}
+              >
+                Open in Google Maps ↗
+              </a>
             </div>
           </div>
 
