@@ -39,12 +39,20 @@ const SHOP_LNG = 98.9915941;
 // pattern the old address-based embed already used), so the embed
 // uses the coordinate-based `q=lat,lng&output=embed` shorthand rather
 // than the full `pb=` embed format, which requires one.
-const MAPS_EMBED_SRC = `https://maps.google.com/maps?q=${SHOP_LAT},${SHOP_LNG}&z=17&output=embed`;
-// The user's own verified short link for "open in the Maps app" —
-// reused as-is rather than reconstructed from the Place ID, since
-// that ID is in Google's internal CID (0x…:0x…) format, not the
-// `ChIJ…` Place ID the Maps URLs API's query_place_id expects.
-const SHOP_MAPS_URL = 'https://maps.app.goo.gl/gyANPQcP2yrVz2Xw5';
+// hl=en — without it Google Maps picks a language from the visitor's
+// own browser/device settings, which for a Chiang Mai location often
+// means Thai, even though the rest of this English-language site
+// clearly targets English-speaking visitors.
+const MAPS_EMBED_SRC = `https://maps.google.com/maps?q=${SHOP_LAT},${SHOP_LNG}&z=17&hl=en&output=embed`;
+// "Open in Maps" link, built via Google's documented Maps URLs API
+// (developers.google.com/maps/documentation/urls/get-started#search-action)
+// rather than the user's verified short link, since a short link
+// can't be given a language param after its redirect. `query` is the
+// exact, distinctively-named business — reliable on its own even if
+// query_place_id (Google's internal CID format, 0x…:0x…, not the
+// ChIJ… Place ID this parameter is documented for) ends up ignored.
+const SHOP_PLACE_ID = '0x30da3bb4d505e7c5:0x41cac3c3a753cc10';
+const SHOP_MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Uri Herbs Workshop')}&query_place_id=${SHOP_PLACE_ID}&hl=en`;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
