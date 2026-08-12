@@ -9,7 +9,7 @@ src/
 ├── app/
 │   ├── page.tsx                          Home → links to /book
 │   ├── layout.tsx                        Root layout
-│   ├── book/page.tsx                     Customer booking flow (4 steps)
+│   ├── book/page.tsx                     Customer booking flow (5 steps)
 │   ├── admin/
 │   │   ├── layout.tsx                    Provides AuthProvider to all /admin routes
 │   │   ├── login/page.tsx                Public — staff sign in

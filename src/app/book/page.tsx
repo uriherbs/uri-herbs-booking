@@ -190,7 +190,7 @@ const GiftSVG = ({ size = 14 }) => (
 // DECORATIVE: Botanical vine progress indicator
 // ════════════════════════════════════════════════════════════
 
-const STEP_LABELS = ["Experience", "Date & Time", "Your Details", "Confirmation"];
+const STEP_LABELS = ["Experience", "Date & Time", "Your Details", "Payment", "Confirmation"];
 
 function StepVine({ currentStep }) {
   return (
@@ -371,6 +371,20 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             }}>+</button>
         </div>
       </div>
+
+      {/* Informational only — not a blocking checkbox. Business intent
+          (per spec): families with kids are welcome and encouraged;
+          this exists to head off parents booking several young
+          children as "independent" participants to use as childcare
+          while the adult doesn't actually take part. */}
+      <p style={{
+        fontFamily: "'DM Sans'", fontSize: 12.5, lineHeight: 1.6, color: C.barkLight,
+        margin: "10px 2px 20px",
+      }}>
+        Uri Herbs Workshop is a hands-on family experience, not childcare. Children under 12 are
+        welcome as part of a family booking, but must be seated with and actively supervised by a
+        participating parent throughout. Guests aged 12–17 need an accompanying adult in the group.
+      </p>
 
       {categories.map(cat => {
         const catPackages = packages.filter(p => p.category === cat.key);
@@ -787,44 +801,185 @@ function CustomerStep({ form, onChange, errors }) {
             style={{ ...inputStyle(false), resize: "vertical", lineHeight: 1.5 }}
           />
         </div>
-
-        {/* Age acknowledgment */}
-        <div style={{
-          background: C.mist, borderRadius: 10, padding: "14px 16px",
-        }}>
-          <label style={{
-            display: "flex", gap: 12, cursor: "pointer", alignItems: "flex-start",
-          }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: 6, flexShrink: 0, marginTop: 1,
-              border: form.ageConfirmed ? `none` : `1.5px solid ${errors.age ? C.coral : C.sand}`,
-              background: form.ageConfirmed ? C.sage : C.white,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s",
-            }}
-              onClick={(e) => { e.preventDefault(); onChange("ageConfirmed", !form.ageConfirmed); }}
-            >
-              {form.ageConfirmed && <CheckSVG size={14}/>}
-            </div>
-            <div>
-              <span style={{
-                fontFamily: "'DM Sans'", fontSize: 13, color: C.forest, fontWeight: 500, lineHeight: 1.5,
-              }}
-                onClick={(e) => { e.preventDefault(); onChange("ageConfirmed", !form.ageConfirmed); }}
-              >
-                I confirm all guests are <strong>12 years or older</strong>. Guests aged 12–17 are accompanied by an adult in our group.
-              </span>
-              {errors.age && <div style={errorStyle}>{errors.age}</div>}
-            </div>
-          </label>
-        </div>
       </div>
     </div>
   );
 }
 
 // ════════════════════════════════════════════════════════════
-// STEP 4: CONFIRMATION
+// STEP 4: PAYMENT
+// ════════════════════════════════════════════════════════════
+// UI SHELL ONLY — this step does not process any real payment. All
+// three options currently do the exact same thing under the hood:
+// picking one just unlocks "Confirm Booking", which calls the same
+// create_booking() RPC as before, creating a `confirmed` booking
+// directly. There's no pending_payment/expired status, no Stripe/
+// PayPal SDK, and no webhook — none of that exists in this project
+// yet (checked: no payment env vars, no such booking_status values).
+// Wiring real payment processing is a separate, deliberately-scoped
+// project (new DB migration, provider SDKs, a webhook endpoint, a
+// slot-expiry mechanism) — see the spec doc's §5 for the intended
+// real design. This step exists so the flow's shape (and the
+// mandatory Terms & Conditions agreement) is in place and reviewable
+// now, without pretending money actually moves yet.
+
+const PAYMENT_METHODS = [
+  {
+    key: "stripe" as const,
+    label: "Pay with Card",
+    sublabel: "via Stripe",
+    description: "Secure checkout. Full amount charged now.",
+  },
+  {
+    key: "paypal" as const,
+    label: "PayPal",
+    sublabel: "",
+    description: "Pay with your PayPal balance or a linked card. Full amount charged now.",
+  },
+  {
+    key: "later" as const,
+    label: "Pay Later",
+    sublabel: "",
+    description: "Cash, PromptPay QR, or WeChat Pay when you arrive. Nothing charged now.",
+  },
+];
+
+// TODO(design): generic placeholder marks, not the real Stripe/PayPal
+// brand assets — swap for their official logo kits before launch
+// (stripe.com/newsroom/brand-assets, paypal.com/us/webapps/mpp/logo-center).
+const CardSVG = ({ color = C.barkLight }) => (
+  <svg width={22} height={16} viewBox="0 0 24 18" fill="none" stroke={color} strokeWidth="1.6">
+    <rect x="1" y="1" width="22" height="16" rx="2.5" />
+    <path d="M1 6.5h22" />
+  </svg>
+);
+
+const WalletSVG = ({ color = C.barkLight }) => (
+  <svg width={22} height={18} viewBox="0 0 24 20" fill="none" stroke={color} strokeWidth="1.6">
+    <path d="M2 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5Z" />
+    <path d="M16 11a1.5 1.5 0 1 0 0-3h5v3h-5Z" />
+  </svg>
+);
+
+const CashSVG = ({ color = C.barkLight }) => (
+  <svg width={22} height={16} viewBox="0 0 24 18" fill="none" stroke={color} strokeWidth="1.6">
+    <rect x="1" y="1" width="22" height="16" rx="2.5" />
+    <circle cx="12" cy="9" r="3.2" />
+  </svg>
+);
+
+const PAYMENT_ICONS: Record<string, (props: { color?: string }) => JSX.Element> = {
+  stripe: CardSVG, paypal: WalletSVG, later: CashSVG,
+};
+
+function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors }) {
+  return (
+    <div style={{ padding: "0 16px 100px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {PAYMENT_METHODS.map(opt => {
+          const selected = paymentMethod === opt.key;
+          const Icon = PAYMENT_ICONS[opt.key];
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onSelectMethod(opt.key)}
+              style={{
+                display: "flex", alignItems: "center", gap: 14,
+                width: "100%", textAlign: "left", cursor: "pointer",
+                borderRadius: 14, padding: "16px 16px",
+                background: selected ? C.sageLight : C.white,
+                border: selected ? `2px solid ${C.sage}` : `1.5px solid ${C.sand}`,
+              }}
+            >
+              <span style={{
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: selected ? C.white : C.mist,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Icon color={selected ? C.sage : C.barkLight} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 700, color: C.forest }}>
+                    {opt.label}
+                  </span>
+                  {opt.sublabel && (
+                    <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight }}>
+                      {opt.sublabel}
+                    </span>
+                  )}
+                </span>
+                <span style={{
+                  display: "block", marginTop: 2,
+                  fontFamily: "'DM Sans'", fontSize: 12.5, color: C.barkLight, lineHeight: 1.4,
+                }}>
+                  {opt.description}
+                </span>
+                {opt.key !== "later" && (
+                  <span style={{
+                    display: "block", marginTop: 4,
+                    fontFamily: "'DM Sans'", fontSize: 11, color: C.barkLight, opacity: 0.8,
+                  }}>
+                    Visa · Mastercard · Amex accepted
+                  </span>
+                )}
+              </span>
+              <span style={{
+                width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                border: `2px solid ${selected ? C.sage : C.sand}`,
+                background: selected ? C.sage : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {selected && <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.white }} />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {errors.payment && (
+        <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.coral, marginTop: 8 }}>
+          {errors.payment}
+        </div>
+      )}
+
+      {/* Terms & Conditions agreement — required before confirming.
+          TODO: no dedicated /terms or /privacy page exists in this
+          project yet (per spec doc, the legal text itself hasn't
+          been written). Not linking to avoid shipping a 404 — wire
+          these up to real pages once they exist. */}
+      <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 20 }}>
+        <label style={{ display: "flex", gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
+          <div
+            style={{
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0, marginTop: 1,
+              border: agreedToTerms ? "none" : `1.5px solid ${errors.terms ? C.coral : C.sand}`,
+              background: agreedToTerms ? C.sage : C.white,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.15s",
+            }}
+            onClick={(e) => { e.preventDefault(); onToggleTerms(); }}
+          >
+            {agreedToTerms && <CheckSVG size={14} />}
+          </div>
+          <div>
+            <span
+              style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.forest, fontWeight: 500, lineHeight: 1.5 }}
+              onClick={(e) => { e.preventDefault(); onToggleTerms(); }}
+            >
+              I agree to Uri Herbs Workshop&rsquo;s <strong>Terms &amp; Conditions</strong> and{" "}
+              <strong>Privacy Policy</strong>.
+            </span>
+            {errors.terms && <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.coral, marginTop: 4 }}>{errors.terms}</div>}
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// STEP 5: CONFIRMATION
 // ════════════════════════════════════════════════════════════
 
 function ConfirmationStep({ pkg, result, form, onReset }) {
@@ -994,8 +1149,10 @@ export default function BookingFlow() {
   const [participants, setParticipants] = useState(1);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "", ageConfirmed: false });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal" | "later" | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const { submit, submitting, error: submitError, result, reset: resetBooking } = useCreateBooking();
 
@@ -1029,7 +1186,6 @@ export default function BookingFlow() {
     setErrors(e => ({
       ...e,
       [field]: null,
-      age: field === "ageConfirmed" ? null : e.age,
       submit: null,
     }));
   }, []);
@@ -1038,14 +1194,27 @@ export default function BookingFlow() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Please enter your name";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
-    if (!form.ageConfirmed) e.age = "Please confirm the age requirement";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  // Step 3 (Payment) is a presentational shell only — see PaymentStep's
+  // own comment for why. Booking creation still happens right here,
+  // unchanged, gated on a payment method being picked + terms agreed
+  // rather than on any real payment actually completing.
+  const validatePayment = () => {
+    const e: Record<string, string> = {};
+    if (!paymentMethod) e.payment = "Please choose how you'd like to pay";
+    if (!agreedToTerms) e.terms = "Please agree to the Terms & Conditions to continue";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleNext = async () => {
-    if (step === 2) {
-      if (!validateStep3()) return;
+    if (step === 2 && !validateStep3()) return;
+
+    if (step === 3) {
+      if (!validatePayment()) return;
 
       try {
         await submit({
@@ -1057,11 +1226,12 @@ export default function BookingFlow() {
           customer_email: form.email || undefined,
         customer_phone: form.phone ? `${form.phoneCountryCode}${form.phone.replace(/^0+/, '')}` : undefined,
           customer_notes: form.notes || undefined,
-          has_minors: false, // no dedicated "group includes a minor" field in this form yet —
-          // ageConfirmed is required for EVERY booking (not just ones with minors), so it
-          // can't be reused as this signal. Minor-in-group info currently reaches staff via
-          // the free-text notes field, same as the admin dashboard's existing mock data
-          // pattern ("Family group — 1 child (age 14)"). Add a real checkbox here if/when
+          has_minors: false, // no dedicated "group includes a minor" field in this
+          // form — per spec, kids under 12 booking with a participating parent is
+          // normal and welcome, not a special case worth flagging structurally.
+          // Minor-in-group info currently reaches staff via the free-text notes
+          // field, same as the admin dashboard's existing mock data pattern
+          // ("Family group — 1 child (age 14)"). Add a real field here if/when
           // this needs to be structured data instead of a note staff read manually.
         });
       } catch (err: any) {
@@ -1084,13 +1254,14 @@ export default function BookingFlow() {
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
-  // Only confirms when there's actually something to lose: step 2 is
-  // the "Your Details" form (name/email/phone typed in but not yet
-  // submitted). Steps 0–1 haven't collected personal info yet, and
-  // step 3 only renders after a booking already succeeded, so leaving
-  // from either is safe without asking.
+  // Only confirms when there's actually something to lose: steps 2–3
+  // are "Your Details" and "Payment" (name/email/phone typed in, or a
+  // payment method picked, but not yet submitted). Steps 0–1 haven't
+  // collected personal info yet, and step 4 only renders after a
+  // booking already succeeded, so leaving from any of those is safe
+  // without asking.
   const handleExit = () => {
-    if (step === 2 && !window.confirm("Leave without finishing your booking? Your details won't be saved.")) {
+    if ((step === 2 || step === 3) && !window.confirm("Leave without finishing your booking? Your details won't be saved.")) {
       return;
     }
     router.push('/');
@@ -1099,21 +1270,23 @@ export default function BookingFlow() {
   const handleReset = () => {
     setStep(0); setSelectedPkg(null); setParticipants(1);
     setSelectedDate(null); setSelectedTime(null);
-    setForm({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "", ageConfirmed: false });
-    setErrors({}); resetBooking();
+    setForm({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "" });
+    setErrors({}); setPaymentMethod(null); setAgreedToTerms(false); resetBooking();
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
   const canContinue = [
     selectedPkg !== null,
     selectedDate !== null && selectedTime !== null,
-    true, // step 3 validated on click
+    true, // step 3 (Your Details) validated on click
+    paymentMethod !== null && agreedToTerms,
     true,
   ][step];
 
   const ctaLabel = [
     "Continue to Date & Time",
     "Continue to Your Details",
+    "Continue to Payment",
     submitting ? "Confirming…" : "Confirm Booking",
     null,
   ][step];
@@ -1178,7 +1351,7 @@ export default function BookingFlow() {
         </div>
       </div>
 
-      {step > 0 && step < 3 && (
+      {step > 0 && step < 4 && (
         <div style={{ padding: "10px 16px 0" }}>
           <button onClick={handleBack} style={{
             background: "none", border: "none", cursor: "pointer",
@@ -1191,7 +1364,7 @@ export default function BookingFlow() {
       )}
 
       {/* Step Progress */}
-      {step < 3 && <StepVine currentStep={step}/>}
+      {step < 4 && <StepVine currentStep={step}/>}
 
       {/* Section Title */}
       <div style={{ padding: "20px 16px 14px" }}>
@@ -1199,9 +1372,9 @@ export default function BookingFlow() {
           fontFamily: "'Crimson Pro'", fontSize: 24, fontWeight: 700,
           color: C.forest, margin: 0, lineHeight: 1.2,
         }}>
-          {["Choose Your Experience", "Pick a Date & Time", "Your Details", ""][step]}
+          {["Choose Your Experience", "Pick a Date & Time", "Your Details", "Payment", ""][step]}
         </h2>
-        {step < 3 && (
+        {step < 4 && (
           <p style={{
             fontFamily: "'DM Sans'", fontSize: 13, color: C.barkLight,
             margin: "6px 0 0", lineHeight: 1.4,
@@ -1210,6 +1383,7 @@ export default function BookingFlow() {
               "Hands-on herbal workshops in Chiang Mai's Old City",
               pkg ? `Select when you'd like to join ${pkg.name}` : "",
               "Almost there — just a few details to reserve your spot",
+              "Choose how you'd like to pay",
             ][step]}
           </p>
         )}
@@ -1244,8 +1418,15 @@ export default function BookingFlow() {
         />
       )}
       {step === 2 && (
+        <CustomerStep form={form} onChange={updateForm} errors={errors}/>
+      )}
+      {step === 3 && (
         <>
-          <CustomerStep form={form} onChange={updateForm} errors={errors}/>
+          <PaymentStep
+            paymentMethod={paymentMethod} onSelectMethod={setPaymentMethod}
+            agreedToTerms={agreedToTerms} onToggleTerms={() => setAgreedToTerms(a => !a)}
+            errors={errors}
+          />
           {errors.submit && (
             <div style={{ padding: "0 16px", marginTop: -8 }}>
               <div style={{
@@ -1259,7 +1440,7 @@ export default function BookingFlow() {
           )}
         </>
       )}
-      {step === 3 && pkg && result && (
+      {step === 4 && pkg && result && (
         <ConfirmationStep
           pkg={pkg} result={result} form={form}
           onReset={handleReset}
@@ -1267,7 +1448,7 @@ export default function BookingFlow() {
       )}
 
       {/* Sticky bottom CTA */}
-      {step < 3 && (
+      {step < 4 && (
         <div style={{
           position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
           width: "100%", maxWidth: 480,
