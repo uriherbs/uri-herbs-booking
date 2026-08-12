@@ -366,6 +366,7 @@ export default function ContactPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
+                    autoComplete="name"
                     placeholder="Your name"
                     style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${C.sand}`, fontSize: 14, color: C.bark }}
                   />
@@ -378,6 +379,7 @@ export default function ContactPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="email"
                     placeholder="you@example.com"
                     style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${C.sand}`, fontSize: 14, color: C.bark }}
                   />

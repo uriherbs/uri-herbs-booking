@@ -747,16 +747,22 @@ function CustomerStep({ form, onChange, errors }) {
 
   return (
     <div style={{ padding: "0 16px 100px" }}>
-      <div style={{
+      {/* A real <form> (not just styled divs) so mobile browsers'
+          autofill reliably kicks in for the autoComplete attributes
+          below — some only offer saved values for inputs inside an
+          actual form element. preventDefault since there's nothing to
+          submit here: the real "next step" action is the sticky CTA
+          button rendered by the parent, outside this form. */}
+      <form onSubmit={e => e.preventDefault()} style={{
         background: C.white, borderRadius: 14, border: `1.5px solid ${C.sand}`,
         padding: "20px 18px", display: "flex", flexDirection: "column", gap: 18,
       }}>
         <div>
           <label style={labelStyle}>Full Name *</label>
           <input
-            type="text" placeholder="e.g. Sophie Martin"
+            type="text" placeholder="e.g. Sophie Martin" autoComplete="name"
             value={form.name} onChange={e => onChange("name", e.target.value)}
-            style={inputStyle(errors.name) as React.CSSProperties}  
+            style={inputStyle(errors.name) as React.CSSProperties}
           />
           {errors.name && <div style={errorStyle}>{errors.name}</div>}
         </div>
@@ -764,7 +770,7 @@ function CustomerStep({ form, onChange, errors }) {
         <div>
           <label style={labelStyle}>Email</label>
           <input
-            type="email" placeholder="For booking confirmation (optional)"
+            type="email" placeholder="For booking confirmation (optional)" autoComplete="email"
             value={form.email} onChange={e => onChange("email", e.target.value)}
             style={inputStyle(errors.email)}
           />
@@ -784,7 +790,7 @@ function CustomerStep({ form, onChange, errors }) {
               ))}
             </select>
             <input
-              type="tel" placeholder="812345678" inputMode="numeric"
+              type="tel" placeholder="812345678" inputMode="numeric" autoComplete="tel-national"
               value={form.phone}
               onChange={e => onChange("phone", e.target.value.replace(/[^\d]/g, ""))}
               style={{ ...inputStyle(false), flex: 1 }}
@@ -801,7 +807,7 @@ function CustomerStep({ form, onChange, errors }) {
             style={{ ...inputStyle(false), resize: "vertical", lineHeight: 1.5 }}
           />
         </div>
-      </div>
+      </form>
     </div>
   );
 }
