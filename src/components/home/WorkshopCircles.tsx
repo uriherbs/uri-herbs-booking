@@ -108,10 +108,8 @@ export async function WorkshopCircles() {
             }}
           >
             <div style={{ position: 'relative', aspectRatio: '4 / 3', overflow: 'hidden' }}>
-              {/* See src/lib/workshop-placeholder-images.ts for why
-                  this deliberately doesn't use w.hero_image_url. */}
               <img
-                src={getPlaceholderWorkshopImage(w.slug, i)}
+                src={w.hero_image_url || getPlaceholderWorkshopImage(w.slug, i)}
                 alt={`${w.name} workshop`}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />

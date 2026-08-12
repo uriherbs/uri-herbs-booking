@@ -50,9 +50,7 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
   const w = await getWorkshopPageData(params.slug);
   if (!w) notFound();
 
-  // See src/lib/workshop-placeholder-images.ts for why this
-  // deliberately doesn't use w.hero_image_url.
-  const heroImage = getPlaceholderWorkshopImage(w.slug, 0);
+  const heroImage = w.hero_image_url || getPlaceholderWorkshopImage(w.slug, 0);
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh' }}>
@@ -105,10 +103,11 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
         </div>
 
         <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center' }}>
-          {/* TODO(design): AI-generated placeholder photo (see
-              src/lib/workshop-placeholder-images.ts). Swap the
-              relevant public/workshop-*.png file for a real studio
-              photo once one exists — no code change needed here. */}
+          {/* Real hero_image_url from the DB when this workshop has
+              one; an AI-generated placeholder (see
+              src/lib/workshop-placeholder-images.ts) only if it's
+              null. No code change needed here once every workshop has
+              a real photo — the placeholder just stops being used. */}
           <LeafFrame>
             <img
               src={heroImage}

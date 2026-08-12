@@ -14,15 +14,15 @@
 // photo that actually matches its craft (the tea-blending workshop
 // shows the tea-blending placeholder, etc.), not just "a" placeholder.
 //
-// Both callers deliberately do NOT fall back to a workshop's real
-// `hero_image_url` from the DB: as of writing, one workshop ("Tea
-// Blending") has hero_image_url set to what looks like a stray/wrong
-// asset (a design file, not a workshop photo) — the other 3 have
-// none at all. Preferring hero_image_url when present would show 1
-// broken-looking image next to 3 placeholder photos, worse than 4
-// consistent ones. Once real, verified photos exist for ALL 4
-// workshops, both callers should switch back to preferring
-// `hero_image_url ?? PLACEHOLDER_IMAGE_BY_SLUG[slug]`.
+// Use this ONLY as a fallback for a missing `hero_image_url` — never
+// to second-guess or override a real one. An earlier version of this
+// module judged Tea Blending's real hero_image_url as "probably
+// wrong" purely from its generic CDN filename and had both callers
+// ignore it outright; that was a mistake — confirmed via /admin/content
+// that it's real studio photography, not a stray upload. A filename
+// is not a reliable signal of a real image's *content*, so don't
+// filter on it: always prefer `hero_image_url` when the DB has one,
+// and only reach for a placeholder when the field is actually null.
 export const PLACEHOLDER_IMAGE_BY_SLUG: Record<string, string> = {
   'tea-blending': '/workshop-tea-blending.png',
   'ya-dom-inhaler': '/workshop-ya-dom.png',
