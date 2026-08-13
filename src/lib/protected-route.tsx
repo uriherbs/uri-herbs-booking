@@ -41,10 +41,10 @@ function LoadingScreen() {
       alignItems: 'center', justifyContent: 'center', gap: 16,
       background: C.parchment, fontFamily: "'DM Sans', sans-serif",
     }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500&display=swap');
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url(https://fonts.googleapis.com/css2?family=DM+Sans:wght@500&display=swap);
         @keyframes uri-spin { to { transform: rotate(360deg); } }
-      `}</style>
+      ` }} />
       <div style={{
         width: 36, height: 36, borderRadius: '50%',
         border: `3px solid ${C.sand}`, borderTopColor: C.sage,

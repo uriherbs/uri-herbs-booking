@@ -238,13 +238,13 @@ export default function BlogPostEditPage() {
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         button:active { transform: scale(0.98); }
         textarea, input[type="text"], input[type="date"], input[type="number"] { font-family: 'DM Sans', sans-serif; }
         textarea:focus, input:focus { outline: none; border-color: ${C.sage}; }
-      `}</style>
+      ` }} />
 
       <div style={{ background: C.forest, padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 9 }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff" opacity="0.9"><path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22.5C7.76 17.66 9.41 12.67 18 11.18V14C21.78 10.58 20 2 20 2S13.21 4.58 17 8Z" /></svg>

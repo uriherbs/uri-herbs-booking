@@ -633,12 +633,12 @@ export default function AdminDashboard({ adminName, onSignOut }) {
       maxWidth: 600, margin: "0 auto", minHeight: "100vh",
       background: C.parchment, fontFamily: "'DM Sans', sans-serif",
     }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         button:active { transform: scale(0.97); }
         a { text-decoration: none; }
-      `}</style>
+      ` }} />
 
       {/* Header */}
       <div style={{
