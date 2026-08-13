@@ -93,7 +93,7 @@ export default async function BlogPage() {
             )}
 
             {wellnessPosts.length > 0 && (
-              <section style={{ marginTop: 56, paddingTop: 44, borderTop: workshopPosts.length > 0 ? `1px solid ${C.sand}` : undefined }}>
+              <section style={{ marginTop: 40, paddingTop: 28, borderTop: workshopPosts.length > 0 ? `1px solid ${C.sand}` : undefined }}>
                 <h2 style={{ margin: 0, fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 24, color: C.forest }}>
                   Wellness Tips
                 </h2>
