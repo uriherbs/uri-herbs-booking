@@ -1,20 +1,22 @@
 // ============================================================
 // src/app/admin/(protected)/content/blog/[slug]/page.tsx
 // ============================================================
-// Blog Content (CMS) — edit screen, stage 1: post-level fields only
-// (title, slug, excerpt, published date, read time, hero image,
-// category, published/draft toggle) + Delete Post. Content blocks
-// are shown read-only below, with a note that the dynamic
-// add/remove/reorder block editor is a follow-up pass — see
-// admin-blog-service.ts's file header for why that's split out
-// (variable block count vs. the workshop editor's fixed 4).
+// Blog Content (CMS) — edit screen: post-level fields (title, slug,
+// excerpt, published date, read time, hero image, category,
+// published/draft toggle) + the dynamic content-block editor
+// (BlockEditor — add/remove/reorder any number of paragraph/
+// heading/image/quote blocks; see that component's header for why
+// blog posts need this instead of the workshop editor's fixed-4
+// slots) + Delete Post.
 //
 // Same local-draft-state pattern as the workshop editor
-// ([slug]/page.tsx one level up): fields are seeded from the fetch,
-// edited freely, and only written back on "Save Changes". Image
-// uploads are the one exception — a chosen file uploads to Storage
-// immediately so the preview shows the real result, but the post
-// row itself isn't updated until Save.
+// ([slug]/page.tsx one level up): fields (and now blocks) are
+// seeded from the fetch, edited freely, and only written back on
+// "Save Changes" — via updateBlogPostFields() + saveBlogContentBlocks()
+// together, so one Save persists both. Image uploads are the one
+// exception — a chosen file uploads to Storage immediately so the
+// preview shows the real result, but the post/block rows themselves
+// aren't updated until Save.
 // ============================================================
 
 'use client';
@@ -26,8 +28,10 @@ import {
   updateBlogPostFields,
   uploadBlogImage,
   deleteBlogPost,
+  saveBlogContentBlocks,
   type BlogPostCategory,
 } from '@/lib/admin-blog-service';
+import { BlockEditor, type EditableBlock } from '@/components/admin/BlockEditor';
 
 const C = {
   sage: '#6B8F71',
@@ -103,11 +107,6 @@ const inputStyle: React.CSSProperties = {
   border: `1.5px solid ${C.sand}`, borderRadius: 10, padding: '11px 13px',
 };
 
-function blockPreviewText(b: { block_type: string; text_content: string | null }): string {
-  if (b.block_type === 'heading') return `— ${b.text_content}`;
-  return b.text_content ? (b.text_content.length > 90 ? b.text_content.slice(0, 90) + '…' : b.text_content) : '(image block)';
-}
-
 export default function BlogPostEditPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
@@ -122,6 +121,7 @@ export default function BlogPostEditPage() {
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
   const [category, setCategory] = useState<BlogPostCategory>('wellness-tips');
   const [isActive, setIsActive] = useState(false);
+  const [blocks, setBlocks] = useState<EditableBlock[]>([]);
 
   const [heroUploading, setHeroUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -144,6 +144,18 @@ export default function BlogPostEditPage() {
     setHeroImageUrl(post.hero_image_url);
     setCategory(post.category);
     setIsActive(post.is_active);
+    setBlocks(
+      post.blocks.map((b) => ({
+        key: b.id,
+        id: b.id,
+        block_type: b.block_type,
+        text_content: b.text_content ?? '',
+        image_url: b.image_url,
+        image_alt: b.image_alt ?? '',
+        caption: b.caption ?? '',
+        attribution: b.attribution ?? '',
+      })),
+    );
   }, [post]);
 
   const handleHeroUpload = async (file: File) => {
@@ -165,6 +177,9 @@ export default function BlogPostEditPage() {
     setSaving(true);
     setSaveError(null);
     try {
+      const originalBlockIds = post.blocks.map((b) => b.id);
+      await saveBlogContentBlocks(post.id, originalBlockIds, blocks);
+
       const { slug: newSlug } = await updateBlogPostFields(post.id, {
         title,
         slug: slugField,
@@ -346,29 +361,9 @@ export default function BlogPostEditPage() {
           <div style={{ flex: 1, height: 1, background: C.sand }} />
         </div>
 
-        {/* Content blocks — read-only for now; the add/remove/reorder
-            editor is a follow-up pass (see file header). */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{
-            padding: '9px 12px', borderRadius: 10, background: C.mist,
-            fontSize: 12, color: C.barkLight, lineHeight: 1.5,
-          }}>
-            {post.blocks.length} block{post.blocks.length === 1 ? '' : 's'} · read-only preview — the block editor (add/remove/reorder paragraphs, headings, images, quotes) is coming in the next update.
-          </div>
-          {post.blocks.map((b, i) => (
-            <div key={b.id} style={{
-              background: C.white, border: `1px solid ${C.sand}`, borderRadius: 10,
-              padding: '9px 12px', display: 'flex', gap: 10, alignItems: 'baseline',
-            }}>
-              <span style={{
-                fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
-                color: C.sageDark, background: C.sageLight, borderRadius: 6, padding: '2px 6px', flexShrink: 0,
-              }}>{b.block_type}</span>
-              <span style={{ fontSize: 12.5, color: C.bark, lineHeight: 1.5 }}>{blockPreviewText(b)}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 10.5, color: C.barkLight, flexShrink: 0 }}>#{i + 1}</span>
-            </div>
-          ))}
-        </div>
+        {/* Content blocks — add/remove/reorder any number of
+            paragraph/heading/image/quote blocks. */}
+        <BlockEditor blocks={blocks} onChange={setBlocks} postSlug={slug ?? post.slug} />
 
         {/* Danger zone */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>

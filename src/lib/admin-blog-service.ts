@@ -14,11 +14,10 @@
 // Unlike the workshop CMS — which always edits exactly 4 fixed
 // content blocks — a blog post can have any number of blocks (the
 // 6 "Wellness Tips" posts have 11–18 each), so block CRUD here is
-// list-shaped (create/update/delete/reorder) rather than "always
-// exactly N slots". Section 7 below is data-layer only; the dynamic
-// add/remove/reorder block editor UI that will call it is a
-// follow-up pass — this file already fully backs the
-// /admin/content/blog list + edit (post-fields) screens.
+// list-shaped (create/update/delete/reorder, section 7) with
+// saveBlogContentBlocks() (section 8) diffing a full editor draft
+// against what was loaded and applying exactly the writes needed —
+// that's what the /admin/content/blog/[slug] block editor calls.
 // ============================================================
 
 import { supabase } from './supabase';
@@ -254,9 +253,9 @@ export async function uploadBlogImage(file: File, postSlug: string): Promise<str
 }
 
 // ────────────────────────────────────────────────────────────
-// 7. CONTENT BLOCK CRUD  (data layer only — see file header;
-//    the dynamic add/remove/reorder editor UI is a follow-up
-//    pass, wired up now so that pass is UI-only)
+// 7. CONTENT BLOCK CRUD  (data layer — driven by
+//    saveBlogContentBlocks() below, which is what the edit
+//    screen's dynamic block editor actually calls)
 // ────────────────────────────────────────────────────────────
 
 export interface BlogContentBlockInput {
@@ -292,11 +291,67 @@ export async function deleteBlogContentBlock(blockId: string): Promise<void> {
 
 // Persists a full reordered block list in one go — writes each
 // block's sort_order to match its new array index. Used by the
-// (follow-up) drag-to-reorder editor UI.
+// reorder buttons in the block editor.
 export async function reorderBlogContentBlocks(blockIds: string[]): Promise<void> {
   const results = await Promise.all(
     blockIds.map((id, index) => supabase.from('blog_post_content_blocks').update({ sort_order: index + 1 }).eq('id', id)),
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) throw new Error(`Failed to reorder content blocks: ${failed.error.message}`);
+}
+
+// ────────────────────────────────────────────────────────────
+// 8. SAVE ALL BLOCKS  (one call from the edit screen's Save
+//    button — diffs the editor's current draft against what was
+//    originally loaded and applies exactly the creates/updates/
+//    deletes needed, then persists the final order)
+// ────────────────────────────────────────────────────────────
+// Mirrors saveWorkshopContent()'s "insert if id is null, update
+// otherwise" idea, generalized to a variable-length list: blocks
+// present in `originalBlockIds` but missing from `draftBlocks` are
+// deleted (the admin removed them in the editor), everything left
+// is created or updated, and the survivors' sort_order is set to
+// match their final position in `draftBlocks`.
+
+export interface DraftContentBlock {
+  id: string | null; // null = added in this editing session, not yet in the DB
+  block_type: BlogContentBlockType;
+  text_content: string;
+  image_url: string | null;
+  image_alt: string;
+  caption: string;
+  attribution: string;
+}
+
+export async function saveBlogContentBlocks(
+  postId: string,
+  originalBlockIds: string[],
+  draftBlocks: DraftContentBlock[],
+): Promise<void> {
+  const keptIds = new Set(draftBlocks.map((b) => b.id).filter((id): id is string => !!id));
+  const toDelete = originalBlockIds.filter((id) => !keptIds.has(id));
+  if (toDelete.length > 0) {
+    await Promise.all(toDelete.map((id) => deleteBlogContentBlock(id)));
+  }
+
+  const finalIds: string[] = [];
+  for (const block of draftBlocks) {
+    const input: BlogContentBlockInput = {
+      block_type: block.block_type,
+      text_content: block.text_content.trim() || null,
+      image_url: block.image_url,
+      image_alt: block.image_alt.trim() || null,
+      caption: block.caption.trim() || null,
+      attribution: block.attribution.trim() || null,
+      sort_order: 0, // real value written by reorderBlogContentBlocks below
+    };
+    if (block.id) {
+      await updateBlogContentBlock(block.id, input);
+      finalIds.push(block.id);
+    } else {
+      finalIds.push(await createBlogContentBlock(postId, input));
+    }
+  }
+
+  await reorderBlogContentBlocks(finalIds);
 }
