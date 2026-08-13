@@ -22,6 +22,10 @@ import {
   listWorkshopsForAdmin,
   getWorkshopForAdmin,
 } from './admin-content-service';
+import {
+  listBlogPostsForAdmin,
+  getBlogPostForAdmin,
+} from './admin-blog-service';
 import type {
   AvailableSlot,
   CalendarDay,
@@ -33,6 +37,10 @@ import type {
   AdminWorkshopSummary,
   AdminWorkshopDetail,
 } from './admin-content-service';
+import type {
+  AdminBlogPostSummary,
+  AdminBlogPostDetail,
+} from './admin-blog-service';
 
 
 // ─────────────────────────────────────────────────────────
@@ -570,4 +578,66 @@ export function useAdminWorkshopEditor(slug: string | null) {
   }, [refresh]);
 
   return { workshop, loading, error, refresh };
+}
+
+// ───────────────────────────────────────────────────────────
+// 10. useAdminBlogList  (CMS: blog content list screen)
+// ───────────────────────────────────────────────────────────
+
+export function useAdminBlogList() {
+  const [posts, setPosts] = useState<AdminBlogPostSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listBlogPostsForAdmin();
+      setPosts(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load blog posts');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { posts, loading, error, refresh };
+}
+
+// ───────────────────────────────────────────────────────────
+// 11. useAdminBlogEditor  (CMS: blog edit screen — initial load)
+// ───────────────────────────────────────────────────────────
+// Just the fetch — same shape as useAdminWorkshopEditor. The edit
+// screen owns its own local draft state and calls
+// updateBlogPostFields()/the block CRUD functions itself.
+
+export function useAdminBlogEditor(slug: string | null) {
+  const [post, setPost] = useState<AdminBlogPostDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!slug) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getBlogPostForAdmin(slug);
+      setPost(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load blog post');
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { post, loading, error, refresh };
 }

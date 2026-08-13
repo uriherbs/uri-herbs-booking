@@ -667,6 +667,18 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             }}>
             {Icons.edit(14)}
           </Link>
+          <Link
+            href="/admin/content/blog"
+            title="Blog Content"
+            style={{
+              background: "rgba(255,255,255,0.12)", borderRadius: 20,
+              width: 30, height: 30,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+            </svg>
+          </Link>
           <button
             onClick={handleSignOut}
             title="Sign out"
