@@ -1,55 +1,78 @@
 // ============================================================
 // src/app/blog/page.tsx
 // ============================================================
-// Placeholder so the "Blog" nav link (see SiteHeader) has
-// somewhere real to go instead of 404ing. Swap this file's
-// content for actual posts whenever the blog is ready — nothing
-// else references this page.
+// Post-list page. Replaces the old static "Our Blog is Brewing"
+// placeholder now that a real (if content-placeholder) /blog exists.
+// Pulls the 4 posts from Supabase via getActiveBlogPosts() — same
+// pattern as WorkshopCircles pulling from getActiveWorkshopSummaries.
+//
+// Structure-only pass: the 4 posts currently in the DB are the same
+// placeholder copy carried over from the uri-herbs-v0-design mockup.
+// Real post content comes in a separate follow-up (new DB rows only
+// — this page doesn't change for that).
 // ============================================================
 
-import Link from 'next/link';
+import type { Metadata } from 'next';
 import SiteHeader from '@/components/SiteHeader';
+import { PostCard } from '@/components/blog/PostCard';
+import { getActiveBlogPosts } from '@/lib/blog-content-service';
+import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
-const C = {
-  sage: '#6B8F71',
-  forest: '#2D4639',
-  parchment: '#F8F5EF',
-  white: '#FFFFFF',
-  gold: '#A89068',
-  bark: '#5C4A3D',
-  barkLight: '#8A7668',
+export const metadata: Metadata = {
+  title: 'Blog — Uri Herbs Workshop',
+  description:
+    'Stories from the workshop — notes on Thai herbal tea, ya dom, natural skincare, and herbal massage balms from Uri Herbs Workshop in Chiang Mai.',
 };
 
-export default function BlogPage() {
+export default async function BlogPage() {
+  let posts: Awaited<ReturnType<typeof getActiveBlogPosts>> = [];
+  try {
+    posts = await getActiveBlogPosts();
+  } catch (err) {
+    console.error('BlogPage: failed to load posts', err);
+  }
+
   return (
-    <div style={{ background: C.parchment, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@700&family=DM+Sans:wght@400;600;700&display=swap');
-        a { text-decoration: none; }
-      `}</style>
+    <div style={{ background: C.parchment, minHeight: '100vh' }}>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            ${FONT_IMPORT}
+            * { box-sizing: border-box; }
+            .blog-grid { display: grid; grid-template-columns: 1fr; gap: 20px 24px; }
+            @media (min-width: 620px) { .blog-grid { grid-template-columns: 1fr 1fr; } }
+            @media (min-width: 940px) { .blog-grid { grid-template-columns: repeat(3, 1fr); } }
+          `,
+        }}
+      />
 
       <SiteHeader />
 
-      <div style={{
-        maxWidth: 560, margin: '0 auto', minHeight: 'calc(100vh - 65px)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        textAlign: 'center', padding: '60px 24px',
-      }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🌿</div>
-        <h1 style={{ fontFamily: "'Crimson Pro'", fontSize: 'clamp(28px,5vw,38px)', fontWeight: 700, color: C.forest, margin: '0 0 14px' }}>
-          Our Blog is Brewing
-        </h1>
-        <p style={{ fontSize: 16, lineHeight: 1.7, color: C.bark, margin: '0 0 32px' }}>
-          We're writing up stories from the workshop — Thai herbal traditions, seasonal ingredients,
-          and behind-the-scenes from Chiang Mai Old City. Check back soon.
-        </p>
-        <Link href="/book" style={{
-          background: C.sage, color: '#fff', padding: '14px 28px',
-          borderRadius: 12, fontWeight: 700, fontSize: 15,
-        }}>
-          Book a Workshop Instead
-        </Link>
-      </div>
+      <main style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 20px 80px' }}>
+        <div style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontFamily: FONT_BODY, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.gold }}>
+            From the Garden
+          </p>
+          <h1 style={{ margin: '8px 0 0', fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 'clamp(30px,5vw,42px)', color: C.forest, lineHeight: 1.1 }}>
+            Stories from the Workshop
+          </h1>
+          <p style={{ margin: '12px 0 0', fontFamily: FONT_BODY, fontSize: 15, lineHeight: 1.6, color: C.barkLight }}>
+            Notes on Thai herbal tradition, and what actually goes into the things we make by hand.
+          </p>
+        </div>
+
+        {posts.length === 0 ? (
+          <p style={{ marginTop: 56, textAlign: 'center', fontFamily: FONT_BODY, fontSize: 15, color: C.barkLight }}>
+            No stories posted yet — check back soon.
+          </p>
+        ) : (
+          <div className="blog-grid" style={{ marginTop: 48 }}>
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
