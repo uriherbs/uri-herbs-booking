@@ -4,19 +4,25 @@
 // Post-list page. Replaces the old static "Our Blog is Brewing"
 // placeholder now that a real /blog exists. Pulls all posts from
 // Supabase via getActiveBlogPosts() — same pattern as WorkshopCircles
-// pulling from getActiveWorkshopSummaries — then splits them into two
-// sections by `category`: the original 4 workshop-focused posts, and
-// a second "Wellness Tips" batch transcribed from the old
-// uriherbs.com/blog (migration "add_wellness_tips_blog_posts"). Kept
-// as two grids instead of one interleaved-by-date list so the two
-// very different kinds of post (workshop recaps vs. general wellness
-// notes) each read as their own clear section.
+// pulling from getActiveWorkshopSummaries.
+//
+// Posts render as one continuous grid — the original 4 workshop-
+// focused posts, followed by the "Wellness Tips" batch transcribed
+// from the old uriherbs.com/blog (migration
+// "add_wellness_tips_blog_posts") — rather than two separately-
+// headed grids. Two grids left an orphaned last row for the 4-post
+// workshop group (1 card + 2 empty cells in the 3-column layout)
+// before a big section break; one grid lets the next post in line
+// flow straight into those empty cells instead. Each card still
+// carries its own category label (PostCard's "Workshop Story" /
+// "Wellness Tip" meta text) so the two kinds of post stay
+// distinguishable without a hard visual break between them.
 // ============================================================
 
 import type { Metadata } from 'next';
 import SiteHeader from '@/components/SiteHeader';
 import { PostCard } from '@/components/blog/PostCard';
-import { getActiveBlogPosts, type BlogPostSummary } from '@/lib/blog-content-service';
+import { getActiveBlogPosts } from '@/lib/blog-content-service';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
 export const metadata: Metadata = {
@@ -24,16 +30,6 @@ export const metadata: Metadata = {
   description:
     'Stories from the workshop and wellness tips from the garden — notes on Thai herbal tea, ya dom, natural skincare, aloe vera, castor oil, and more from Uri Herbs Workshop in Chiang Mai.',
 };
-
-function PostGrid({ posts }: { posts: BlogPostSummary[] }) {
-  return (
-    <div className="blog-grid">
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </div>
-  );
-}
 
 export default async function BlogPage() {
   let posts: Awaited<ReturnType<typeof getActiveBlogPosts>> = [];
@@ -43,8 +39,13 @@ export default async function BlogPage() {
     console.error('BlogPage: failed to load posts', err);
   }
 
-  const workshopPosts = posts.filter((p) => p.category === 'workshop');
-  const wellnessPosts = posts.filter((p) => p.category === 'wellness-tips');
+  // Workshop posts first, then wellness-tips — same grouping the two
+  // sections used to enforce, just flowing through one grid now
+  // instead of breaking into a second header + grid.
+  const orderedPosts = [
+    ...posts.filter((p) => p.category === 'workshop'),
+    ...posts.filter((p) => p.category === 'wellness-tips'),
+  ];
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh' }}>
@@ -75,37 +76,16 @@ export default async function BlogPage() {
           </p>
         </div>
 
-        {posts.length === 0 ? (
+        {orderedPosts.length === 0 ? (
           <p style={{ marginTop: 56, textAlign: 'center', fontFamily: FONT_BODY, fontSize: 15, color: C.barkLight }}>
             No stories posted yet — check back soon.
           </p>
         ) : (
-          <>
-            {workshopPosts.length > 0 && (
-              <section style={{ marginTop: 48 }}>
-                <h2 style={{ margin: 0, fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 24, color: C.forest }}>
-                  Workshop Stories
-                </h2>
-                <div style={{ marginTop: 24 }}>
-                  <PostGrid posts={workshopPosts} />
-                </div>
-              </section>
-            )}
-
-            {wellnessPosts.length > 0 && (
-              <section style={{ marginTop: 40, paddingTop: 28, borderTop: workshopPosts.length > 0 ? `1px solid ${C.sand}` : undefined }}>
-                <h2 style={{ margin: 0, fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 24, color: C.forest }}>
-                  Wellness Tips
-                </h2>
-                <p style={{ margin: '8px 0 0', fontFamily: FONT_BODY, fontSize: 14, color: C.barkLight }}>
-                  Practical natural-health notes from the Uri Herbs garden.
-                </p>
-                <div style={{ marginTop: 24 }}>
-                  <PostGrid posts={wellnessPosts} />
-                </div>
-              </section>
-            )}
-          </>
+          <div className="blog-grid" style={{ marginTop: 48 }}>
+            {orderedPosts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
         )}
       </main>
     </div>
