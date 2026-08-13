@@ -17,7 +17,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getBlogPostBySlug, getRelatedBlogPosts, formatPostDate } from '@/lib/blog-content-service';
+import { getBlogPostBySlug, getRelatedBlogPosts, formatPostDate, getCategoryLabel } from '@/lib/blog-content-service';
 import SiteHeader from '@/components/SiteHeader';
 import { LeafFrame } from '@/components/LeafFrame';
 import { PostContent } from '@/components/blog/PostContent';
@@ -44,7 +44,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
   const post = await getBlogPostBySlug(params.slug);
   if (!post) notFound();
 
-  const relatedPosts = await getRelatedBlogPosts(post.slug);
+  const relatedPosts = await getRelatedBlogPosts(post.slug, post.category);
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh' }}>
@@ -84,7 +84,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
         <div style={{ marginTop: 24 }}>
           <p style={{ margin: 0, fontFamily: FONT_BODY, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.gold }}>
-            From the Garden
+            {post.category === 'wellness-tips' ? 'Wellness Tips' : 'From the Garden'}
           </p>
           <h1 style={{ margin: '8px 0 0', fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 'clamp(28px,5vw,40px)', color: C.forest, lineHeight: 1.15 }}>
             {post.title}

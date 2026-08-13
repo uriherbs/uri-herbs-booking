@@ -10,7 +10,7 @@
 import Link from 'next/link';
 import { LeafFrame } from '@/components/LeafFrame';
 import { C, FONT_DISPLAY, FONT_BODY } from '@/lib/theme';
-import { formatPostDate, type BlogPostSummary } from '@/lib/blog-content-service';
+import { formatPostDate, getCategoryLabel, type BlogPostSummary } from '@/lib/blog-content-service';
 
 const ArrowUpRightSVG = () => (
   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -36,7 +36,7 @@ export function PostCard({ post }: { post: BlogPostSummary }) {
 
       <div style={{ display: 'flex', flex: 1, flexDirection: 'column', padding: '4px 4px 0' }}>
         <p style={{ margin: 0, fontFamily: FONT_BODY, fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: C.barkLight }}>
-          {formatPostDate(post.published_at)}
+          {getCategoryLabel(post.category)} · {formatPostDate(post.published_at)}
         </p>
         <h3 style={{ margin: '8px 0 0', fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 19, lineHeight: 1.3, color: C.forest }}>
           {post.title}

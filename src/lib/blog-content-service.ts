@@ -7,12 +7,13 @@
 // blog_posts" / "...content_blocks" are USING(true) / is_active),
 // so it's safe to call straight from a Server Component.
 //
-// Structure only in this pass — the 4 posts currently in the DB are
-// the same placeholder copy carried over from the uri-herbs-v0-design
-// mockup (lib/blog/posts.ts there). Real post content from the live
-// uriherbs.com blog gets swapped in as a separate content pass later
-// (just new rows in blog_posts/blog_post_content_blocks — no code
-// here needs to change for that).
+// The first 4 posts were placeholder copy carried over from the
+// uri-herbs-v0-design mockup (lib/blog/posts.ts there); a `category`
+// column (migration "add_wellness_tips_blog_posts") now separates
+// those workshop-focused posts from a second batch of real posts
+// transcribed from the old uriherbs.com/blog — tagged 'wellness-tips'
+// so /blog can group them into their own section instead of
+// interleaving two very different kinds of post by date alone.
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
@@ -23,6 +24,7 @@ const publicClient = createClient(
     );
 
 export type BlogContentBlockType = 'paragraph' | 'heading' | 'image' | 'quote';
+export type BlogPostCategory = 'workshop' | 'wellness-tips';
 
 export interface BlogPostContentBlock {
       id: string;
@@ -43,13 +45,20 @@ export interface BlogPostSummary {
       published_at: string;
       read_time_minutes: number | null;
       hero_image_url: string | null;
+      category: BlogPostCategory;
 }
 
 export interface BlogPostData extends BlogPostSummary {
       content_blocks: BlogPostContentBlock[];
 }
 
-const SUMMARY_COLUMNS = 'id, slug, title, excerpt, published_at, read_time_minutes, hero_image_url';
+const SUMMARY_COLUMNS = 'id, slug, title, excerpt, published_at, read_time_minutes, hero_image_url, category';
+
+// Small display label for a post's category — used by PostCard's
+// meta line and the [slug] page's eyebrow.
+export function getCategoryLabel(category: BlogPostCategory): string {
+  return category === 'wellness-tips' ? 'Wellness Tip' : 'Workshop Story';
+}
 
 // Listing used by /blog — newest first, matches the ordering already
 // used for post cards in the uri-herbs-v0-design mockup.
@@ -87,21 +96,32 @@ export async function getBlogPostBySlug(slug: string): Promise<BlogPostData | nu
   return { ...post, content_blocks: blocks ?? [] };
 }
 
-// "You might also like" — other active posts, newest first, capped
-// at `count`. No real relatedness signal (tags/category) yet, so
-// this is "everything else" rather than a topical match; revisit
-// once posts carry a category.
-export async function getRelatedBlogPosts(slug: string, count = 3): Promise<BlogPostSummary[]> {
+// "You might also like" — same-category posts first (newest first),
+// topped up with other active posts if the category doesn't have
+// enough on its own, capped at `count`. Pass the current post's own
+// category so a wellness-tips post surfaces other wellness-tips
+// posts before workshop posts, and vice versa.
+export async function getRelatedBlogPosts(
+  slug: string,
+  category?: BlogPostCategory,
+  count = 3,
+): Promise<BlogPostSummary[]> {
+      const relate = (others: BlogPostSummary[]) => {
+        if (!category) return others.slice(0, count);
+        const sameCategory = others.filter((p) => p.category === category);
+        const rest = others.filter((p) => p.category !== category);
+        return [...sameCategory, ...rest].slice(0, count);
+      };
+
       const { data, error } = await publicClient
         .from('blog_posts')
         .select(SUMMARY_COLUMNS)
         .eq('is_active', true)
         .neq('slug', slug)
-        .order('published_at', { ascending: false })
-        .limit(count);
+        .order('published_at', { ascending: false });
 
   if (error) throw new Error(`Failed to load related posts: ${error.message}`);
-      return data ?? [];
+      return relate(data ?? []);
 }
 
 export function formatPostDate(isoDate: string): string {
