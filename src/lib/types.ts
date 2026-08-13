@@ -13,6 +13,9 @@ export interface AvailableSlot {
   start_time: string;       // '10:00:00'
   end_time: string;         // '11:00:00'
   remaining_capacity: number;
+  // 'A' | 'B' = one table; null = either not yet assigned (unavailable),
+  // or — when the request was for a 9-16 whole-space private booking —
+  // "both tables together".
   instructor_group: 'A' | 'B' | null;
   is_available: boolean;
 }
@@ -32,7 +35,10 @@ export interface BookingConfirmation {
   start_time: string;
   end_time: string;
   num_participants: number;
-  instructor_group: 'A' | 'B';
+  // null only for a whole-space (9-16 guest) private booking, which
+  // occupies both tables rather than being assigned to just one.
+  instructor_group: 'A' | 'B' | null;
+  is_private: boolean;
   total_price_thb: number;
   status: string;
 }
@@ -90,12 +96,17 @@ export interface CreateBookingRequest {
   customer_phone?: string;
   customer_notes?: string;
   has_minors?: boolean;
+  // Private session (own table, up to 8 — or the whole space, 9-16)
+  // vs. a public group join (shares a table, capped at 6). Defaults
+  // to false (group) server-side if omitted.
+  is_private?: boolean;
 }
 
 export interface AvailabilityRequest {
   date: string;
   package_slug: string;
   num_participants?: number;
+  is_private?: boolean;
 }
 
 export interface CalendarRequest {
@@ -103,6 +114,7 @@ export interface CalendarRequest {
   end_date: string;
   package_slug: string;
   num_participants?: number;
+  is_private?: boolean;
 }
 
 // ── Error Types ──
@@ -141,7 +153,7 @@ export function parseBookingError(pgMessage: string): BookingError {
 // User-friendly error messages (Thai tourists + international visitors)
 export const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   INVALID_PACKAGE:      'This workshop is not currently available.',
-  INVALID_PARTICIPANTS: 'Please check the number of participants (1–12 per group).',
+  INVALID_PARTICIPANTS: 'Please check your guest count — up to 6 for a shared group session, or up to 16 for a private booking.',
   INVALID_DATE:         'This date is not available for booking.',
   INVALID_TIME:         'This time slot is not available for the selected workshop.',
   INVALID_CUSTOMER:     'Please enter your name to complete the booking.',

@@ -53,6 +53,11 @@ export async function getPackages(calendarType?: 'herbal' | 'aromatherapy'): Pro
 // ────────────────────────────────────────────────────────────
 // Returns which start times are bookable, with capacity info.
 //
+// A "group" request shares a table with other bookings (soft cap 6);
+// a "private" request claims a whole table to itself (1-8, hard cap
+// 8) or — at 9+ guests — the whole space (both tables, cap 16). See
+// migration "add_private_vs_group_capacity_model" for the full model.
+//
 // Usage:
 //   const slots = await getAvailableSlots('2026-07-28', 'combo-tea-inhaler', 2);
 //   → [{ start_time: '10:00', remaining: 8, group: 'A', available: true }, ...]
@@ -60,20 +65,23 @@ export async function getPackages(calendarType?: 'herbal' | 'aromatherapy'): Pro
 export async function getAvailableSlots(
   date: string,
   packageSlug: string,
-  numParticipants: number = 1
+  numParticipants: number = 1,
+  isPrivate: boolean = false
 ): Promise<AvailableSlot[]> {
   // Client-side pre-validation
   if (!date || !packageSlug) {
     throw new Error('Date and package are required');
   }
-  if (numParticipants < 1 || numParticipants > 12) {
-    throw new Error('Participants must be between 1 and 12');
+  const maxGuests = isPrivate ? 16 : 6;
+  if (numParticipants < 1 || numParticipants > maxGuests) {
+    throw new Error(`Participants must be between 1 and ${maxGuests}`);
   }
 
   const { data, error } = await supabase.rpc('get_available_slots', {
     p_date: date,
     p_package_slug: packageSlug,
     p_num_participants: numParticipants,
+    p_is_private: isPrivate,
   });
 
   if (error) throw new Error(`Availability check failed: ${error.message}`);
@@ -94,13 +102,15 @@ export async function getCalendarAvailability(
   startDate: string,
   endDate: string,
   packageSlug: string,
-  numParticipants: number = 1
+  numParticipants: number = 1,
+  isPrivate: boolean = false
 ): Promise<CalendarDay[]> {
   const { data, error } = await supabase.rpc('get_calendar_availability', {
     p_start_date: startDate,
     p_end_date: endDate,
     p_package_slug: packageSlug,
     p_num_participants: numParticipants,
+    p_is_private: isPrivate,
   });
 
   if (error) throw new Error(`Calendar check failed: ${error.message}`);
@@ -137,8 +147,9 @@ export async function createBooking(
   if (!req.start_time)     errors.push('Start time is required');
   if (!req.customer_name?.trim()) errors.push('Name is required');
 
-  if (req.num_participants < 1 || req.num_participants > 12) {
-    errors.push('Participants must be between 1 and 12');
+  const maxGuests = req.is_private ? 16 : 6;
+  if (req.num_participants < 1 || req.num_participants > maxGuests) {
+    errors.push(`Participants must be between 1 and ${maxGuests}`);
   }
 
   if (req.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.customer_email)) {
@@ -164,6 +175,7 @@ throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as any;  }
     p_customer_phone:   req.customer_phone?.trim() || null,
     p_customer_notes:   req.customer_notes?.trim() || null,
     p_has_minors:       req.has_minors ?? false,
+    p_is_private:       req.is_private ?? false,
   });
 
   if (error) {

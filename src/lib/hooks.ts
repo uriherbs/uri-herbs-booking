@@ -54,7 +54,8 @@ import type {
 export function useAvailableSlots(
   date: string | null,
   packageSlug: string | null,
-  numParticipants: number = 1
+  numParticipants: number = 1,
+  isPrivate: boolean = false
 ) {
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,7 +69,7 @@ export function useAvailableSlots(
     setLoading(true);
     setError(null);
     try {
-      const data = await getAvailableSlots(date, packageSlug, numParticipants);
+      const data = await getAvailableSlots(date, packageSlug, numParticipants, isPrivate);
       setSlots(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load availability');
@@ -76,7 +77,7 @@ export function useAvailableSlots(
     } finally {
       setLoading(false);
     }
-  }, [date, packageSlug, numParticipants]);
+  }, [date, packageSlug, numParticipants, isPrivate]);
 
   // Initial fetch + refetch whenever inputs change
   useEffect(() => {
@@ -125,7 +126,8 @@ export function useCalendarAvailability(
   startDate: string | null,
   endDate: string | null,
   packageSlug: string | null,
-  numParticipants: number = 1
+  numParticipants: number = 1,
+  isPrivate: boolean = false
 ) {
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,7 +141,7 @@ export function useCalendarAvailability(
     setLoading(true);
     setError(null);
     try {
-      const data = await getCalendarAvailability(startDate, endDate, packageSlug, numParticipants);
+      const data = await getCalendarAvailability(startDate, endDate, packageSlug, numParticipants, isPrivate);
       setDays(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load calendar');
@@ -147,7 +149,7 @@ export function useCalendarAvailability(
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, packageSlug, numParticipants]);
+  }, [startDate, endDate, packageSlug, numParticipants, isPrivate]);
 
   useEffect(() => {
     refresh();
@@ -247,7 +249,7 @@ export function useSlotCapacityLive(
   calendarType: 'herbal' | 'aromatherapy' = 'herbal'
 ) {
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [maxCapacity, setMaxCapacity] = useState<number>(12);
+  const [maxCapacity, setMaxCapacity] = useState<number>(16);
 
   useEffect(() => {
     if (!date || !startTime) return;
@@ -321,7 +323,10 @@ export interface AdminBookingRow {
   start_time: string;
   end_time: string;
   num_participants: number;
-  instructor_group: 'A' | 'B';
+  // null = a whole-space (9-16 guest) private booking, occupying
+  // both tables rather than being assigned to just one.
+  instructor_group: 'A' | 'B' | null;
+  is_private: boolean;
   customer_name: string;
   customer_email: string | null;
   customer_phone: string | null;
@@ -370,7 +375,7 @@ export function useAdminDayData(date: string | null) {
           .from('bookings')
           .select(`
             id, booking_ref, slot_date, start_time, end_time, num_participants,
-            instructor_group, customer_name, customer_email, customer_phone,
+            instructor_group, is_private, customer_name, customer_email, customer_phone,
             customer_notes, has_minors, total_price_thb, status,
             attendance_status, payment_status,
             packages ( name, slug, duration_minutes, calendar_type )

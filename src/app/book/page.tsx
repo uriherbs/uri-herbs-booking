@@ -132,6 +132,43 @@ function mergePackage(dbPkg) {
 // there's now exactly one place the schedule matrix is enforced.
 
 // ════════════════════════════════════════════════════════════
+// PRIVATE VS. GROUP CAPACITY MODEL (spec /book §2.1)
+// ════════════════════════════════════════════════════════════
+// Two instructors, two tables. A group ("join a group") booking shares
+// a table — soft-capped at 6 — with other parties, billed by actual
+// headcount. A private booking claims a whole table to itself:
+//   1–6 guests  → one table, one instructor
+//   7–8 guests  → same one table, just a cozier fit (messaging-only
+//                 difference — the locking logic is identical to 1–6)
+//   9–16 guests → both tables, both instructors (the whole space)
+// Pricing never adds a "private surcharge" — it's the same per-person
+// rate as group, just with a minimum headcount charged regardless of
+// actual attendance. Mirrors create_booking()'s GREATEST(...) logic
+// exactly, so what the customer sees pre-submit matches what they're
+// actually charged.
+function chargedParticipants(participants, isPrivate) {
+  if (!isPrivate) return participants;
+  const minimum = participants <= 8 ? 4 : 10;
+  return Math.max(participants, minimum);
+}
+
+// Dynamic "Experience" step messaging, per spec §4.
+function privateModeMessage(participants) {
+  if (participants <= 6) return "Private session — just your group, with one instructor";
+  if (participants <= 8) return "Private session — just your group (cozy fit for up to 8, one instructor)";
+  return "Private session — the whole space, with both instructors";
+}
+
+// Table label shown on a Date & Time slot, mode-aware (group vs.
+// private) and null-safe (null = a whole-space private booking spans
+// both tables, so there's no single "group" to name).
+function slotGroupLabel(group, isPrivate) {
+  if (group === null) return isPrivate ? "Whole space — both instructors" : null;
+  const instructor = group === "A" ? "with Mali" : "Instructor B";
+  return isPrivate ? `Private table — Group ${group} (${instructor})` : `Group ${group} (${instructor})`;
+}
+
+// ════════════════════════════════════════════════════════════
 // SVG ICONS
 // ════════════════════════════════════════════════════════════
 
@@ -243,9 +280,10 @@ function StepVine({ currentStep }) {
 // STEP 1: PACKAGE SELECTION
 // ════════════════════════════════════════════════════════════
 
-function PackageCard({ pkg, selected, onSelect, participants }) {
+function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
   const isSelected = selected === pkg.slug;
-  const totalPrice = pkg.price * participants;
+  const charged = chargedParticipants(participants, isPrivate);
+  const totalPrice = pkg.price * charged;
   return (
     <button
       onClick={() => onSelect(pkg.slug)}
@@ -282,11 +320,15 @@ function PackageCard({ pkg, selected, onSelect, participants }) {
               fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.gold,
               lineHeight: 1,
             }}>฿{totalPrice.toLocaleString()}</div>
-            {participants > 1 && (
+            {charged !== participants ? (
+              <div style={{ fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight }}>
+                ฿{pkg.price.toLocaleString()} × {charged} (min. for private)
+              </div>
+            ) : participants > 1 ? (
               <div style={{ fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight }}>
                 ฿{pkg.price.toLocaleString()} × {participants}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -317,7 +359,44 @@ function PackageCard({ pkg, selected, onSelect, participants }) {
   );
 }
 
-function PackageStep({ packages, selected, onSelect, participants, onParticipantsChange }) {
+function ModeToggle({ isPrivate, onChange }) {
+  const options = [
+    { value: false, label: "Join a Group", sub: "Share a table · best value" },
+    { value: true, label: "Private Session", sub: "Just your group" },
+  ];
+  return (
+    <div style={{
+      display: "flex", gap: 4, background: C.mist, borderRadius: 12, padding: 4,
+    }}>
+      {options.map(opt => {
+        const selected = isPrivate === opt.value;
+        return (
+          <button
+            key={String(opt.value)}
+            onClick={() => onChange(opt.value)}
+            style={{
+              flex: 1, cursor: "pointer", border: "none", borderRadius: 9,
+              padding: "10px 8px", textAlign: "center",
+              background: selected ? C.white : "transparent",
+              boxShadow: selected ? "0 1px 5px rgba(0,0,0,0.08)" : "none",
+              transition: "all 0.15s",
+            }}
+          >
+            <div style={{
+              fontFamily: "'Crimson Pro'", fontSize: 15, fontWeight: 700,
+              color: selected ? C.forest : C.barkLight,
+            }}>{opt.label}</div>
+            <div style={{
+              fontFamily: "'DM Sans'", fontSize: 11, color: C.barkLight, marginTop: 1,
+            }}>{opt.sub}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PackageStep({ packages, selected, onSelect, participants, onParticipantsChange, isPrivate, onIsPrivateChange }) {
   // Most expensive/longest first, per business request — highest-value
   // option gets first look before the customer scrolls past it.
   const categories = [
@@ -327,12 +406,21 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
     { key: "aromatherapy", title: "Aromatherapy Mastery", subtitle: "2 Hours • Mon–Thu only" },
   ];
 
+  // Group (shared table) soft-caps at 6; private can go up to the whole
+  // space (16). See spec /book §2.1 §1.
+  const maxGuests = isPrivate ? 16 : 6;
+
   return (
     <div style={{ padding: "0 16px 100px" }}>
+      {/* Private vs. Group toggle */}
+      <div style={{ marginBottom: 14 }}>
+        <ModeToggle isPrivate={isPrivate} onChange={onIsPrivateChange} />
+      </div>
+
       {/* Participant counter */}
       <div style={{
         background: C.white, borderRadius: 14, padding: "16px 18px",
-        border: `1.5px solid ${C.sand}`, marginBottom: 20,
+        border: `1.5px solid ${C.sand}`, marginBottom: isPrivate ? 10 : 20,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div>
@@ -340,7 +428,7 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             Number of Guests
           </div>
           <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, marginTop: 2 }}>
-            Max 12 per session
+            {isPrivate ? "Up to 16 — 8 per table, or the whole space for 9+" : "Up to 6, sharing a table with other guests"}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -359,18 +447,29 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             color: C.forest, minWidth: 28, textAlign: "center",
           }}>{participants}</span>
           <button
-            onClick={() => onParticipantsChange(Math.min(12, participants + 1))}
-            disabled={participants >= 12}
+            onClick={() => onParticipantsChange(Math.min(maxGuests, participants + 1))}
+            disabled={participants >= maxGuests}
             style={{
               width: 36, height: 36, borderRadius: "50%",
-              border: `1.5px solid ${participants >= 12 ? C.sand : C.sage}`,
-              background: participants >= 12 ? "transparent" : C.sage,
-              cursor: participants >= 12 ? "default" : "pointer",
-              fontSize: 20, color: participants >= 12 ? C.sand : C.white,
+              border: `1.5px solid ${participants >= maxGuests ? C.sand : C.sage}`,
+              background: participants >= maxGuests ? "transparent" : C.sage,
+              cursor: participants >= maxGuests ? "default" : "pointer",
+              fontSize: 20, color: participants >= maxGuests ? C.sand : C.white,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>+</button>
         </div>
       </div>
+
+      {/* Private-mode dynamic messaging, per spec §4 */}
+      {isPrivate && (
+        <div style={{
+          background: C.goldLight, border: `1px solid rgba(168,144,104,0.25)`,
+          borderRadius: 12, padding: "12px 14px", marginBottom: 20,
+          fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.5,
+        }}>
+          {privateModeMessage(participants)}
+        </div>
+      )}
 
       {/* Informational only — not a blocking checkbox. Business intent
           (per spec): families with kids are welcome and encouraged;
@@ -404,7 +503,7 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             {catPackages.map(pkg => (
               <PackageCard
                 key={pkg.slug} pkg={pkg} selected={selected}
-                onSelect={onSelect} participants={participants}
+                onSelect={onSelect} participants={participants} isPrivate={isPrivate}
               />
             ))}
           </div>
@@ -422,7 +521,7 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-function MiniCalendar({ selectedDate, onSelectDate, selectedPkg, participants }) {
+function MiniCalendar({ selectedDate, onSelectDate, selectedPkg, participants, isPrivate }) {
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -433,7 +532,7 @@ function MiniCalendar({ selectedDate, onSelectDate, selectedPkg, participants })
   const monthEnd = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   const { days: liveDays, loading: calLoading } = useCalendarAvailability(
-    monthStart, monthEnd, selectedPkg?.slug || null, participants
+    monthStart, monthEnd, selectedPkg?.slug || null, participants, isPrivate
   );
 
   // Map server results by date for O(1) lookup while building the grid
@@ -566,10 +665,15 @@ function MiniCalendar({ selectedDate, onSelectDate, selectedPkg, participants })
   );
 }
 
-function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, participants }) {
-  const { slots, loading, error } = useAvailableSlots(selectedDate, pkg?.slug || null, participants);
+function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, participants, isPrivate }) {
+  const { slots, loading, error } = useAvailableSlots(selectedDate, pkg?.slug || null, participants, isPrivate);
 
   if (!selectedDate) return null;
+
+  // Same mode-dependent ceiling the RPC uses for remaining_capacity:
+  // 6 for a shared group table, 8 for a private one-table booking,
+  // 16 for a private whole-space booking. See spec /book §2.1 §1.
+  const maxCap = !isPrivate ? 6 : participants <= 8 ? 8 : 16;
 
   const formatTime = (t) => {
     const [h] = t.split(":");
@@ -606,7 +710,8 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
             const remaining = slot.remaining_capacity;
             const available = slot.is_available;
             const group = slot.instructor_group;
-            const pct = ((12 - remaining) / 12) * 100;
+            const groupLabel = slotGroupLabel(group, isPrivate);
+            const pct = ((maxCap - remaining) / maxCap) * 100;
             return (
               <button key={slot.start_time}
                 onClick={() => available && onSelectTime(slot.start_time)}
@@ -627,13 +732,13 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
                       {formatTime(slot.start_time)}
                       <span style={{ fontSize: 13, fontWeight: 400, color: C.barkLight }}> – {formatTime(slot.end_time)}</span>
                     </div>
-                    {available && group && (
+                    {available && groupLabel && (
                       <div style={{
                         fontFamily: "'DM Sans'", fontSize: 11, color: C.sage, marginTop: 3,
                         display: "flex", alignItems: "center", gap: 4,
                       }}>
                         <UsersSVG size={12} color={C.sage}/>
-                        Group {group} {group === "A" ? "(with Mali)" : "(Instructor B)"}
+                        {groupLabel}
                       </div>
                     )}
                   </div>
@@ -661,8 +766,8 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
                   display: "flex", justifyContent: "space-between", marginTop: 4,
                   fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight,
                 }}>
-                  <span>{12 - remaining} booked</span>
-                  <span>12 max</span>
+                  <span>{maxCap - remaining} booked</span>
+                  <span>{maxCap} max</span>
                 </div>
               </button>
             );
@@ -673,7 +778,8 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
   );
 }
 
-function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, pkg, participants }) {
+function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, pkg, participants, isPrivate }) {
+  const charged = chargedParticipants(participants, isPrivate);
   return (
     <div style={{ padding: "0 16px 100px" }}>
       {/* Selected package reminder */}
@@ -685,10 +791,11 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
         <span style={{ fontSize: 22 }}>{pkg.icon}</span>
         <div>
           <div style={{ fontFamily: "'Crimson Pro'", fontSize: 15, fontWeight: 600, color: C.forest }}>
-            {pkg.name}
+            {pkg.name}{isPrivate && " · Private"}
           </div>
           <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight }}>
-            {pkg.duration} min • {participants} guest{participants > 1 ? "s" : ""} • ฿{(pkg.price * participants).toLocaleString()}
+            {pkg.duration} min • {participants} guest{participants > 1 ? "s" : ""} • ฿{(pkg.price * charged).toLocaleString()}
+            {charged !== participants && ` (min. ${charged})`}
           </div>
         </div>
       </div>
@@ -708,6 +815,7 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
         onSelectDate={onSelectDate}
         selectedPkg={pkg}
         participants={participants}
+        isPrivate={isPrivate}
       />
 
       <TimeSlotPicker
@@ -716,6 +824,7 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
         onSelectTime={onSelectTime}
         pkg={pkg}
         participants={participants}
+        isPrivate={isPrivate}
       />
     </div>
   );
@@ -1041,7 +1150,9 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
                 {result.package_name}
               </div>
               <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight }}>
-                {pkg.duration} minutes • {result.num_participants} guest{result.num_participants > 1 ? "s" : ""} • Group {result.instructor_group}
+                {pkg.duration} minutes • {result.num_participants} guest{result.num_participants > 1 ? "s" : ""} •{" "}
+                {result.instructor_group === null ? "Whole space" : `Group ${result.instructor_group}`}
+                {result.is_private && " · Private"}
               </div>
             </div>
           </div>
@@ -1080,11 +1191,16 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
               ฿{result.total_price_thb.toLocaleString()}
             </span>
           </div>
-          {result.num_participants > 1 && (
-            <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, textAlign: "right", marginTop: 2 }}>
-              ฿{pkg.price.toLocaleString()} × {result.num_participants} guests
-            </div>
-          )}
+          {(() => {
+            const charged = chargedParticipants(result.num_participants, result.is_private);
+            if (charged <= 1) return null;
+            return (
+              <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, textAlign: "right", marginTop: 2 }}>
+                ฿{pkg.price.toLocaleString()} × {charged} guest{charged > 1 ? "s" : ""}
+                {charged !== result.num_participants && ` (${result.num_participants} attending, ${charged}-guest minimum)`}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -1153,6 +1269,7 @@ export default function BookingFlow() {
   const [packagesError, setPackagesError] = useState(null);
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [participants, setParticipants] = useState(1);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "" });
@@ -1186,6 +1303,15 @@ export default function BookingFlow() {
   }, []);
 
   const pkg = packages.find(p => p.slug === selectedPkg);
+
+  // Switching Private → Group can leave `participants` above the
+  // group soft cap (6) — clamp down rather than leaving an invalid
+  // count silently in state. Group → Private never needs clamping
+  // (6 is always ≤ 16).
+  const handleIsPrivateChange = useCallback((next: boolean) => {
+    setIsPrivate(next);
+    if (!next) setParticipants(p => Math.min(p, 6));
+  }, []);
 
   const updateForm = useCallback((field: string, value: any) => {
     setForm(f => ({ ...f, [field]: value }));
@@ -1228,6 +1354,7 @@ export default function BookingFlow() {
           date: selectedDate,
           start_time: selectedTime,
           num_participants: participants,
+          is_private: isPrivate,
           customer_name: form.name,
           customer_email: form.email || undefined,
         customer_phone: form.phone ? `${form.phoneCountryCode}${form.phone.replace(/^0+/, '')}` : undefined,
@@ -1274,7 +1401,7 @@ export default function BookingFlow() {
   };
 
   const handleReset = () => {
-    setStep(0); setSelectedPkg(null); setParticipants(1);
+    setStep(0); setSelectedPkg(null); setParticipants(1); setIsPrivate(false);
     setSelectedDate(null); setSelectedTime(null);
     setForm({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "" });
     setErrors({}); setPaymentMethod(null); setAgreedToTerms(false); resetBooking();
@@ -1413,6 +1540,7 @@ export default function BookingFlow() {
             packages={packages}
             selected={selectedPkg} onSelect={setSelectedPkg}
             participants={participants} onParticipantsChange={setParticipants}
+            isPrivate={isPrivate} onIsPrivateChange={handleIsPrivateChange}
           />
         )
       )}
@@ -1420,7 +1548,7 @@ export default function BookingFlow() {
         <DateTimeStep
           selectedDate={selectedDate} onSelectDate={(d) => { setSelectedDate(d); setSelectedTime(null); }}
           selectedTime={selectedTime} onSelectTime={setSelectedTime}
-          pkg={pkg} participants={participants}
+          pkg={pkg} participants={participants} isPrivate={isPrivate}
         />
       )}
       {step === 2 && (

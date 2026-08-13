@@ -99,7 +99,8 @@ function mapBooking(row) {
     endTime: row.end_time.slice(0, 5),
     blocks: computeBlocks(row.start_time, pkg?.duration_minutes || 60),
     guests: row.num_participants,
-    group: row.instructor_group,
+    group: row.instructor_group, // 'A' | 'B' | null (null = whole-space private)
+    isPrivate: !!row.is_private,
     name: row.customer_name,
     email: row.customer_email || "",
     phone: row.customer_phone || "",
@@ -186,8 +187,10 @@ function formatTime12(t) {
   return `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? "PM" : "AM"}`;
 }
 
-// Two-tone capacity gauge: sage = Group A (1-6), gold = Group B (7-12)
-function CapacityGauge({ groupA, groupB, max = 12, blocked }) {
+// Two-tone capacity gauge: sage = Group A, gold = Group B — two independent
+// tables, each soft-capped at 6 (up to 8 for a private booking), not one
+// sequential pool.
+function CapacityGauge({ groupA, groupB, max = 16, blocked }) {
   if (blocked) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -278,7 +281,7 @@ function BookingRow({ booking, onUpdate }) {
         {/* Group indicator */}
         <div style={{
           width: 6, height: 36, borderRadius: 3, flexShrink: 0,
-          background: booking.group === "A" ? C.sage : C.gold,
+          background: booking.group === "A" ? C.sage : booking.group === "B" ? C.gold : C.coral,
         }}/>
 
         {/* Name & package */}
@@ -340,9 +343,10 @@ function BookingRow({ booking, onUpdate }) {
             <div>
               <div style={{ fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Group</div>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: booking.group === "A" ? C.sage : C.gold }}/>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: booking.group === "A" ? C.sage : booking.group === "B" ? C.gold : C.coral }}/>
                 <span style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.forest }}>
-                  {booking.group === "A" ? "Group A (Mali)" : "Group B"}
+                  {booking.group === "A" ? "Group A (Mali)" : booking.group === "B" ? "Group B" : "Whole Space"}
+                  {booking.isPrivate && " · Private"}
                 </span>
               </div>
             </div>
@@ -430,12 +434,26 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
   const [open, setOpen] = useState(bookings.length > 0);
   const isBlocked = blockedSlots.has(block.time);
 
-  const groupA = bookings.filter(b => b.group === "A").reduce((s, b) => s + b.guests, 0);
-  const groupB = bookings.filter(b => b.group === "B").reduce((s, b) => s + b.guests, 0);
+  // A whole-space private booking has group === null (occupies both
+  // tables at once) — split its headcount evenly across both bars so
+  // the gauge still reflects real occupancy instead of hiding it.
+  const groupA = bookings.reduce((s, b) => s + (b.group === "A" ? b.guests : b.group === null ? Math.ceil(b.guests / 2) : 0), 0);
+  const groupB = bookings.reduce((s, b) => s + (b.group === "B" ? b.guests : b.group === null ? Math.floor(b.guests / 2) : 0), 0);
   const total = groupA + groupB;
 
   const allArrived = bookings.length > 0 && bookings.every(b => b.attendance === "arrived");
   const allPaid = bookings.length > 0 && bookings.every(b => b.payment === "paid");
+
+  // Private-booking label (§6 of the spec) — visible on the collapsed
+  // header, next to the time, without needing to expand any booking.
+  const privateWhole = bookings.some(b => b.isPrivate && b.group === null);
+  const privateA = bookings.some(b => b.isPrivate && b.group === "A");
+  const privateB = bookings.some(b => b.isPrivate && b.group === "B");
+  const privateLabel = privateWhole || (privateA && privateB)
+    ? "Private — Full Space"
+    : privateA ? "Private — Group A"
+    : privateB ? "Private — Group B"
+    : null;
 
   return (
     <div style={{
@@ -461,6 +479,16 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
           <div style={{ fontFamily: "'DM Sans'", fontSize: 11, color: C.barkLight }}>
             – {formatTime12(block.end)}
           </div>
+          {privateLabel && (
+            <div style={{
+              marginTop: 4, display: "inline-flex", alignItems: "center",
+              fontFamily: "'DM Sans'", fontSize: 10, fontWeight: 700,
+              color: C.coral, background: C.coralPale, border: `1px solid rgba(192,122,110,0.3)`,
+              borderRadius: 6, padding: "2px 6px", whiteSpace: "nowrap",
+            }}>
+              {privateLabel}
+            </div>
+          )}
         </div>
 
         {/* Capacity gauge */}
@@ -515,7 +543,7 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
           padding: "12px 16px 18px", textAlign: "center",
           fontFamily: "'DM Sans'", fontSize: 13, color: C.barkLight,
         }}>
-          No bookings yet — 12 spots available
+          No bookings yet — 16 spots available
         </div>
       )}
     </div>
@@ -901,11 +929,18 @@ export default function AdminDashboard({ adminName, onSignOut }) {
         <div style={{ display: "flex", gap: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 12, height: 12, borderRadius: 3, background: C.sage }}/>
-            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group A · Mali (Guests 1–6)</span>
+            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group A · Mali (up to 6, 8 if private)</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 12, height: 12, borderRadius: 3, background: C.gold }}/>
-            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group B · (Guests 7–12)</span>
+            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group B (up to 6, 8 if private)</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+              width: 12, height: 12, borderRadius: 3, background: C.coralPale,
+              border: `1px solid rgba(192,122,110,0.4)`,
+            }}/>
+            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Private booking (table or full space closed)</span>
           </div>
         </div>
       </div>
