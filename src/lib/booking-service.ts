@@ -14,6 +14,7 @@ import type {
   AvailableSlot,
   CalendarDay,
   BookingConfirmation,
+  PaymentConfirmation,
   CancelConfirmation,
   DashboardBlock,
   Package,
@@ -119,11 +120,14 @@ export async function getCalendarAvailability(
 
 
 // ────────────────────────────────────────────────────────────
-// 4. CREATE BOOKING  (the main transaction)
+// 4. CREATE BOOKING  (reserves capacity, starts pending_payment)
 // ────────────────────────────────────────────────────────────
-// Atomically reserves capacity and creates the booking.
-// Returns a confirmation with booking ref, or throws a
-// structured BookingError on failure.
+// Atomically reserves capacity and creates the booking. The booking
+// ALWAYS comes back with status 'pending_payment' now — it does not
+// become 'confirmed' until payment is verified server-side (see
+// confirmPayLaterBooking below, and the Stripe/PayPal payment API
+// routes for the online-payment paths). Returns a confirmation with
+// booking ref, or throws a structured BookingError on failure.
 //
 // Usage:
 //   const result = await createBooking({
@@ -134,7 +138,7 @@ export async function getCalendarAvailability(
 //     customer_name: 'Sophie Martin',
 //     customer_email: 'sophie@example.com',
 //   });
-//   → { booking_ref: 'URI-20260728-001', ... }
+//   → { booking_ref: 'URI-20260728-001', status: 'pending_payment', ... }
 
 export async function createBooking(
   req: CreateBookingRequest
@@ -194,9 +198,51 @@ throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as any;  }
 
 
 // ────────────────────────────────────────────────────────────
+// 4b. CONFIRM PAY-LATER BOOKING
+// ────────────────────────────────────────────────────────────
+// "Pay Later" makes no online-payment claim — cash/PromptPay/WeChat
+// happens in person, so this just flips pending_payment -> confirmed
+// directly. Safe to expose to the browser: it never touches
+// payment_status/payment_provider_ref (see confirm_booking_payment,
+// which is locked to server-side callers only, for the online-payment
+// equivalent of this).
+//
+// Usage:
+//   const result = await confirmPayLaterBooking('URI-20260728-001');
+//   → { booking_ref: 'URI-20260728-001', status: 'confirmed', ... }
+
+export async function confirmPayLaterBooking(
+  bookingRef: string
+): Promise<PaymentConfirmation> {
+  if (!bookingRef?.trim()) {
+    throw { code: 'BOOKING_NOT_FOUND', message: 'Booking reference is required' };
+  }
+
+  const { data, error } = await supabase.rpc('confirm_pay_later_booking', {
+    p_booking_ref: bookingRef.trim().toUpperCase(),
+  });
+
+  if (error) {
+    const bookingError = parseBookingError(error.message);
+    throw { ...bookingError, message: ERROR_MESSAGES[bookingError.code] || bookingError.message };
+  }
+
+  if (!data || data.length === 0) {
+    throw { code: 'BOOKING_NOT_FOUND', message: ERROR_MESSAGES.BOOKING_NOT_FOUND };
+  }
+
+  return data[0] as PaymentConfirmation;
+}
+
+
+// ────────────────────────────────────────────────────────────
 // 5. CANCEL BOOKING
 // ────────────────────────────────────────────────────────────
 // Cancels by reference code and releases capacity back to the pool.
+// Works on both 'confirmed' and 'pending_payment' bookings — the
+// Payment step calls this if the customer backs out (goes Back, or
+// closes the flow) before completing payment, so the slot frees up
+// immediately instead of waiting for the 30-min abandonment cleanup.
 //
 // Usage:
 //   const result = await cancelBooking('URI-20260728-001');

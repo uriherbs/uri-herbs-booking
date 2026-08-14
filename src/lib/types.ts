@@ -5,7 +5,15 @@
 // ── Database Enums ──
 
 export type CalendarType = 'herbal' | 'aromatherapy';
-export type BookingStatus = 'confirmed' | 'cancelled' | 'no_show' | 'completed';
+// 'pending_payment' is the state every booking is created in now (see
+// migration add_online_payment_integration) — capacity is reserved
+// immediately, but it only becomes 'confirmed' once a real payment is
+// verified server-side (or the customer picks Pay Later). Abandoned
+// pending_payment bookings are auto-cancelled after 30 min by a
+// scheduled DB job.
+export type BookingStatus = 'pending_payment' | 'confirmed' | 'cancelled' | 'no_show' | 'completed';
+
+export type PaymentMethod = 'stripe' | 'paypal' | 'later';
 
 // ── API Response Types ──
 
@@ -40,7 +48,16 @@ export interface BookingConfirmation {
   instructor_group: 'A' | 'B' | null;
   is_private: boolean;
   total_price_thb: number;
-  status: string;
+  status: string; // 'pending_payment' — always, straight out of create_booking now
+}
+
+// Returned by confirm_pay_later_booking / (indirectly) by the payment
+// routes once confirm_booking_payment succeeds server-side.
+export interface PaymentConfirmation {
+  booking_id: string;
+  booking_ref: string;
+  status: string; // 'confirmed'
+  total_price_thb: number;
 }
 
 export interface CancelConfirmation {
@@ -131,6 +148,7 @@ export type BookingErrorCode =
   | 'SLOT_BLOCKED'
   | 'CAPACITY_FULL'
   | 'BOOKING_NOT_FOUND'
+  | 'BOOKING_NOT_PAYABLE'
   | 'UNKNOWN_ERROR';
 
 export interface BookingError {
@@ -163,5 +181,6 @@ export const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   SLOT_BLOCKED:         'This time slot has been closed. Please choose another.',
   CAPACITY_FULL:        'Sorry, this slot is fully booked. Please try a different time or date.',
   BOOKING_NOT_FOUND:    'Booking not found. Please check your reference number.',
+  BOOKING_NOT_PAYABLE:  'This booking is no longer awaiting payment — it may have expired. Please start a new booking.',
   UNKNOWN_ERROR:        'Something went wrong. Please try again or contact us directly.',
 };

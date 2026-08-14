@@ -3,8 +3,11 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getPackages } from "@/lib/booking-service";
+import { getPackages, confirmPayLaterBooking, cancelBooking } from "@/lib/booking-service";
 import { useAvailableSlots, useCalendarAvailability, useCreateBooking } from "@/lib/hooks";
+import { StripeCardForm } from "@/components/payments/StripeCardForm";
+import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButtons";
+import { PaymentLoadingBox } from "@/components/payments/PaymentStatusBoxes";
 
 // ════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -924,19 +927,28 @@ function CustomerStep({ form, onChange, errors }) {
 // ════════════════════════════════════════════════════════════
 // STEP 4: PAYMENT
 // ════════════════════════════════════════════════════════════
-// UI SHELL ONLY — this step does not process any real payment. All
-// three options currently do the exact same thing under the hood:
-// picking one just unlocks "Confirm Booking", which calls the same
-// create_booking() RPC as before, creating a `confirmed` booking
-// directly. There's no pending_payment/expired status, no Stripe/
-// PayPal SDK, and no webhook — none of that exists in this project
-// yet (checked: no payment env vars, no such booking_status values).
-// Wiring real payment processing is a separate, deliberately-scoped
-// project (new DB migration, provider SDKs, a webhook endpoint, a
-// slot-expiry mechanism) — see the spec doc's §5 for the intended
-// real design. This step exists so the flow's shape (and the
-// mandatory Terms & Conditions agreement) is in place and reviewable
-// now, without pretending money actually moves yet.
+// Real payment processing (spec §5, §6.2). By the time this step
+// renders, the booking already exists as 'pending_payment' (created
+// on the 2→3 transition in BookingFlow, holding the slot) with its
+// price computed server-side by create_booking().
+//
+//   Pay with Card  → StripeCardForm embeds Stripe's Payment Element
+//                     inline; PaymentIntent created via
+//                     /api/payments/stripe/create-intent, confirmed
+//                     authoritatively by /api/payments/stripe/webhook
+//                     (confirm_booking_payment, service-role only).
+//   PayPal         → PayPalCheckoutButtons embeds PayPal's own
+//                     buttons; order created/captured via
+//                     /api/payments/paypal/create-order +
+//                     capture-order, with the PayPal webhook as a
+//                     backstop confirmation path.
+//   Pay Later      → no online payment claim at all — the sticky CTA
+//                     below just calls confirm_pay_later_booking()
+//                     directly, same trust level as before.
+//
+// Abandoned pending_payment bookings (tab closed, payment never
+// finished) are auto-cancelled ~30 min later by a pg_cron job
+// (expire_pending_bookings) so the slot frees back up on its own.
 
 const PAYMENT_METHODS = [
   {
@@ -987,7 +999,8 @@ const PAYMENT_ICONS: Record<string, (props: { color?: string }) => JSX.Element> 
   stripe: CardSVG, paypal: WalletSVG, later: CashSVG,
 };
 
-function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors }) {
+function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors, booking, onOnlinePaymentSuccess }) {
+  const amountLabel = booking ? `฿${booking.total_price_thb.toLocaleString()}` : "";
   return (
     <div style={{ padding: "0 16px 100px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1089,6 +1102,38 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
           </div>
         </label>
       </div>
+
+      {/* Card / PayPal complete their own payment here, inline —
+          neither uses the generic sticky "Confirm Booking" CTA below
+          (that one only drives the Pay Later path). Gated on the
+          terms checkbox above so nothing can be paid before agreeing. */}
+      {(paymentMethod === "stripe" || paymentMethod === "paypal") && (
+        agreedToTerms ? (
+          booking ? (
+            paymentMethod === "stripe" ? (
+              <StripeCardForm
+                bookingId={booking.booking_id}
+                amountLabel={amountLabel}
+                onSuccess={onOnlinePaymentSuccess}
+              />
+            ) : (
+              <PayPalCheckoutButtons
+                bookingId={booking.booking_id}
+                onSuccess={onOnlinePaymentSuccess}
+              />
+            )
+          ) : (
+            <PaymentLoadingBox label="Preparing your booking…" style={{ marginTop: 12 }} />
+          )
+        ) : (
+          <div style={{
+            background: C.mist, borderRadius: 10, padding: "12px 14px", marginTop: 12,
+            fontFamily: "'DM Sans'", fontSize: 12.5, color: C.barkLight, lineHeight: 1.5,
+          }}>
+            Please agree to the Terms &amp; Conditions above to continue to payment.
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -1276,7 +1321,17 @@ export default function BookingFlow() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal" | "later" | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [confirmingPayLater, setConfirmingPayLater] = useState(false);
 
+  // `result` here is the booking as create_booking() returns it — which
+  // now ALWAYS starts status: 'pending_payment' (see migration
+  // add_online_payment_integration). It's created the moment the
+  // customer reaches the Payment step (2→3 transition below), not on
+  // final confirm — that's what actually reserves the slot while they
+  // pay. Every field on it (package_name, slot_date, times, price...)
+  // stays valid all the way through to ConfirmationStep; only `status`
+  // changes, so step 4 just overrides that one field once payment
+  // actually succeeds rather than re-fetching anything.
   const { submit, submitting, error: submitError, result, reset: resetBooking } = useCreateBooking();
 
   // Fetch the live product catalog once on mount. Presentation metadata
@@ -1322,6 +1377,11 @@ export default function BookingFlow() {
     }));
   }, []);
 
+  const handleSelectPaymentMethod = useCallback((method: "stripe" | "paypal" | "later") => {
+    setPaymentMethod(method);
+    setErrors(e => ({ ...e, payment: null, submit: null }));
+  }, []);
+
   const validateStep3 = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Please enter your name";
@@ -1330,24 +1390,25 @@ export default function BookingFlow() {
     return Object.keys(e).length === 0;
   };
 
-  // Step 3 (Payment) is a presentational shell only — see PaymentStep's
-  // own comment for why. Booking creation still happens right here,
-  // unchanged, gated on a payment method being picked + terms agreed
-  // rather than on any real payment actually completing.
-  const validatePayment = () => {
+  // Only the Pay Later path is validated/confirmed through this — see
+  // PaymentStep's own comment: Stripe/PayPal complete inline via their
+  // own embedded widgets and call handleOnlinePaymentSuccess directly.
+  const validatePayLater = () => {
     const e: Record<string, string> = {};
-    if (!paymentMethod) e.payment = "Please choose how you'd like to pay";
     if (!agreedToTerms) e.terms = "Please agree to the Terms & Conditions to continue";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleNext = async () => {
-    if (step === 2 && !validateStep3()) return;
+    if (step === 2) {
+      if (!validateStep3()) return;
 
-    if (step === 3) {
-      if (!validatePayment()) return;
-
+      // Reserve the slot NOW, before payment — this is what actually
+      // prevents someone else from taking it while this customer is
+      // still on the Payment step (spec /book §5). The booking starts
+      // 'pending_payment'; it only becomes 'confirmed' once payment is
+      // verified server-side (or Pay Later is explicitly chosen below).
       try {
         await submit({
           package_slug: pkg.slug,
@@ -1368,21 +1429,61 @@ export default function BookingFlow() {
           // this needs to be structured data instead of a note staff read manually.
         });
       } catch (err: any) {
-        // useCreateBooking already captured this in `submitError` — surface
-        // it inline near the button rather than silently failing to advance.
         // Common case: someone else took the last spot while this person
         // was filling out the form (CAPACITY_FULL) — they need to go back
         // and pick a different time, not just retry the same submission.
         setErrors(e => ({ ...e, submit: err.message || "Something went wrong. Please try again." }));
         return;
       }
+      setStep(3);
+      window.scrollTo?.({ top: 0, behavior: "smooth" });
+      return;
     }
+
+    if (step === 3) {
+      // The sticky CTA only ever drives Pay Later — Stripe/PayPal
+      // finish inline (see handleOnlinePaymentSuccess) and this branch
+      // is unreachable for them since the CTA is hidden in that case.
+      if (!validatePayLater() || !result) return;
+
+      setConfirmingPayLater(true);
+      try {
+        await confirmPayLaterBooking(result.booking_ref);
+      } catch (err: any) {
+        setErrors(e => ({ ...e, submit: err.message || "Something went wrong. Please try again." }));
+        setConfirmingPayLater(false);
+        return;
+      }
+      setConfirmingPayLater(false);
+      setStep(4);
+      window.scrollTo?.({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setStep(s => s + 1);
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
+  // Called by the embedded Stripe/PayPal widgets once THEY confirm
+  // payment succeeded server-side (StripeCardForm/PayPalCheckoutButtons
+  // only ever call this after their own API routes report success —
+  // never optimistically from a client-only signal).
+  const handleOnlinePaymentSuccess = useCallback(() => {
+    setStep(4);
+    window.scrollTo?.({ top: 0, behavior: "smooth" });
+  }, []);
+
   const handleBack = () => {
     if (step === 1) { setSelectedDate(null); setSelectedTime(null); }
+    if (step === 3 && result?.booking_ref) {
+      // Backing out of payment deliberately — free the slot right now
+      // instead of leaving it locked until the 30-min abandonment
+      // cleanup. Best-effort: if this fails, the cron still catches it.
+      cancelBooking(result.booking_ref).catch(() => {});
+      resetBooking();
+      setPaymentMethod(null);
+      setAgreedToTerms(false);
+    }
     setStep(s => s - 1);
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
@@ -1397,6 +1498,9 @@ export default function BookingFlow() {
     if ((step === 2 || step === 3) && !window.confirm("Leave without finishing your booking? Your details won't be saved.")) {
       return;
     }
+    if (step === 3 && result?.booking_ref) {
+      cancelBooking(result.booking_ref).catch(() => {});
+    }
     router.push('/');
   };
 
@@ -1404,7 +1508,7 @@ export default function BookingFlow() {
     setStep(0); setSelectedPkg(null); setParticipants(1); setIsPrivate(false);
     setSelectedDate(null); setSelectedTime(null);
     setForm({ name: "", email: "", phone: "", phoneCountryCode: "+66", notes: "" });
-    setErrors({}); setPaymentMethod(null); setAgreedToTerms(false); resetBooking();
+    setErrors({}); setPaymentMethod(null); setAgreedToTerms(false); setConfirmingPayLater(false); resetBooking();
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
@@ -1412,15 +1516,17 @@ export default function BookingFlow() {
     selectedPkg !== null,
     selectedDate !== null && selectedTime !== null,
     true, // step 3 (Your Details) validated on click
-    paymentMethod !== null && agreedToTerms,
+    // Stripe/PayPal complete via their own embedded widget, not this
+    // CTA — it's only ever meaningful (and shown) for Pay Later.
+    paymentMethod === "later" && agreedToTerms,
     true,
   ][step];
 
   const ctaLabel = [
     "Continue to Date & Time",
     "Continue to Your Details",
-    "Continue to Payment",
-    submitting ? "Confirming…" : "Confirm Booking",
+    submitting ? "Reserving your spot…" : "Continue to Payment",
+    confirmingPayLater ? "Confirming…" : "Confirm Booking",
     null,
   ][step];
 
@@ -1555,34 +1661,38 @@ export default function BookingFlow() {
         <CustomerStep form={form} onChange={updateForm} errors={errors}/>
       )}
       {step === 3 && (
-        <>
-          <PaymentStep
-            paymentMethod={paymentMethod} onSelectMethod={setPaymentMethod}
-            agreedToTerms={agreedToTerms} onToggleTerms={() => setAgreedToTerms(a => !a)}
-            errors={errors}
-          />
-          {errors.submit && (
-            <div style={{ padding: "0 16px", marginTop: -8 }}>
-              <div style={{
-                background: C.coralLight, border: `1px solid rgba(192,122,110,0.3)`,
-                borderRadius: 10, padding: "12px 14px",
-                fontFamily: "'DM Sans'", fontSize: 13, color: C.coral, lineHeight: 1.5,
-              }}>
-                {errors.submit}
-              </div>
-            </div>
-          )}
-        </>
+        <PaymentStep
+          paymentMethod={paymentMethod} onSelectMethod={handleSelectPaymentMethod}
+          agreedToTerms={agreedToTerms} onToggleTerms={() => setAgreedToTerms(a => !a)}
+          errors={errors} booking={result} onOnlinePaymentSuccess={handleOnlinePaymentSuccess}
+        />
+      )}
+      {(step === 2 || step === 3) && errors.submit && (
+        <div style={{ padding: "0 16px", marginTop: -8 }}>
+          <div style={{
+            background: C.coralLight, border: `1px solid rgba(192,122,110,0.3)`,
+            borderRadius: 10, padding: "12px 14px",
+            fontFamily: "'DM Sans'", fontSize: 13, color: C.coral, lineHeight: 1.5,
+          }}>
+            {errors.submit}
+          </div>
+        </div>
       )}
       {step === 4 && pkg && result && (
         <ConfirmationStep
-          pkg={pkg} result={result} form={form}
+          // step 4 only ever renders after Pay Later / Stripe / PayPal
+          // actually confirmed payment server-side — safe to show
+          // 'confirmed' here without re-fetching; every other field on
+          // `result` was already correct since create_booking().
+          pkg={pkg} result={{ ...result, status: "confirmed" }} form={form}
           onReset={handleReset}
         />
       )}
 
-      {/* Sticky bottom CTA */}
-      {step < 4 && (
+      {/* Sticky bottom CTA — hidden once Stripe/PayPal is picked at the
+          Payment step, since those complete via their own embedded
+          widget instead of this generic button. */}
+      {step < 4 && !(step === 3 && (paymentMethod === "stripe" || paymentMethod === "paypal")) && (
         <div style={{
           position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
           width: "100%", maxWidth: 480,
@@ -1591,14 +1701,14 @@ export default function BookingFlow() {
         }}>
           <button
             onClick={handleNext}
-            disabled={!canContinue || submitting}
+            disabled={!canContinue || submitting || confirmingPayLater}
             style={{
               width: "100%", padding: "16px 24px", borderRadius: 14, border: "none",
-              background: (canContinue && !submitting) ? C.sage : C.sand,
-              color: (canContinue && !submitting) ? C.white : C.barkLight,
+              background: (canContinue && !submitting && !confirmingPayLater) ? C.sage : C.sand,
+              color: (canContinue && !submitting && !confirmingPayLater) ? C.white : C.barkLight,
               fontFamily: "'DM Sans'", fontSize: 16, fontWeight: 700,
-              cursor: (canContinue && !submitting) ? "pointer" : "default",
-              boxShadow: (canContinue && !submitting) ? "0 4px 16px rgba(107,143,113,0.3)" : "none",
+              cursor: (canContinue && !submitting && !confirmingPayLater) ? "pointer" : "default",
+              boxShadow: (canContinue && !submitting && !confirmingPayLater) ? "0 4px 16px rgba(107,143,113,0.3)" : "none",
               transition: "all 0.2s",
               letterSpacing: "0.01em",
             }}
