@@ -1072,10 +1072,9 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
       )}
 
       {/* Terms & Conditions agreement — required before confirming.
-          TODO: no dedicated /terms or /privacy page exists in this
-          project yet (per spec doc, the legal text itself hasn't
-          been written). Not linking to avoid shipping a 404 — wire
-          these up to real pages once they exist. */}
+          Links open /terms and /privacy in a new tab (target="_blank")
+          so the customer can actually read what they're agreeing to
+          without losing their booking progress in this one. */}
       <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 20 }}>
         <label style={{ display: "flex", gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
           <div
@@ -1095,8 +1094,27 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
               style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.forest, fontWeight: 500, lineHeight: 1.5 }}
               onClick={(e) => { e.preventDefault(); onToggleTerms(); }}
             >
-              I agree to Uri Herbs Workshop&rsquo;s <strong>Terms &amp; Conditions</strong> and{" "}
-              <strong>Privacy Policy</strong>.
+              I agree to Uri Herbs Workshop&rsquo;s{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{ color: C.sageDark, fontWeight: 700, textDecoration: "underline" }}
+              >
+                Terms &amp; Conditions
+              </a>{" "}
+              and{" "}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{ color: C.sageDark, fontWeight: 700, textDecoration: "underline" }}
+              >
+                Privacy Policy
+              </a>
+              . Opens in a new tab — your booking progress is saved.
             </span>
             {errors.terms && <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.coral, marginTop: 4 }}>{errors.terms}</div>}
           </div>
