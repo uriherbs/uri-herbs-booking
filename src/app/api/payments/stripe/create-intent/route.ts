@@ -18,7 +18,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { getStripe, thbToSatang } from '@/lib/stripe-server';
 
+// A raw "server responded with 502" in the browser's console is what a
+// crashed/timed-out serverless function looks like too, not only an
+// app-level error response — the two are indistinguishable from that
+// message alone. This outer handler exists so that ANY failure in this
+// route, not just a rejected Stripe API call, comes back as JSON with
+// enough detail to tell the two apart from the browser's own Network
+// tab, instead of an opaque platform error page with no body at all.
 export async function POST(request: NextRequest) {
+  try {
+    return await handleCreateIntent(request);
+  } catch (err: any) {
+    console.error('Stripe create-intent: unhandled error', err);
+    return NextResponse.json(
+      {
+        error: "Couldn't start card payment. Please try again.",
+        detail: { unhandled: true, name: err?.name, message: err?.message },
+      },
+      { status: 502 }
+    );
+  }
+}
+
+async function handleCreateIntent(request: NextRequest): Promise<NextResponse> {
   let body: any;
   try {
     body = await request.json();
@@ -101,14 +123,27 @@ export async function POST(request: NextRequest) {
     // 1's root cause wasn't visible from Vercel's logs alone. Logging
     // the full shape here means the next failure (if any) is
     // diagnosable without another guess-and-redeploy round.
-    console.error('Stripe create-intent failed:', {
+    const detail = {
       message: err?.message,
       type: err?.type,
       code: err?.code,
       param: err?.param,
       statusCode: err?.statusCode,
       requestId: err?.requestId,
-    });
-    return NextResponse.json({ error: "Couldn't start card payment. Please try again." }, { status: 502 });
+    };
+    console.error('Stripe create-intent failed:', detail);
+    // We don't have Vercel function-log access in every environment
+    // this runs in, and this endpoint has already failed once with a
+    // root cause that logging alone didn't make visible fast enough.
+    // Stripe's err.message/type/code are safe to hand back as-is —
+    // they describe what went wrong with the request (e.g. "no such
+    // customer", a bad param, an account restriction), never a secret
+    // — so put them in the response body itself. That turns the
+    // browser's own Network tab into a diagnostic tool without needing
+    // any dashboard access at all.
+    return NextResponse.json(
+      { error: "Couldn't start card payment. Please try again.", detail },
+      { status: 502 }
+    );
   }
 }
