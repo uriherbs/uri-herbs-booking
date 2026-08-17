@@ -63,6 +63,17 @@ export async function POST(request: NextRequest) {
             },
           },
         ],
+        // This is a service booking, not a shipped good — without this,
+        // PayPal's hosted checkout defaults to collecting a shipping
+        // address, which is both irrelevant here and one more thing
+        // that can interact with its risk/compliance evaluation of the
+        // order. brand_name/user_action are minor UX polish (shows our
+        // name instead of a blank one; skips an extra "Continue" step).
+        application_context: {
+          shipping_preference: 'NO_SHIPPING',
+          brand_name: 'Uri Herbs Workshop',
+          user_action: 'PAY_NOW',
+        },
       }),
     });
 
@@ -71,6 +82,13 @@ export async function POST(request: NextRequest) {
       console.error('PayPal create-order failed:', JSON.stringify(order));
       return NextResponse.json({ error: "Couldn't start PayPal payment. Please try again." }, { status: 502 });
     }
+    // Order creation itself succeeding is not the whole story for this
+    // bug — Bug 2's COMPLIANCE_VIOLATION happens on PayPal's OWN hosted
+    // checkout page, after this call already returned an order id. Log
+    // the created order's id/status regardless, so a support request to
+    // PayPal (or a look at the Sandbox dashboard's order activity) has
+    // something concrete to reference.
+    console.log(`PayPal order created: ${order.id} (status: ${order.status}) for booking ${booking.booking_ref}`);
 
     // Same bookkeeping as the Stripe route: record which order
     // belongs to this booking (checked again in capture-order below)

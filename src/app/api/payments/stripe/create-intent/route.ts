@@ -55,6 +55,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!booking.total_price_thb || booking.total_price_thb <= 0) {
+    console.error(`Booking ${booking.booking_ref} has an invalid price:`, booking.total_price_thb);
+    return NextResponse.json({ error: 'This booking has an invalid price. Please contact us.' }, { status: 500 });
+  }
+
   try {
     const stripe = getStripe();
     const intent = await stripe.paymentIntents.create({
@@ -62,7 +67,16 @@ export async function POST(request: NextRequest) {
       currency: 'thb',
       description: `Uri Herbs Workshop — ${booking.booking_ref}`,
       metadata: { booking_id: booking.id, booking_ref: booking.booking_ref },
-      automatic_payment_methods: { enabled: true },
+      // Explicit 'card' instead of automatic_payment_methods: the UI
+      // button already says "Pay with Card" specifically, and
+      // automatic_payment_methods resolves its set dynamically from
+      // what's enabled for THB in the Stripe Dashboard — on an account
+      // that hasn't explicitly turned on THB-compatible methods beyond
+      // cards, that resolution can come back empty and the create()
+      // call fails outright. 'card' is available on every Stripe
+      // account regardless of Dashboard configuration, so this removes
+      // that whole failure mode rather than just working around it.
+      payment_method_types: ['card'],
     });
 
     // Record which PaymentIntent belongs to this booking so the
@@ -81,7 +95,20 @@ export async function POST(request: NextRequest) {
       publishable_key: publishableKey,
     });
   } catch (err: any) {
-    console.error('Stripe create-intent failed:', err.message);
+    // Stripe errors carry structured detail beyond .message (type,
+    // code, the specific param that was rejected) — logging only the
+    // message on a previous version of this route is exactly why Bug
+    // 1's root cause wasn't visible from Vercel's logs alone. Logging
+    // the full shape here means the next failure (if any) is
+    // diagnosable without another guess-and-redeploy round.
+    console.error('Stripe create-intent failed:', {
+      message: err?.message,
+      type: err?.type,
+      code: err?.code,
+      param: err?.param,
+      statusCode: err?.statusCode,
+      requestId: err?.requestId,
+    });
     return NextResponse.json({ error: "Couldn't start card payment. Please try again." }, { status: 502 });
   }
 }
