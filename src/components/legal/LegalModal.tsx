@@ -91,6 +91,21 @@ export default function LegalModal({ doc, onClose }: LegalModalProps) {
               .legal-modal-panel { max-width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
             }
             .legal-modal-close:hover { background: ${C.sand} !important; }
+
+            /* Jump-list: wraps across lines on desktop (plenty of width
+               to spare); on phones that eats a lot of vertical space
+               before the customer even reaches the actual text, so it
+               becomes a single horizontally-swipeable row instead. */
+            .legal-modal-jumplist { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+            @media (max-width: 640px) {
+              .legal-modal-jumplist {
+                flex-wrap: nowrap; overflow-x: auto; gap: 18px;
+                padding-bottom: 2px; /* room for the scrollbar so it doesn't clip text */
+                scroll-snap-type: x proximity;
+                -webkit-overflow-scrolling: touch;
+              }
+              .legal-modal-jumplist-item { flex-shrink: 0; white-space: nowrap; scroll-snap-align: start; }
+            }
           `,
         }}
       />
@@ -158,13 +173,15 @@ export default function LegalModal({ doc, onClose }: LegalModalProps) {
           </a>
         </div>
 
-        {/* Jump list */}
+        {/* Jump list — single swipeable row on mobile, see the
+            .legal-modal-jumplist media query above */}
         <div style={{ flexShrink: 0, padding: '12px 20px', borderBottom: `1px solid ${C.sand}`, background: C.goldLight }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
+          <div className="legal-modal-jumplist">
             {doc.sections.map((s) => (
               <button
                 key={s.id}
                 onClick={() => jumpTo(s.id)}
+                className="legal-modal-jumplist-item"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
                   fontFamily: "'DM Sans'", fontSize: 12.5, color: C.bark, textAlign: 'left',
