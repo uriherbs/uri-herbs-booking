@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^10.3.0",
+    "@react-pdf/renderer": "^4.6.1",
     "@stripe/react-stripe-js": "^6.8.1",
     "@stripe/stripe-js": "^9.13.0",
     "@supabase/ssr": "^0.5.1",

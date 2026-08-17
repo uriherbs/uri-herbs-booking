@@ -8,6 +8,8 @@ import { useAvailableSlots, useCalendarAvailability, useCreateBooking } from "@/
 import { StripeCardForm } from "@/components/payments/StripeCardForm";
 import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButtons";
 import { PaymentLoadingBox } from "@/components/payments/PaymentStatusBoxes";
+import LegalModal from "@/components/legal/LegalModal";
+import { legalDocs } from "@/lib/legal-content";
 
 // ════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -1001,6 +1003,11 @@ const PAYMENT_ICONS: Record<string, (props: { color?: string }) => JSX.Element> 
 
 function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors, booking, onOnlinePaymentSuccess }) {
   const amountLabel = booking ? `฿${booking.total_price_thb.toLocaleString()}` : "";
+  // Which legal doc's modal is open, if any — fully local to this
+  // component. Opening/closing it only ever touches this one piece of
+  // state; it has no way to reach the booking form or the agreement
+  // checkbox above, by construction (LegalModal only calls onClose).
+  const [legalModalDoc, setLegalModalDoc] = useState(null);
   return (
     <div style={{ padding: "0 16px 100px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1072,9 +1079,12 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
       )}
 
       {/* Terms & Conditions agreement — required before confirming.
-          Links open /terms and /privacy in a new tab (target="_blank")
-          so the customer can actually read what they're agreeing to
-          without losing their booking progress in this one. */}
+          "Terms & Conditions" / "Privacy Policy" open an in-page modal
+          (LegalModal, below) rather than navigating away — same content
+          as the standalone /terms and /privacy pages (both pull from
+          the same legal-content.ts), just without leaving this flow.
+          Local legalModalDoc state only ever calls onClose; it can't
+          touch the booking form or the agreement checkbox. */}
       <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 20 }}>
         <label style={{ display: "flex", gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
           <div
@@ -1095,26 +1105,28 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
               onClick={(e) => { e.preventDefault(); onToggleTerms(); }}
             >
               I agree to Uri Herbs Workshop&rsquo;s{" "}
-              <a
-                href="/terms"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{ color: C.sageDark, fontWeight: 700, textDecoration: "underline" }}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setLegalModalDoc("terms"); }}
+                style={{
+                  background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer",
+                  color: C.sageDark, fontWeight: 700, textDecoration: "underline",
+                }}
               >
                 Terms &amp; Conditions
-              </a>{" "}
+              </button>{" "}
               and{" "}
-              <a
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{ color: C.sageDark, fontWeight: 700, textDecoration: "underline" }}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setLegalModalDoc("privacy"); }}
+                style={{
+                  background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer",
+                  color: C.sageDark, fontWeight: 700, textDecoration: "underline",
+                }}
               >
                 Privacy Policy
-              </a>
-              . Opens in a new tab — your booking progress is saved.
+              </button>
+              . Opens right here — your booking progress is saved.
             </span>
             {errors.terms && <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.coral, marginTop: 4 }}>{errors.terms}</div>}
           </div>
@@ -1152,6 +1164,11 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
           </div>
         )
       )}
+
+      <LegalModal
+        doc={legalModalDoc ? legalDocs[legalModalDoc] : null}
+        onClose={() => setLegalModalDoc(null)}
+      />
     </div>
   );
 }

@@ -5,51 +5,31 @@
 // legal documents, so this handles the reading-focused layout
 // (narrower column than the rest of the site, jump-list, section
 // numbering) once instead of duplicating it across both pages.
+//
+// Content comes entirely from a LegalDoc (src/lib/legal-content.ts)
+// — this component has zero legal text of its own, it's purely
+// presentation. The same LegalDoc also feeds LegalModal (the
+// in-checkout popup) and the PDF download, so this page and those two
+// can never show different text than each other.
 // ============================================================
 
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
+import type { LegalDoc } from '@/lib/legal-content';
+import { otherDoc } from '@/lib/legal-content';
+import { C } from './LegalTheme';
+import { LegalBlocks } from './LegalBlocks';
 
-export const C = {
-  sage: '#6B8F71',
-  sageDark: '#4A7050',
-  sageLight: '#E7EFEA',
-  forest: '#2D4639',
-  parchment: '#F8F5EF',
-  white: '#FFFFFF',
-  gold: '#A89068',
-  goldLight: '#F5F0E5',
-  bark: '#5C4A3D',
-  barkLight: '#8A7668',
-  sand: '#E8E2D8',
-  coral: '#C07A6E',
-  coralLight: '#FCEAE6',
-};
-
-export interface LegalSection {
-  id: string;
-  number: number;
-  heading: string;
-  body: React.ReactNode;
-}
+export { C };
 
 interface LegalPageLayoutProps {
-  title: string;
-  effectiveDate: string;
+  doc: LegalDoc;
   intro?: React.ReactNode;
-  sections: LegalSection[];
-  otherPageHref: string;
-  otherPageLabel: string;
 }
 
-export default function LegalPageLayout({
-  title,
-  effectiveDate,
-  intro,
-  sections,
-  otherPageHref,
-  otherPageLabel,
-}: LegalPageLayoutProps) {
+export default function LegalPageLayout({ doc, intro }: LegalPageLayoutProps) {
+  const other = otherDoc(doc.slug);
+
   return (
     <div style={{ background: C.parchment, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
       {/* dangerouslySetInnerHTML, not a text child — the Google Fonts
@@ -80,13 +60,13 @@ export default function LegalPageLayout({
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '20px 24px 80px' }}>
         <div style={{ width: 32, height: 3, background: C.gold, marginBottom: 14 }} />
         <h1 style={{ fontFamily: "'Crimson Pro'", fontSize: 'clamp(30px,5vw,42px)', fontWeight: 700, color: C.forest, margin: '0 0 8px' }}>
-          {title}
+          {doc.title}
         </h1>
         <p style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.barkLight, margin: '0 0 6px' }}>
-          Effective {effectiveDate}
+          Effective {doc.effectiveDate}
         </p>
-        <Link href={otherPageHref} className="legal-jump-link" style={{ fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 600, color: C.sageDark }}>
-          Also read our {otherPageLabel} →
+        <Link href={`/${other.slug}`} className="legal-jump-link" style={{ fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 600, color: C.sageDark }}>
+          Also read our {other.title} →
         </Link>
 
         {intro && (
@@ -106,7 +86,7 @@ export default function LegalPageLayout({
             On This Page
           </div>
           <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {sections.map((s) => (
+            {doc.sections.map((s) => (
               <li key={s.id}>
                 <a
                   href={`#${s.id}`}
@@ -122,7 +102,7 @@ export default function LegalPageLayout({
         </nav>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 34 }}>
-          {sections.map((s) => (
+          {doc.sections.map((s) => (
             <section key={s.id} id={s.id} style={{ scrollMarginTop: 84 }}>
               <h2 style={{
                 fontFamily: "'Crimson Pro'", fontSize: 21, fontWeight: 700, color: C.forest,
@@ -132,33 +112,12 @@ export default function LegalPageLayout({
                 {s.heading}
               </h2>
               <div className="legal-body" style={{ fontFamily: "'DM Sans'", fontSize: 15, lineHeight: 1.7, color: C.bark }}>
-                {s.body}
+                <LegalBlocks blocks={s.blocks} />
               </div>
             </section>
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Shared "how to reach us" card used at the end of both documents —
-// same visual language as the info cards on /contact.
-export function ContactCard({ email, phone, address }: { email: string; phone: string; address?: string }) {
-  return (
-    <div style={{
-      background: C.white, border: `1px solid ${C.sand}`, borderRadius: 12,
-      padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4,
-    }}>
-      <a href={`mailto:${email}`} style={{ fontFamily: "'DM Sans'", fontSize: 15, fontWeight: 600, color: C.sageDark }}>
-        {email}
-      </a>
-      <a href={`tel:${phone.replace(/\s/g, '')}`} style={{ fontFamily: "'DM Sans'", fontSize: 15, color: C.forest }}>
-        {phone}
-      </a>
-      {address && (
-        <span style={{ fontFamily: "'DM Sans'", fontSize: 14, color: C.barkLight }}>{address}</span>
-      )}
     </div>
   );
 }
