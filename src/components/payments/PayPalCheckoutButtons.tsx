@@ -39,7 +39,13 @@ export function PayPalCheckoutButtons({ bookingId, onSuccess }: PayPalCheckoutBu
 
   return (
     <div style={{ marginTop: 12 }}>
-      <PayPalScriptProvider options={{ clientId, currency: 'THB', intent: 'capture' }}>
+      {/* locale: 'en_US' pins the SDK buttons AND the hosted checkout
+          popup to English — without it PayPal infers language from the
+          buyer's browser/IP (Thailand → Thai), which made every QA
+          screenshot of this bug unreadable to a non-Thai-speaking dev.
+          Does not change what currency the customer is charged in
+          (currency: 'THB' below is unrelated and untouched). */}
+      <PayPalScriptProvider options={{ clientId, currency: 'THB', intent: 'capture', locale: 'en_US' }}>
         <PayPalButtons
           style={{ layout: 'vertical', shape: 'pill' }}
           createOrder={async () => {
