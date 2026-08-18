@@ -72,7 +72,10 @@ export async function POST(request: NextRequest) {
     const capture = await res.json();
     if (!res.ok) {
       console.error('PayPal capture failed:', JSON.stringify(capture));
-      return NextResponse.json({ error: "Payment couldn't be completed. Please try again." }, { status: 502 });
+      return NextResponse.json(
+        { error: "Payment couldn't be completed. Please try again.", detail: capture },
+        { status: 502 }
+      );
     }
 
     const captureUnit = capture.purchase_units?.[0]?.payments?.captures?.[0];
@@ -110,6 +113,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ booking_ref: booking.booking_ref, status: 'confirmed' });
   } catch (err: any) {
     console.error('PayPal capture-order error:', err.message);
-    return NextResponse.json({ error: "Payment couldn't be completed. Please try again." }, { status: 502 });
+    return NextResponse.json(
+      { error: "Payment couldn't be completed. Please try again.", detail: { message: err.message } },
+      { status: 502 }
+    );
   }
 }

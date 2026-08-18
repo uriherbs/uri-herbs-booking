@@ -80,7 +80,16 @@ export async function POST(request: NextRequest) {
     const order = await res.json();
     if (!res.ok) {
       console.error('PayPal create-order failed:', JSON.stringify(order));
-      return NextResponse.json({ error: "Couldn't start PayPal payment. Please try again." }, { status: 502 });
+      // `detail` surfaces PayPal's actual error body (name, message,
+      // debug_id, details[]) instead of forcing every failure through
+      // the same generic message — same fix applied to the Stripe
+      // create-intent route. Safe to return: this is PayPal's own
+      // error payload, never contains PAYPAL_SECRET or other server
+      // config, only order-specific diagnostic info.
+      return NextResponse.json(
+        { error: "Couldn't start PayPal payment. Please try again.", detail: order },
+        { status: 502 }
+      );
     }
     // Order creation itself succeeding is not the whole story for this
     // bug — Bug 2's COMPLIANCE_VIOLATION happens on PayPal's OWN hosted
@@ -102,6 +111,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ order_id: order.id });
   } catch (err: any) {
     console.error('PayPal create-order error:', err.message);
-    return NextResponse.json({ error: "Couldn't start PayPal payment. Please try again." }, { status: 502 });
+    return NextResponse.json(
+      { error: "Couldn't start PayPal payment. Please try again.", detail: { message: err.message } },
+      { status: 502 }
+    );
   }
 }

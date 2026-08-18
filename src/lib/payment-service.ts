@@ -21,6 +21,14 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // `detail` (when the server route includes it) is the raw
+    // provider error body — logged to the console for debugging, not
+    // shown in the UI, so a support/QA session can open devtools and
+    // see PayPal/Stripe's actual error instead of just the generic
+    // user-facing message below.
+    if (data.detail) {
+      console.error(`${url} failed (${res.status}):`, data.detail);
+    }
     throw new Error(data.error || `Request to ${url} failed (${res.status})`);
   }
   return data as T;
