@@ -13,6 +13,7 @@
 // ============================================================
 
 import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 import { Hero } from '@/components/home/Hero';
 import { WorkshopCircles } from '@/components/home/WorkshopCircles';
 import { Intro } from '@/components/home/Intro';
@@ -50,6 +51,7 @@ export default function Home() {
         <Intro />
         <GetInTouch />
       </main>
+      <SiteFooter />
     </div>
   );
 }

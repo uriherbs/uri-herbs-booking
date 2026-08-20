@@ -27,6 +27,7 @@ import { notFound } from 'next/navigation';
 import { getWorkshopPageData } from '@/lib/workshop-content-service';
 import { getPlaceholderWorkshopImage } from '@/lib/workshop-placeholder-images';
 import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 import { LeafFrame } from '@/components/LeafFrame';
 import { PillButton } from '@/components/PillButton';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
@@ -222,6 +223,7 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
           </PillButton>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

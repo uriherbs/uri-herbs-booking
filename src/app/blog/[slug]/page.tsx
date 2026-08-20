@@ -19,6 +19,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getBlogPostBySlug, getRelatedBlogPosts, formatPostDate, getCategoryLabel } from '@/lib/blog-content-service';
 import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 import { LeafFrame } from '@/components/LeafFrame';
 import { PostContent } from '@/components/blog/PostContent';
 import { PostCard } from '@/components/blog/PostCard';
@@ -130,6 +131,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
         <CommentsSection postSlug={post.slug} />
       </main>
+      <SiteFooter />
     </div>
   );
 }

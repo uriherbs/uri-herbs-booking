@@ -21,6 +21,7 @@
 
 import type { Metadata } from 'next';
 import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 import { PostCard } from '@/components/blog/PostCard';
 import { getActiveBlogPosts } from '@/lib/blog-content-service';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
@@ -88,6 +89,7 @@ export default async function BlogPage() {
           </div>
         )}
       </main>
+      <SiteFooter />
     </div>
   );
 }

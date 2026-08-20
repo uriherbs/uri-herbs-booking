@@ -656,6 +656,51 @@ export default function AdminDashboard({ adminName, onSignOut }) {
   const currentBlocks = activeTab === "herbal" ? HERBAL_BLOCKS : aromaBlocksToday;
   const currentByBlock = activeTab === "herbal" ? herbalByBlock : aromaByBlock;
 
+  // "Close the whole day" — there's no separate `blocked_dates` write
+  // path anywhere in the app (only the iCal feed reads that table),
+  // so this stays a client-side loop over the SAME per-slot
+  // `admin_toggle_slot_block` RPC every individual lock button already
+  // uses, one call per hourly block of the active calendar/day. The
+  // iCal feed already merges contiguous blocked hours into a single
+  // VEVENT (see flushSlotRun in the ical route), so OTA partners see
+  // one clean "closed" block either way.
+  const allBlockedToday = currentBlocks.length > 0 &&
+    currentBlocks.every(b => blockedTimesByCalendar[activeTab]?.has(b.time));
+
+  const handleCloseWholeDay = async () => {
+    const blocks = currentBlocks;
+    if (blocks.length === 0) return;
+    const calendarLabel = activeTab === "herbal" ? "Herbal Workshops" : "Aromatherapy";
+    const blockedSet = blockedTimesByCalendar[activeTab] || new Set();
+
+    if (allBlockedToday) {
+      if (!window.confirm(`Reopen all ${blocks.length} slot${blocks.length === 1 ? "" : "s"} for ${calendarLabel} on ${dayLabel}?`)) return;
+      setPendingAction("whole-day");
+      try {
+        await Promise.all(blocks.map(b => adminToggleSlotBlock(dateStr, b.time, activeTab as any, false)));
+      } catch (err) {
+        alert(`Couldn't reopen the day: ${err.message}`);
+      } finally {
+        setPendingAction(null);
+      }
+      return;
+    }
+
+    if (!window.confirm(
+      `Close ALL ${blocks.length} slot${blocks.length === 1 ? "" : "s"} for ${calendarLabel} on ${dayLabel}?\n\nExisting bookings are not cancelled — this only stops NEW bookings (direct, OTA, and manual) from being made in this window.`
+    )) return;
+    const reason = window.prompt("Reason for closing the day (optional):") || undefined;
+    const toBlock = blocks.filter(b => !blockedSet.has(b.time));
+    setPendingAction("whole-day");
+    try {
+      await Promise.all(toBlock.map(b => adminToggleSlotBlock(dateStr, b.time, activeTab as any, true, reason)));
+    } catch (err) {
+      alert(`Couldn't close the day: ${err.message}`);
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
   return (
     <div style={{
       maxWidth: 600, margin: "0 auto", minHeight: "100vh",
@@ -685,27 +730,36 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               fontFamily: "'DM Sans'", fontSize: 12, color: "rgba(255,255,255,0.7)",
             }}>{adminName}</span>
           )}
+          {/* Text labels added alongside the icons — icon-only pills
+              with just a hover `title` tooltip are effectively
+              invisible on a touch device (no hover state), which is
+              exactly why these two existing CMS screens went
+              unnoticed until asked about directly. */}
           <Link
             href="/admin/content"
             title="Workshop Content"
             style={{
               background: "rgba(255,255,255,0.12)", borderRadius: 20,
-              width: 30, height: 30,
-              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
             }}>
-            {Icons.edit(14)}
+            {Icons.edit(13)}
+            Content
           </Link>
           <Link
             href="/admin/content/blog"
             title="Blog Content"
             style={{
               background: "rgba(255,255,255,0.12)", borderRadius: 20,
-              width: 30, height: 30,
-              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
             }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
             </svg>
+            Blog
           </Link>
           <button
             onClick={handleSignOut}
@@ -812,6 +866,31 @@ export default function AdminDashboard({ adminName, onSignOut }) {
           </button>
         ))}
       </div>
+
+      {/* Close/reopen the whole day (active tab's calendar) in one tap */}
+      {!loading && currentBlocks.length > 0 && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <button
+            onClick={handleCloseWholeDay}
+            disabled={pendingAction === "whole-day"}
+            style={{
+              width: "100%", padding: "11px 14px", borderRadius: 10,
+              border: `1.5px solid ${allBlockedToday ? C.sage : C.coral}`,
+              background: allBlockedToday ? C.sagePale : C.coralPale,
+              cursor: pendingAction === "whole-day" ? "default" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 700,
+              color: allBlockedToday ? C.sageDark : C.coral,
+            }}>
+            {allBlockedToday ? Icons.unlock(14, C.sageDark) : Icons.lock(14, C.coral)}
+            {pendingAction === "whole-day"
+              ? "Updating…"
+              : allBlockedToday
+                ? `Reopen entire day — ${activeTab === "herbal" ? "Herbal" : "Aromatherapy"}`
+                : `Close entire day — ${activeTab === "herbal" ? "Herbal" : "Aromatherapy"}`}
+          </button>
+        </div>
+      )}
 
       {/* Session sections */}
       <div style={{ padding: "16px 16px 40px" }}>

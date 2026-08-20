@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 
 // ══════════════════════════════════════════════════════════════════
 // DESIGN TOKENS — same palette as the rest of the site
@@ -415,6 +416,8 @@ export default function ContactPage() {
           </div>
         </div>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }
