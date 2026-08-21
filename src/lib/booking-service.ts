@@ -231,6 +231,18 @@ export async function confirmPayLaterBooking(
     throw { code: 'BOOKING_NOT_FOUND', message: ERROR_MESSAGES.BOOKING_NOT_FOUND };
   }
 
+  // Fire-and-forget — the confirmation emails go out via a tiny
+  // server route (this function runs in the browser with the anon
+  // key, so it can't send them directly; RESEND_API_KEY is
+  // server-only). Never blocks or fails the booking itself: a
+  // customer whose Pay Later booking is confirmed must see that
+  // success regardless of whether the email happens to go out.
+  fetch('/api/bookings/notify-confirmed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_ref: bookingRef.trim().toUpperCase() }),
+  }).catch((err) => console.error('notify-confirmed request failed:', err?.message));
+
   return data[0] as PaymentConfirmation;
 }
 

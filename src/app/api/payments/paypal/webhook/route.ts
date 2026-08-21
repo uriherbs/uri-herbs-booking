@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { PAYPAL_API_BASE, getPayPalAccessToken } from '@/lib/paypal-server';
+import { sendBookingConfirmationEmails } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   const webhookId = process.env.PAYPAL_WEBHOOK_ID;
@@ -110,6 +111,12 @@ export async function POST(request: NextRequest) {
 
       if (error) {
         console.error(`confirm_booking_payment failed for ${bookingRef}:`, error.message);
+      } else {
+        // Best-effort — bookingId here came from PayPal's own webhook
+        // payload (resource.custom_id), not user input.
+        await sendBookingConfirmationEmails(db, bookingId).catch((err) =>
+          console.error(`sendBookingConfirmationEmails threw for ${bookingRef}:`, err?.message)
+        );
       }
     }
   } catch (err: any) {

@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { getStripe } from '@/lib/stripe-server';
+import { sendBookingConfirmationEmails } from '@/lib/notifications';
 
 export const runtime = 'nodejs'; // Stripe's SDK needs Node, not Edge
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      const { error } = await db.rpc('confirm_booking_payment', {
+      const { data, error } = await db.rpc('confirm_booking_payment', {
         p_booking_ref: bookingRef,
         p_payment_method: 'stripe',
         p_payment_provider_ref: intent.id,
@@ -91,6 +92,13 @@ export async function POST(request: NextRequest) {
         // booking. Logged loudly so it's visible in Vercel's function
         // logs; the money sits with Stripe until manually refunded.
         console.error(`confirm_booking_payment failed for ${bookingRef}:`, error.message);
+      } else if (data?.[0]?.booking_id) {
+        // Best-effort — a failed email must never turn a real,
+        // successful payment into a webhook error (Stripe would just
+        // retry, redelivering a payment we already confirmed).
+        await sendBookingConfirmationEmails(db, data[0].booking_id).catch((err) =>
+          console.error(`sendBookingConfirmationEmails threw for ${bookingRef}:`, err?.message)
+        );
       }
     }
     // payment_intent.payment_failed and others: no DB action needed —

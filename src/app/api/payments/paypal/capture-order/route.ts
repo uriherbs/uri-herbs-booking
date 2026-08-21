@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { PAYPAL_API_BASE, getPayPalAccessToken } from '@/lib/paypal-server';
+import { sendBookingConfirmationEmails } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   let body: any;
@@ -109,6 +110,12 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Best-effort — a failed email must never turn a real, successful
+    // payment into an error response to the browser.
+    await sendBookingConfirmationEmails(db, booking.id).catch((err) =>
+      console.error(`sendBookingConfirmationEmails threw for ${booking.booking_ref}:`, err?.message)
+    );
 
     return NextResponse.json({ booking_ref: booking.booking_ref, status: 'confirmed' });
   } catch (err: any) {

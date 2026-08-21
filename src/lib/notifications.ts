@@ -16,7 +16,15 @@
 
 const SHOP_NAME = 'Uri Herbs Workshop';
 const SHOP_ADDRESS = '44, 3 Si Phum Soi 9, Tambon Si Phum, Chiang Mai Old City, Thailand';
-const SHOP_MAPS_URL = 'https://maps.google.com/?q=Uri+Herbs+Workshop+Chiang+Mai+Old+City';
+// Coordinate + Place ID pattern (matches src/app/contact/page.tsx and
+// src/app/book/page.tsx) — a free-text query like the old
+// `?q=Uri+Herbs+Workshop+...` link used to geocode to a neighboring
+// business (The Moon Eatery / SALT & FIRE Rooftop Bar) instead of the
+// actual location. hl=en keeps the destination page in English.
+const SHOP_MAPS_URL =
+  'https://www.google.com/maps/search/?api=1&query=' +
+  encodeURIComponent('Uri Herbs Workshop') +
+  '&query_place_id=0x30da3bb4d505e7c5:0x41cac3c3a753cc10&hl=en';
 const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66812345678'; // set NEXT_PUBLIC_WHATSAPP_NUMBER in Vercel — this fallback is a placeholder only
 const SHOP_INSTAGRAM = 'https://instagram.com/uriherbsworkshop';
 const SHOP_WEBSITE = 'https://www.uriherbs.com';
@@ -69,9 +77,22 @@ export interface BookingEmailData {
   startTime: string;      // 'HH:MM'
   endTime: string;        // 'HH:MM'
   numParticipants: number;
-  instructorGroup: 'A' | 'B';
+  // null = a whole-space private booking (9+ guests) that spans both
+  // instructor tables — there's no single group to name. Same
+  // null-safety as slotGroupLabel() in src/app/book/page.tsx.
+  instructorGroup: 'A' | 'B' | null;
+  isPrivate: boolean;
   totalPriceThb: number;
   takeawayDescription: string;
+}
+
+// Mirrors the group-label logic in src/app/book/page.tsx's
+// slotGroupLabel() so the email matches what the customer already
+// saw on the confirmation page.
+function groupLabel(instructorGroup: 'A' | 'B' | null, isPrivate: boolean): string {
+  if (instructorGroup === null) return isPrivate ? 'Whole space — both instructors' : 'Whole space';
+  const instructor = instructorGroup === 'A' ? 'with Mali' : 'Instructor B';
+  return isPrivate ? `Private table — Group ${instructorGroup} (${instructor})` : `Group ${instructorGroup} (${instructor})`;
 }
 
 function formatDateLong(dateStr: string): string {
@@ -152,7 +173,7 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
                       ${data.packageIcon} ${data.packageName}
                     </div>
                     <div style="font-family: Arial, sans-serif; font-size:12px; color:#8A7668; margin-top:2px;">
-                      ${data.numParticipants} guest${data.numParticipants > 1 ? 's' : ''} • Group ${data.instructorGroup}
+                      ${data.numParticipants} guest${data.numParticipants > 1 ? 's' : ''} • ${groupLabel(data.instructorGroup, data.isPrivate)}
                     </div>
                   </td>
                 </tr>
@@ -321,6 +342,83 @@ export function buildCancellationEmailHtml(bookingRef: string, customerName: str
 
 
 // ────────────────────────────────────────────────────────────
+// 3b. OWNER NEW-BOOKING NOTIFICATION  (→ Mali's inbox)
+// ────────────────────────────────────────────────────────────
+// Fired alongside the customer confirmation email — see
+// sendBookingConfirmationEmails() below. Plainer than the customer
+// email on purpose (this is an internal alert, not a branded
+// experience); leads with what Mali actually needs to act on a new
+// booking: who, when, how many, and a one-tap way to reach them.
+
+export const OWNER_EMAIL = 'uherbhouse@gmail.com';
+
+export interface OwnerNotificationData extends BookingEmailData {
+  customerEmail?: string;
+  customerPhone?: string;
+  paymentMethod: string; // 'stripe' | 'paypal' | 'later' | ...
+}
+
+export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): string {
+  const dateLong = formatDateLong(data.date);
+  const startStr = formatTime12(data.startTime);
+  const endStr = formatTime12(data.endTime);
+  const whatsappLink = data.customerPhone
+    ? buildShopToCustomerWhatsAppLink(data.customerPhone, data.customerName, data.bookingRef)
+    : null;
+
+  return `
+<!DOCTYPE html>
+<html><body style="margin:0; padding:24px; background-color:#F5F2EC; font-family: Arial, sans-serif;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
+    <tr><td style="background-color:#2D4639; padding:24px; text-align:center;">
+      <div style="font-family: Georgia, serif; font-size:18px; color:#ffffff;">🌿 New Booking — ${data.bookingRef}</div>
+    </td></tr>
+    <tr><td style="padding:24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden; margin-bottom:16px;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Experience</div>
+          <div style="font-size:15px; color:#2D4639; font-weight:bold;">${data.packageIcon} ${data.packageName}</div>
+          <div style="font-size:12px; color:#8A7668; margin-top:2px;">${data.numParticipants} guest${data.numParticipants > 1 ? 's' : ''} • ${groupLabel(data.instructorGroup, data.isPrivate)}</div>
+        </tr></td>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">When</div>
+          <div style="font-size:14px; color:#2D4639;">${dateLong}, ${startStr} – ${endStr}</div>
+        </tr></td>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Customer</div>
+          <div style="font-size:14px; color:#2D4639;">${data.customerName}</div>
+          ${data.customerPhone ? `<div style="font-size:13px; color:#5C4A3D;">${data.customerPhone}</div>` : ''}
+          ${data.customerEmail ? `<div style="font-size:13px; color:#5C4A3D;">${data.customerEmail}</div>` : ''}
+        </tr></td>
+        <tr><td style="padding:12px 16px; background-color:#FAF7F0;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
+          <div style="font-size:14px; color:#2D4639;">฿${data.totalPriceThb.toLocaleString()} — ${data.paymentMethod === 'later' ? 'Pay on arrival' : `Paid online (${data.paymentMethod})`}</div>
+        </tr></td>
+      </table>
+      ${whatsappLink ? `<p style="text-align:center; margin:0 0 12px;"><a href="${whatsappLink}" style="display:inline-block; background:#6B8F71; color:#ffffff; text-decoration:none; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold;">Message ${data.customerName.split(' ')[0]} on WhatsApp</a></p>` : ''}
+      <p style="font-size:12px; color:#8A7668; text-align:center; margin:0;">Uri Herbs Booking Admin</p>
+    </td></tr>
+  </table>
+</body></html>
+`.trim();
+}
+
+export function buildOwnerNotificationEmailText(data: OwnerNotificationData): string {
+  return `
+New Booking — ${data.bookingRef}
+
+${data.packageIcon} ${data.packageName}
+${data.numParticipants} guest${data.numParticipants > 1 ? 's' : ''} • ${groupLabel(data.instructorGroup, data.isPrivate)}
+${formatDateLong(data.date)}, ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
+
+Customer: ${data.customerName}
+${data.customerPhone ? `Phone: ${data.customerPhone}\n` : ''}${data.customerEmail ? `Email: ${data.customerEmail}\n` : ''}
+Total: ฿${data.totalPriceThb.toLocaleString()} — ${data.paymentMethod === 'later' ? 'Pay on arrival' : `Paid online (${data.paymentMethod})`}
+`.trim();
+}
+
+
+// ────────────────────────────────────────────────────────────
 // 4. RESEND API CALL  (server-side only — Edge Function / API route)
 // ────────────────────────────────────────────────────────────
 
@@ -358,6 +456,140 @@ export async function sendEmailViaResend(
   }
 
   return response.json();
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 4b. BOOKING CONFIRMATION — ORCHESTRATION
+// ────────────────────────────────────────────────────────────
+// Called from every path that can move a booking to 'confirmed': the
+// Stripe webhook, both PayPal confirmation paths (capture-order AND
+// the webhook backstop — see that route's own comment for why there
+// are two), and the Pay Later confirm route. More than one of these
+// can legitimately fire for the same booking (PayPal's two paths
+// race on purpose), so this claims the send atomically via the
+// existing bookings.confirmation_email_sent flag — an
+// UPDATE ... WHERE confirmation_email_sent = false ... RETURNING id
+// that only one caller can ever win. Never throws — a booking that's
+// genuinely paid/confirmed must not fail because an email couldn't
+// be sent; failures are logged loudly instead (visible in Vercel's
+// function logs) so a silently-broken RESEND_API_KEY or an
+// unverified sending domain doesn't go unnoticed.
+
+// Presentation metadata (icon, takeaway copy) that doesn't live in
+// the database — same source data as PACKAGE_META in
+// src/app/book/page.tsx, duplicated here in minimal form since that
+// file is a 'use client' component and can't be imported into
+// server-only code. If a package's copy changes there, mirror it
+// here too.
+const PACKAGE_EMAIL_META: Record<string, { icon: string; takeaway: string }> = {
+  'single-tea':            { icon: '🍵',   takeaway: '2 custom dried tea cloth bags + fresh tasting' },
+  'single-inhaler':        { icon: '🌿',   takeaway: '1 personalized Ya Dom jar' },
+  'single-massage-ball':   { icon: '🌾',   takeaway: '1 herbal compress ball in protective bag' },
+  'combo-tea-inhaler':     { icon: '🍵🌿', takeaway: 'Tea bags + Ya Dom jar' },
+  'combo-inhaler-ball':    { icon: '🌿🌾', takeaway: 'Ya Dom jar + herbal compress ball' },
+  'combo-tea-ball':        { icon: '🍵🌾', takeaway: 'Tea bags + herbal compress ball' },
+  'journey-full':          { icon: '✦',    takeaway: 'All 3 takeaway sets: teas, Ya Dom & compress ball' },
+  'skincare-aromatherapy': { icon: '❋',    takeaway: 'Handmade skincare products to take home' },
+};
+
+// `db` is a Supabase client with service-role access (getServiceClient()
+// from '@/lib/supabase') — typed loosely to avoid importing Supabase's
+// types into this otherwise DB-free file.
+export async function sendBookingConfirmationEmails(db: any, bookingId: string): Promise<void> {
+  // Atomic claim — only the caller that flips this false → true
+  // actually sends. Every other (redundant) call for the same
+  // booking sees 0 rows updated and returns immediately.
+  const { data: claimed, error: claimError } = await db
+    .from('bookings')
+    .update({ confirmation_email_sent: true, confirmation_email_sent_at: new Date().toISOString() })
+    .eq('id', bookingId)
+    .eq('confirmation_email_sent', false)
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) {
+    console.error(`sendBookingConfirmationEmails: claim failed for booking ${bookingId}:`, claimError.message);
+    return;
+  }
+  if (!claimed) {
+    // Already sent by another (racing) confirmation path — expected,
+    // not an error.
+    return;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendBookingConfirmationEmails: RESEND_API_KEY not configured — booking ${bookingId} confirmed but no emails sent`);
+    return;
+  }
+
+  const { data: booking, error: fetchError } = await db
+    .from('bookings')
+    .select(
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, packages ( name, slug )'
+    )
+    .eq('id', bookingId)
+    .single();
+
+  if (fetchError || !booking) {
+    console.error(`sendBookingConfirmationEmails: could not fetch booking ${bookingId}:`, fetchError?.message);
+    return;
+  }
+
+  const pkg = Array.isArray(booking.packages) ? booking.packages[0] : booking.packages;
+  const meta = PACKAGE_EMAIL_META[pkg?.slug] || { icon: '🌿', takeaway: 'Your take-home items will be ready for you.' };
+  const emailData: OwnerNotificationData = {
+    bookingRef: booking.booking_ref,
+    customerName: booking.customer_name,
+    packageName: pkg?.name || 'Uri Herbs Workshop',
+    packageIcon: meta.icon,
+    date: booking.slot_date,
+    startTime: String(booking.start_time).slice(0, 5),
+    endTime: String(booking.end_time).slice(0, 5),
+    numParticipants: booking.num_participants,
+    instructorGroup: booking.instructor_group,
+    isPrivate: booking.is_private,
+    totalPriceThb: booking.total_price_thb,
+    takeawayDescription: meta.takeaway,
+    customerEmail: booking.customer_email || undefined,
+    customerPhone: booking.customer_phone || undefined,
+    paymentMethod: booking.payment_method || 'later',
+  };
+
+  // Customer confirmation — best-effort, only if they gave an email
+  // (it's optional at booking time).
+  if (booking.customer_email) {
+    try {
+      await sendEmailViaResend(
+        {
+          to: booking.customer_email,
+          subject: `Booking Confirmed — ${booking.booking_ref} · ${SHOP_NAME}`,
+          html: buildConfirmationEmailHtml(emailData),
+          text: buildConfirmationEmailText(emailData),
+        },
+        apiKey
+      );
+    } catch (err: any) {
+      console.error(`sendBookingConfirmationEmails: customer email failed for ${booking.booking_ref}:`, err.message);
+    }
+  }
+
+  // Owner notification — always sent, regardless of whether the
+  // customer gave an email.
+  try {
+    await sendEmailViaResend(
+      {
+        to: OWNER_EMAIL,
+        subject: `New booking — ${booking.booking_ref} (${booking.num_participants} guest${booking.num_participants > 1 ? 's' : ''})`,
+        html: buildOwnerNotificationEmailHtml(emailData),
+        text: buildOwnerNotificationEmailText(emailData),
+      },
+      apiKey
+    );
+  } catch (err: any) {
+    console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
+  }
 }
 
 

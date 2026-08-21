@@ -32,19 +32,24 @@ const SHOP_HOURS = 'Mon – Sat · 09:00 – 17:00';
 // Verified directly against Google Maps (place: "Uri Herbs Workshop").
 // Geocoding the free-text address above used to send the pin to a
 // neighboring business (The Moon Eatery / SALT & FIRE Rooftop Bar)
-// instead of the actual location — using the coordinates directly
-// sidesteps that fuzzy address-matching problem entirely.
-const SHOP_LAT = 18.794052;
-const SHOP_LNG = 98.9915941;
-// No Maps Embed API key configured in this project (same key-less
-// pattern the old address-based embed already used), so the embed
-// uses the coordinate-based `q=lat,lng&output=embed` shorthand rather
-// than the full `pb=` embed format, which requires one.
-// hl=en — without it Google Maps picks a language from the visitor's
-// own browser/device settings, which for a Chiang Mai location often
-// means Thai, even though the rest of this English-language site
-// clearly targets English-speaking visitors.
-const MAPS_EMBED_SRC = `https://maps.google.com/maps?q=${SHOP_LAT},${SHOP_LNG}&z=17&hl=en&output=embed`;
+// instead of the actual location.
+//
+// Owner reported the embedded map "doesn't look right" — the old
+// coordinate-only embed (`q=lat,lng&output=embed`) just centers the
+// map on that point with no marker, so it renders as a plain street
+// map with nearby cafés/restaurants labeled but nothing marking the
+// workshop itself. That's what actually looked broken, not the
+// coordinates (those were already correct).
+//
+// Fix: this is the CID-based `pb=` URL Google's own "Share → Embed a
+// map" dialog generates for a specific place — it's the same key-less
+// embed product as the coordinate shorthand (no Maps Embed API key
+// needed), it just also renders the place's actual pin/marker instead
+// of an unmarked map. The CID (4740816802854194192) is the same place
+// (Uri Herbs Workshop) as the Place ID used below for SHOP_MAPS_URL,
+// just decimal instead of hex — `0x41cac3c3a753cc10` (the part after
+// the colon in SHOP_PLACE_ID) converts to this same number.
+const MAPS_EMBED_SRC = 'https://www.google.com/maps/embed?pb=!1m3!3m2!1m1!4s4740816802854194192!3m1!1sen!5m1!1sen';
 // "Open in Maps" link, built via Google's documented Maps URLs API
 // (developers.google.com/maps/documentation/urls/get-started#search-action)
 // rather than the user's verified short link, since a short link
@@ -297,18 +302,22 @@ export default function ContactPage() {
                   referrerPolicy="no-referrer-when-downgrade"
                 />
               </div>
+              {/* Was a plain text link — owner feedback: not clear enough
+                  as a tappable button, especially on mobile. Now a
+                  solid-color button with an icon, full width. */}
               <a
                 href={SHOP_MAPS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '12px 16px', borderTop: `1px solid ${C.sand}`,
-                  fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 600, color: C.sageDark,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '14px 16px', borderTop: `1px solid ${C.sand}`,
+                  background: C.sage,
+                  fontFamily: "'DM Sans'", fontSize: 14, fontWeight: 700, color: C.white,
                   textDecoration: 'none',
                 }}
               >
-                Open in Google Maps ↗
+                <PinSVG size={16} color={C.white} /> Open in Google Maps ↗
               </a>
             </div>
           </div>

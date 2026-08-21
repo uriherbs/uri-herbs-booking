@@ -33,6 +33,19 @@ const C = {
 };
 
 // ════════════════════════════════════════════════════════════
+// LOCATION / MAPS LINK
+// ════════════════════════════════════════════════════════════
+// Same coordinate + Place ID pattern as src/app/contact/page.tsx —
+// a free-text address search geocodes to a neighboring business
+// (The Moon Eatery / SALT & FIRE Rooftop Bar), so this uses the
+// exact verified place instead. hl=en keeps the destination page in
+// English regardless of the visitor's own browser/device language.
+const SHOP_MAPS_URL =
+  "https://www.google.com/maps/search/?api=1&query=" +
+  encodeURIComponent("Uri Herbs Workshop") +
+  "&query_place_id=0x30da3bb4d505e7c5:0x41cac3c3a753cc10&hl=en";
+
+// ════════════════════════════════════════════════════════════
 // PACKAGE PRESENTATION METADATA
 // ════════════════════════════════════════════════════════════
 // Icons, taglines, accent colors, and category groupings are
@@ -1240,7 +1253,7 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
 
         {[
           { icon: <ClockSVG size={16} color={C.sage}/>, label: "Date & Time", value: `${dayName}, ${monthName} ${dateObj.getDate()} • ${startStr} – ${endStr}` },
-          { icon: <MapPinSVG size={16} color={C.sage}/>, label: "Location", value: "44/3 Si Phum Soi 9, Chiang Mai Old City" },
+          { icon: <MapPinSVG size={16} color={C.sage}/>, label: "Location", value: "44/3 Si Phum Soi 9, Chiang Mai Old City", isLocation: true },
           { icon: <UsersSVG size={16} color={C.sage}/>, label: "Guest", value: form.name },
         ].map((row, i) => (
           <div key={i} style={{
@@ -1255,6 +1268,22 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
               <div style={{ fontFamily: "'DM Sans'", fontSize: 14, color: C.forest, marginTop: 2 }}>
                 {row.value}
               </div>
+              {row.isLocation && (
+                <a
+                  href={SHOP_MAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    marginTop: 8, padding: "8px 14px", borderRadius: 20,
+                    background: C.sageLight, border: `1px solid rgba(107,143,113,0.3)`,
+                    fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 600,
+                    color: C.sageDark, textDecoration: "none",
+                  }}
+                >
+                  <MapPinSVG size={13} color={C.sageDark}/> Get Directions ↗
+                </a>
+              )}
             </div>
           </div>
         ))}
