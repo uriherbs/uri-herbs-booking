@@ -7,6 +7,11 @@ import SiteFooter from '@/components/SiteFooter';
 // ══════════════════════════════════════════════════════════════════
 // DESIGN TOKENS — same palette as the rest of the site
 // ══════════════════════════════════════════════════════════════════
+// Redesign (Aug 2026): "Split-Screen Spa" direction, picked from 3
+// options drafted on a design canvas. Full-bleed map moment up top
+// (was a plain 2-col info+map / form grid before) with a floating
+// card for info + form. Same real data, icons and form logic as
+// before — layout only.
 
 const C = {
   sage: '#6B8F71',
@@ -132,26 +137,14 @@ const SOCIAL_LINKS = [
 ];
 
 // ══════════════════════════════════════════════════════════════════
-// CONTACT INFO ROW
+// INFO ROW (inside the floating card)
 // ══════════════════════════════════════════════════════════════════
 
-function InfoRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+function InfoRow({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-      <div style={{
-        width: 38, height: 38, borderRadius: 10, background: C.sageLight, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {icon}
-      </div>
-      <div>
-        <div style={{ fontFamily: "'DM Sans'", fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.barkLight, marginBottom: 3 }}>
-          {label}
-        </div>
-        <div style={{ fontFamily: "'DM Sans'", fontSize: 15, color: C.forest, lineHeight: 1.5 }}>
-          {children}
-        </div>
-      </div>
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <div style={{ marginTop: 2, flexShrink: 0 }}>{icon}</div>
+      <div style={{ fontFamily: "'DM Sans'", fontSize: 14.5, color: C.forest, lineHeight: 1.55 }}>{children}</div>
     </div>
   );
 }
@@ -219,125 +212,144 @@ export default function ContactPage() {
             @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
             * { box-sizing: border-box; }
             a { text-decoration: none; }
-            .contact-grid { display: grid; gap: 28px; grid-template-columns: 1fr; }
-            @media (min-width: 820px) {
-              .contact-grid { grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
-            }
             input, textarea { font-family: 'DM Sans', sans-serif; }
-            input:focus, textarea:focus { outline: none; border-color: ${C.sage}; }
+            input:focus, textarea:focus { outline: none; border-color: ${C.gold}; }
+
+            .contact-hero { position: relative; height: 240px; overflow: hidden; background: ${C.forest}; }
+            @media (min-width: 820px) { .contact-hero { height: 400px; } }
+
+            .contact-card {
+              position: relative; background: ${C.white}; border-radius: 24px;
+              box-shadow: 0 20px 48px rgba(45,70,57,0.16);
+              margin: -40px 20px 0; padding: 32px 24px 36px;
+            }
+            @media (min-width: 820px) {
+              .contact-card { max-width: 700px; margin: -72px auto 0; padding: 48px 56px 56px; }
+            }
+
+            .contact-card-grid { display: grid; gap: 30px; }
+            @media (min-width: 640px) {
+              .contact-card-grid { grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+            }
           `,
         }}
       />
 
       <SiteHeader />
 
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 24px 72px' }}>
-        <div style={{ width: 32, height: 3, background: C.gold, marginBottom: 14 }} />
-        <h1 style={{ fontFamily: "'Crimson Pro'", fontSize: 'clamp(30px,5vw,42px)', fontWeight: 700, color: C.forest, margin: '0 0 10px' }}>
+      {/* ── Full-bleed map moment ── */}
+      <div className="contact-hero">
+        <iframe
+          title="Uri Herbs Workshop location"
+          src={MAPS_EMBED_SRC}
+          width="100%"
+          height="100%"
+          style={{ border: 0, display: 'block', filter: 'saturate(0.9)' }}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+        {/* Overlay is pointer-events:none so the map underneath stays
+            fully interactive (pan/zoom) — only the two controls inside
+            re-enable pointer events for themselves. */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 20 }}>
+          <a
+            href={SHOP_MAPS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              pointerEvents: 'auto', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(45,70,57,0.88)', backdropFilter: 'blur(4px)', borderRadius: 999,
+              padding: '9px 16px 9px 12px', fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 700, color: C.white,
+            }}
+          >
+            <PinSVG size={15} color={C.white} />
+            Uri Herbs Workshop &middot; Chiang Mai Old City
+          </a>
+          <a
+            href={SHOP_MAPS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              pointerEvents: 'auto', alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 8,
+              background: C.gold, borderRadius: 999, padding: '10px 18px',
+              fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 700, color: C.forest,
+            }}
+          >
+            Open in Google Maps &#8599;
+          </a>
+        </div>
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: C.gold }} />
+      </div>
+
+      {/* ── Floating card: info + form ── */}
+      <div className="contact-card">
+        <div style={{ fontFamily: "'DM Sans'", fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.gold, marginBottom: 8 }}>
+          Say Hello
+        </div>
+        <h1 style={{ fontFamily: "'Crimson Pro'", fontSize: 'clamp(28px,4vw,36px)', fontWeight: 700, color: C.forest, margin: '0 0 10px' }}>
           Get in Touch
         </h1>
-        <p style={{ fontFamily: "'Crimson Pro'", fontSize: 18, lineHeight: 1.6, color: C.bark, maxWidth: 560, margin: '0 0 40px' }}>
-          Questions about a workshop, a group booking, or just want to say hi? We'd love to hear from you.
+        <p style={{ fontFamily: "'DM Sans'", fontSize: 14.5, lineHeight: 1.6, color: C.barkLight, maxWidth: 460, margin: '0 0 30px' }}>
+          Questions about a workshop, a group booking, or just want to say hi? We&rsquo;d love to hear from you.
         </p>
 
-        <div className="contact-grid">
-          {/* ── Left: contact info + map ── */}
+        <div className="contact-card-grid">
+          {/* ── Left: info + socials ── */}
           <div>
-            <div style={{
-              background: C.white, borderRadius: 16, border: `1px solid ${C.sand}`,
-              padding: 26, display: 'flex', flexDirection: 'column', gap: 22, marginBottom: 20,
-            }}>
-              <InfoRow icon={<PinSVG />} label="Address">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingBottom: 24, marginBottom: 24, borderBottom: `1px solid ${C.sand}` }}>
+              <InfoRow icon={<PinSVG size={16} color={C.gold} />}>
                 <a href={SHOP_MAPS_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
                   {SHOP_ADDRESS}
                 </a>
               </InfoRow>
-              <InfoRow icon={<ClockSVG />} label="Opening Hours">
-                {SHOP_HOURS}
-              </InfoRow>
-              <InfoRow icon={<PhoneSVG />} label="Phone">
+              <InfoRow icon={<ClockSVG size={16} color={C.gold} />}>{SHOP_HOURS}</InfoRow>
+              <InfoRow icon={<PhoneSVG size={16} color={C.gold} />}>
                 <a href={`tel:${SHOP_PHONE_TEL}`} style={{ color: C.forest }}>{SHOP_PHONE_DISPLAY}</a>
               </InfoRow>
-              <InfoRow icon={<MailSVG />} label="Email">
+              <InfoRow icon={<MailSVG size={16} color={C.gold} />}>
                 <a href={`mailto:${SHOP_EMAIL}`} style={{ color: C.forest }}>{SHOP_EMAIL}</a>
               </InfoRow>
             </div>
 
-            <div style={{
-              background: C.white, borderRadius: 16, border: `1px solid ${C.sand}`,
-              padding: 26, marginBottom: 20,
-            }}>
-              <div style={{ fontFamily: "'DM Sans'", fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: C.barkLight, marginBottom: 14 }}>
-                Follow Us
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {SOCIAL_LINKS.map(({ name, href, Icon }) => (
-                  <a
-                    key={name}
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={name}
-                    title={name}
-                    style={{
-                      width: 40, height: 40, borderRadius: 10, background: C.sageLight, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    <Icon />
-                  </a>
-                ))}
-              </div>
+            <div style={{ fontFamily: "'DM Sans'", fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.barkLight, marginBottom: 14 }}>
+              Follow Along
             </div>
-
-            <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.sand}`, background: C.white }}>
-              <div style={{ height: 300 }}>
-                <iframe
-                  title="Uri Herbs Workshop location"
-                  src={MAPS_EMBED_SRC}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0, display: 'block' }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-              {/* Was a plain text link — owner feedback: not clear enough
-                  as a tappable button, especially on mobile. Now a
-                  solid-color button with an icon, full width. */}
-              <a
-                href={SHOP_MAPS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '14px 16px', borderTop: `1px solid ${C.sand}`,
-                  background: C.sage,
-                  fontFamily: "'DM Sans'", fontSize: 14, fontWeight: 700, color: C.white,
-                  textDecoration: 'none',
-                }}
-              >
-                <PinSVG size={16} color={C.white} /> Open in Google Maps ↗
-              </a>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {SOCIAL_LINKS.map(({ name: socialName, href, Icon }) => (
+                <a
+                  key={socialName}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={socialName}
+                  title={socialName}
+                  style={{
+                    width: 38, height: 38, borderRadius: '50%', border: `1px solid ${C.sand}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}
+                >
+                  <Icon size={16} color={C.forest} />
+                </a>
+              ))}
             </div>
           </div>
 
           {/* ── Right: contact form ── */}
-          <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.sand}`, padding: 28 }}>
+          <div>
             {status === 'success' ? (
-              <div style={{ textAlign: 'center', padding: '24px 8px' }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🌿</div>
-                <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 22, fontWeight: 700, color: C.forest, margin: '0 0 8px' }}>
+              <div style={{ textAlign: 'center', padding: '18px 8px' }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>🌿</div>
+                <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.forest, margin: '0 0 8px' }}>
                   Message Sent!
                 </h2>
-                <p style={{ fontSize: 14, color: C.bark, lineHeight: 1.6, margin: '0 0 20px' }}>
-                  Thanks for reaching out — we'll get back to you soon.
+                <p style={{ fontSize: 13.5, color: C.bark, lineHeight: 1.6, margin: '0 0 18px' }}>
+                  Thanks for reaching out — we&rsquo;ll get back to you soon.
                 </p>
                 <button
                   onClick={handleSendAnother}
                   style={{
                     background: 'transparent', border: `1.5px solid ${C.sage}`, color: C.sageDark,
-                    borderRadius: 10, padding: '10px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                    borderRadius: 10, padding: '10px 22px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer',
                   }}
                 >
                   Send Another Message
@@ -345,14 +357,10 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
-                <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 22, fontWeight: 700, color: C.forest, margin: '0 0 20px' }}>
-                  Send Us a Message
-                </h2>
-
                 {status === 'error' && (
                   <div style={{
                     background: C.coralLight, color: C.coral, borderRadius: 10, padding: '12px 14px',
-                    fontSize: 13, marginBottom: 18, lineHeight: 1.5,
+                    fontSize: 13, marginBottom: 16, lineHeight: 1.5,
                   }}>
                     {errorMsg}
                   </div>
@@ -369,41 +377,38 @@ export default function ContactPage() {
                   style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
                 />
 
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.forest, marginBottom: 6 }}>Name</label>
+                <div style={{ marginBottom: 14 }}>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                     autoComplete="name"
-                    placeholder="Your name"
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${C.sand}`, fontSize: 14, color: C.bark }}
+                    placeholder="Name"
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.parchment, fontSize: 14, color: C.forest }}
                   />
                 </div>
 
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.forest, marginBottom: 6 }}>Email</label>
+                <div style={{ marginBottom: 14 }}>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    placeholder="you@example.com"
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${C.sand}`, fontSize: 14, color: C.bark }}
+                    placeholder="Email"
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.parchment, fontSize: 14, color: C.forest }}
                   />
                 </div>
 
-                <div style={{ marginBottom: 22 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.forest, marginBottom: 6 }}>Message</label>
+                <div style={{ marginBottom: 18 }}>
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     required
-                    rows={5}
-                    placeholder="How can we help?"
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${C.sand}`, fontSize: 14, color: C.bark, resize: 'vertical', lineHeight: 1.5 }}
+                    rows={4}
+                    placeholder="Message"
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.parchment, fontSize: 14, color: C.forest, resize: 'vertical', lineHeight: 1.5 }}
                   />
                 </div>
 
@@ -412,9 +417,9 @@ export default function ContactPage() {
                   disabled={!canSubmit || status === 'submitting'}
                   style={{
                     width: '100%', padding: '14px 20px', borderRadius: 12, border: 'none',
-                    background: canSubmit && status !== 'submitting' ? C.sage : C.sand,
-                    color: canSubmit && status !== 'submitting' ? '#fff' : C.barkLight,
-                    fontWeight: 700, fontSize: 15,
+                    background: canSubmit && status !== 'submitting' ? C.gold : C.sand,
+                    color: canSubmit && status !== 'submitting' ? C.forest : C.barkLight,
+                    fontWeight: 700, fontSize: 14.5,
                     cursor: canSubmit && status !== 'submitting' ? 'pointer' : 'default',
                   }}
                 >
@@ -424,6 +429,19 @@ export default function ContactPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── Minimal booking nudge — the highest-value action on this
+          page is a booking, not a blog/social click (those already
+          live in the socials row above), so this stays a link to the
+          site's own booking flow rather than an outbound link. ── */}
+      <div style={{ padding: '30px 24px 60px', textAlign: 'center' }}>
+        <span style={{ fontFamily: "'DM Sans'", fontSize: 14, color: C.barkLight }}>
+          Prefer to book a workshop instead?{' '}
+        </span>
+        <a href="/book" style={{ fontFamily: "'DM Sans'", fontSize: 14, fontWeight: 700, color: C.sageDark, textDecoration: 'underline' }}>
+          See workshops &rarr;
+        </a>
       </div>
 
       <SiteFooter />
