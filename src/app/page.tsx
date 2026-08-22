@@ -17,6 +17,7 @@ import SiteFooter from '@/components/SiteFooter';
 import { Hero } from '@/components/home/Hero';
 import { WorkshopCircles } from '@/components/home/WorkshopCircles';
 import { Intro } from '@/components/home/Intro';
+import { VideoMoment } from '@/components/home/VideoMoment';
 import { GetInTouch } from '@/components/home/GetInTouch';
 import { C, FONT_IMPORT, FONT_BODY } from '@/lib/theme';
 
@@ -49,6 +50,7 @@ export default function Home() {
         <Hero />
         <WorkshopCircles />
         <Intro />
+        <VideoMoment />
         <GetInTouch />
       </main>
       <SiteFooter />
