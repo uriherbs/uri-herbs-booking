@@ -170,11 +170,31 @@ function chargedParticipants(participants, isPrivate) {
   return Math.max(participants, minimum);
 }
 
-// Dynamic "Experience" step messaging, per spec §4.
+// Dynamic "Experience" step messaging, per spec §4. Herbal calendar
+// only (two tables/instructors) — see privateModeMessageFor() below,
+// which branches to aromatherapy's own wording instead of calling
+// this for that calendar.
 function privateModeMessage(participants) {
   if (participants <= 6) return "Private session — just your group, with one instructor";
   if (participants <= 8) return "Private session — just your group (cozy fit for up to 8, one instructor)";
   return "Private session — the whole space, with both instructors";
+}
+
+// Aromatherapy is NOT the herbal two-table model — one instructor,
+// 4 chairs, period (see aromatherapy-capacity-fix doc). Both modes
+// cap at 4 guests; the only difference private makes here is that it
+// closes the whole session to other guests and charges a flat
+// ฿10,800 (4 × price) regardless of actual headcount (1–4).
+function maxGuestsFor(calendarType, isPrivate) {
+  if (calendarType === "aromatherapy") return 4;
+  return isPrivate ? 16 : 6;
+}
+
+function privateModeMessageFor(calendarType, participants) {
+  if (calendarType === "aromatherapy") {
+    return "Private session — the whole session reserved just for your group (flat rate for all 4 chairs, however many of you come)";
+  }
+  return privateModeMessage(participants);
 }
 
 // Table label shown on a Date & Time slot, mode-aware (group vs.
@@ -424,85 +444,31 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
     { key: "aromatherapy", title: "Aromatherapy Mastery", subtitle: "2 Hours • Mon–Thu only" },
   ];
 
-  // Group (shared table) soft-caps at 6; private can go up to the whole
-  // space (16). See spec /book §2.1 §1.
-  const maxGuests = isPrivate ? 16 : 6;
+  // Reordered (Aug 2026): workshop choice now comes BEFORE guest
+  // count, not after. Two reasons: (1) it reads more naturally —
+  // "which workshop, then how many of you" — and (2) it's the fix
+  // for a known UX gap (see aromatherapy-capacity-fix doc): the guest
+  // counter's max used to be a flat 6/16 regardless of package, so an
+  // Aromatherapy booker (hard-capped at 4) only found out at
+  // submission. Now the counter only appears once a package is
+  // picked, sized correctly for THAT package's calendar from the
+  // start — see maxGuestsFor().
+  const selectedPkg = packages.find(p => p.slug === selected);
+  const maxGuests = maxGuestsFor(selectedPkg?.calendar, isPrivate);
+  const isAroma = selectedPkg?.calendar === "aromatherapy";
+
+  // First pick (or a change of package) reveals the guest-count
+  // section below the package list — bring it into view rather than
+  // making the customer scroll down to discover it, especially on a
+  // long package list (e.g. after scrolling past Journey/Combo/Single
+  // to reach Aromatherapy at the bottom).
+  useEffect(() => {
+    if (!selected) return;
+    document.getElementById("guest-count")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selected]);
 
   return (
     <div style={{ padding: "0 16px 100px" }}>
-      {/* Private vs. Group toggle */}
-      <div style={{ marginBottom: 14 }}>
-        <ModeToggle isPrivate={isPrivate} onChange={onIsPrivateChange} />
-      </div>
-
-      {/* Participant counter */}
-      <div style={{
-        background: C.white, borderRadius: 14, padding: "16px 18px",
-        border: `1.5px solid ${C.sand}`, marginBottom: isPrivate ? 10 : 20,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <div>
-          <div style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 600, color: C.forest }}>
-            Number of Guests
-          </div>
-          <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, marginTop: 2 }}>
-            {isPrivate ? "Up to 16 — 8 per table, or the whole space for 9+" : "Up to 6, sharing a table with other guests"}
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button
-            onClick={() => onParticipantsChange(Math.max(1, participants - 1))}
-            disabled={participants <= 1}
-            style={{
-              width: 36, height: 36, borderRadius: "50%",
-              border: `1.5px solid ${participants <= 1 ? C.sand : C.sage}`,
-              background: "transparent", cursor: participants <= 1 ? "default" : "pointer",
-              fontSize: 20, color: participants <= 1 ? C.sand : C.sage,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>−</button>
-          <span style={{
-            fontFamily: "'Crimson Pro'", fontSize: 24, fontWeight: 700,
-            color: C.forest, minWidth: 28, textAlign: "center",
-          }}>{participants}</span>
-          <button
-            onClick={() => onParticipantsChange(Math.min(maxGuests, participants + 1))}
-            disabled={participants >= maxGuests}
-            style={{
-              width: 36, height: 36, borderRadius: "50%",
-              border: `1.5px solid ${participants >= maxGuests ? C.sand : C.sage}`,
-              background: participants >= maxGuests ? "transparent" : C.sage,
-              cursor: participants >= maxGuests ? "default" : "pointer",
-              fontSize: 20, color: participants >= maxGuests ? C.sand : C.white,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>+</button>
-        </div>
-      </div>
-
-      {/* Private-mode dynamic messaging, per spec §4 */}
-      {isPrivate && (
-        <div style={{
-          background: C.goldLight, border: `1px solid rgba(168,144,104,0.25)`,
-          borderRadius: 12, padding: "12px 14px", marginBottom: 20,
-          fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.5,
-        }}>
-          {privateModeMessage(participants)}
-        </div>
-      )}
-
-      {/* Informational only — not a blocking checkbox. Business intent
-          (per spec): families with kids are welcome and encouraged;
-          this exists to head off parents booking several young
-          children as "independent" participants to use as childcare
-          while the adult doesn't actually take part. */}
-      <p style={{
-        fontFamily: "'DM Sans'", fontSize: 12.5, lineHeight: 1.6, color: C.barkLight,
-        margin: "10px 2px 20px",
-      }}>
-        Uri Herbs Workshop is a hands-on family experience, not childcare. Children under 12 are
-        welcome as part of a family booking, but must be seated with and actively supervised by a
-        participating parent throughout. Guests aged 12–17 need an accompanying adult in the group.
-      </p>
-
       {categories.map(cat => {
         const catPackages = packages.filter(p => p.category === cat.key);
         if (catPackages.length === 0) return null;
@@ -528,6 +494,118 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
         </div>
         );
       })}
+
+      {/* Guest count — only revealed once a workshop is chosen, so it
+          can be sized (and priced, via PackageCard's live total above)
+          for that specific package from the very first tap instead of
+          a one-size-fits-all 6/16 the customer might have to walk
+          back from. */}
+      {selectedPkg && (
+        <div id="guest-count" style={{ scrollMarginTop: 16 }}>
+          <div style={{ marginBottom: 10 }}>
+            <h3 style={{ fontFamily: "'Crimson Pro'", fontSize: 18, fontWeight: 600, color: C.forest, margin: 0 }}>
+              How Many Guests?
+            </h3>
+            <p style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, margin: "2px 0 0" }}>
+              For {selectedPkg.name}
+            </p>
+          </div>
+
+          {/* Private vs. Group toggle */}
+          <div style={{ marginBottom: 14 }}>
+            <ModeToggle isPrivate={isPrivate} onChange={onIsPrivateChange} />
+          </div>
+
+          {/* Participant counter */}
+          <div style={{
+            background: C.white, borderRadius: 14, padding: "16px 18px",
+            border: `1.5px solid ${C.sand}`, marginBottom: isPrivate ? 10 : 20,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <div>
+              <div style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 600, color: C.forest }}>
+                Number of Guests
+              </div>
+              <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, marginTop: 2 }}>
+                {isAroma
+                  ? (isPrivate ? "Up to 4 — the whole session, flat rate" : "Up to 4, sharing the session with other guests")
+                  : isPrivate
+                    ? "Up to 16 — 8 per table, or the whole space for 9+"
+                    : "Up to 6, sharing a table with other guests"}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <button
+                onClick={() => onParticipantsChange(Math.max(1, participants - 1))}
+                disabled={participants <= 1}
+                style={{
+                  width: 36, height: 36, borderRadius: "50%",
+                  border: `1.5px solid ${participants <= 1 ? C.sand : C.sage}`,
+                  background: "transparent", cursor: participants <= 1 ? "default" : "pointer",
+                  fontSize: 20, color: participants <= 1 ? C.sand : C.sage,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>−</button>
+              <span style={{
+                fontFamily: "'Crimson Pro'", fontSize: 24, fontWeight: 700,
+                color: C.forest, minWidth: 28, textAlign: "center",
+              }}>{participants}</span>
+              <button
+                onClick={() => onParticipantsChange(Math.min(maxGuests, participants + 1))}
+                disabled={participants >= maxGuests}
+                style={{
+                  width: 36, height: 36, borderRadius: "50%",
+                  border: `1.5px solid ${participants >= maxGuests ? C.sand : C.sage}`,
+                  background: participants >= maxGuests ? "transparent" : C.sage,
+                  cursor: participants >= maxGuests ? "default" : "pointer",
+                  fontSize: 20, color: participants >= maxGuests ? C.sand : C.white,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>+</button>
+            </div>
+          </div>
+
+          {/* Private-mode dynamic messaging, per spec §4 (herbal) /
+              aromatherapy-capacity-fix doc (aromatherapy) */}
+          {isPrivate && (
+            <div style={{
+              background: C.goldLight, border: `1px solid rgba(168,144,104,0.25)`,
+              borderRadius: 12, padding: "12px 14px", marginBottom: 20,
+              fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.5,
+            }}>
+              {privateModeMessageFor(selectedPkg.calendar, participants)}
+            </div>
+          )}
+
+          {/* Live running total — the price also already updates live
+              on the selected PackageCard above, but it's off-screen by
+              the time someone's down here adjusting guest count. */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: C.sageLight, borderRadius: 12, padding: "12px 16px", marginBottom: 20,
+          }}>
+            <span style={{ fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 600, color: C.forest }}>
+              Total
+            </span>
+            <span style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.sageDark }}>
+              ฿{(selectedPkg.price * chargedParticipants(participants, isPrivate)).toLocaleString()}
+            </span>
+          </div>
+
+          {/* Informational only — not a blocking checkbox. Business
+              intent (per spec): families with kids are welcome and
+              encouraged; this exists to head off parents booking
+              several young children as "independent" participants to
+              use as childcare while the adult doesn't actually take
+              part. */}
+          <p style={{
+            fontFamily: "'DM Sans'", fontSize: 12.5, lineHeight: 1.6, color: C.barkLight,
+            margin: "0 2px 4px",
+          }}>
+            Uri Herbs Workshop is a hands-on family experience, not childcare. Children under 12 are
+            welcome as part of a family booking, but must be seated with and actively supervised by a
+            participating parent throughout. Guests aged 12–17 need an accompanying adult in the group.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1423,14 +1501,32 @@ export default function BookingFlow() {
 
   const pkg = packages.find(p => p.slug === selectedPkg);
 
-  // Switching Private → Group can leave `participants` above the
-  // group soft cap (6) — clamp down rather than leaving an invalid
-  // count silently in state. Group → Private never needs clamping
-  // (6 is always ≤ 16).
+  // Package choice now comes BEFORE guest count (see PackageStep) —
+  // switching between a herbal package and Aromatherapy (or between
+  // herbal categories) can leave `participants` above the newly
+  // selected package's max (Aromatherapy caps at 4 either way; herbal
+  // caps at 6 group / 16 private — see maxGuestsFor). Clamp down
+  // rather than leaving an invalid count silently in state; never
+  // needs to clamp UP, so a lower previous count is left untouched.
+  const handleSelectPackage = useCallback((slug: string) => {
+    setSelectedPkg(slug);
+    const newPkg = packages.find(p => p.slug === slug);
+    if (newPkg) {
+      const max = maxGuestsFor(newPkg.calendar, isPrivate);
+      setParticipants(p => Math.min(p, max));
+    }
+  }, [packages, isPrivate]);
+
+  // Same clamping, triggered by the Group/Private toggle instead of
+  // the package choice — e.g. switching Aromatherapy from Group (max
+  // 4) is a no-op since Private is also capped at 4 there, but a
+  // herbal Private → Group switch can still leave participants above
+  // the group soft cap (6).
   const handleIsPrivateChange = useCallback((next: boolean) => {
     setIsPrivate(next);
-    if (!next) setParticipants(p => Math.min(p, 6));
-  }, []);
+    const max = maxGuestsFor(pkg?.calendar, next);
+    setParticipants(p => Math.min(p, max));
+  }, [pkg]);
 
   const updateForm = useCallback((field: string, value: any) => {
     setForm(f => ({ ...f, [field]: value }));
@@ -1708,7 +1804,7 @@ export default function BookingFlow() {
         ) : (
           <PackageStep
             packages={packages}
-            selected={selectedPkg} onSelect={setSelectedPkg}
+            selected={selectedPkg} onSelect={handleSelectPackage}
             participants={participants} onParticipantsChange={setParticipants}
             isPrivate={isPrivate} onIsPrivateChange={handleIsPrivateChange}
           />
