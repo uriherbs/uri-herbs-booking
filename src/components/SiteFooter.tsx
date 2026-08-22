@@ -12,6 +12,12 @@
 // bookmarking /admin/login directly is still the primary way in, this
 // is just a low-visibility fallback so the link isn't only ever
 // something typed from memory.
+//
+// Also carries a second, equally low-key link to /trade (the B2B
+// "Trade & Groups" landing page for travel agencies / tour guides,
+// added Aug 2026) — that audience is a small fraction of visitors,
+// so it doesn't belong in the primary SiteHeader nav, but it still
+// needs one discoverable entry point instead of being link-only.
 // ============================================================
 
 import Link from 'next/link';
@@ -28,13 +34,22 @@ export default function SiteFooter() {
         <span style={{ fontFamily: FONT_BODY, fontSize: 11.5, color: C.barkLight }}>
           © {new Date().getFullYear()} Uri Herbs Workshop
         </span>
-        {/* Small and muted on purpose — for staff use, not a public CTA. */}
-        <Link
-          href="/admin/login"
-          style={{ fontFamily: FONT_BODY, fontSize: 11.5, color: C.barkLight, opacity: 0.7, textDecoration: 'none' }}
-        >
-          Staff
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Small and muted on purpose — see file header comment. */}
+          <Link
+            href="/trade"
+            style={{ fontFamily: FONT_BODY, fontSize: 11.5, color: C.barkLight, opacity: 0.7, textDecoration: 'none' }}
+          >
+            Travel Agencies &amp; Guides
+          </Link>
+          {/* Small and muted on purpose — for staff use, not a public CTA. */}
+          <Link
+            href="/admin/login"
+            style={{ fontFamily: FONT_BODY, fontSize: 11.5, color: C.barkLight, opacity: 0.7, textDecoration: 'none' }}
+          >
+            Staff
+          </Link>
+        </div>
       </div>
     </footer>
   );
