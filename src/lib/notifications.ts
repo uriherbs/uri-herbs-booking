@@ -340,6 +340,20 @@ export function buildCancellationEmailHtml(bookingRef: string, customerName: str
 `.trim();
 }
 
+export function buildCancellationEmailText(bookingRef: string, customerName: string): string {
+  return `
+Booking Cancelled — ${SHOP_NAME}
+
+Dear ${customerName},
+
+Your booking ${bookingRef} has been cancelled as requested. Your spot has been released.
+
+We hope to welcome you another time! Feel free to book again anytime at ${SHOP_WEBSITE}.
+
+— ${SHOP_NAME}
+`.trim();
+}
+
 
 // ────────────────────────────────────────────────────────────
 // 3b. OWNER NEW-BOOKING NOTIFICATION  (→ Mali's inbox)
@@ -589,6 +603,75 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     );
   } catch (err: any) {
     console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
+  }
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 4c. BOOKING CANCELLATION — ORCHESTRATION
+// ────────────────────────────────────────────────────────────
+// Called after admin_cancel_booking (see src/lib/booking-service.ts →
+// cancelBookingAsAdmin) confirms a booking is 'cancelled'. Same
+// atomic-claim shape as sendBookingConfirmationEmails above, just
+// keyed off bookings.cancellation_email_sent instead of
+// confirmation_email_sent — an
+// UPDATE ... WHERE cancellation_email_sent = false ... RETURNING id
+// that only one caller can ever win, so a redundant/retried call is
+// safe. Never throws — a booking that's genuinely cancelled must not
+// fail because an email couldn't be sent; failures are logged loudly
+// instead. Customer-only (no owner copy): cancellation is always
+// admin-initiated here, so Mali already knows it happened — she's the
+// one who clicked Cancel.
+export async function sendCancellationEmail(db: any, bookingId: string): Promise<void> {
+  const { data: claimed, error: claimError } = await db
+    .from('bookings')
+    .update({ cancellation_email_sent: true })
+    .eq('id', bookingId)
+    .eq('cancellation_email_sent', false)
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) {
+    console.error(`sendCancellationEmail: claim failed for booking ${bookingId}:`, claimError.message);
+    return;
+  }
+  if (!claimed) {
+    // Already sent — expected, not an error.
+    return;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId} cancelled but no email sent`);
+    return;
+  }
+
+  const { data: booking, error: fetchError } = await db
+    .from('bookings')
+    .select('booking_ref, customer_name, customer_email')
+    .eq('id', bookingId)
+    .single();
+
+  if (fetchError || !booking) {
+    console.error(`sendCancellationEmail: could not fetch booking ${bookingId}:`, fetchError?.message);
+    return;
+  }
+
+  // Best-effort, only if they gave an email (it's optional at booking time).
+  if (!booking.customer_email) return;
+
+  try {
+    await sendEmailViaResend(
+      {
+        to: booking.customer_email,
+        subject: `Booking Cancelled — ${booking.booking_ref} · ${SHOP_NAME}`,
+        html: buildCancellationEmailHtml(booking.booking_ref, booking.customer_name),
+        text: buildCancellationEmailText(booking.booking_ref, booking.customer_name),
+      },
+      apiKey
+    );
+  } catch (err: any) {
+    console.error(`sendCancellationEmail: email failed for ${booking.booking_ref}:`, err.message);
   }
 }
 
