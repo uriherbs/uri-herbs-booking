@@ -149,6 +149,13 @@ export type BookingErrorCode =
   | 'CAPACITY_FULL'
   | 'BOOKING_NOT_FOUND'
   | 'BOOKING_NOT_PAYABLE'
+  // Raised only by admin_create_manual_booking (see migration
+  // add_admin_create_manual_booking) — the caller isn't an active
+  // admin_staff member.
+  | 'FORBIDDEN'
+  // Raised only by admin_create_manual_booking when p_payment_status isn't
+  // 'paid' or 'unpaid'.
+  | 'INVALID_PAYMENT_STATUS'
   | 'UNKNOWN_ERROR';
 
 export interface BookingError {
@@ -182,5 +189,57 @@ export const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   CAPACITY_FULL:        'Sorry, this slot is fully booked. Please try a different time or date.',
   BOOKING_NOT_FOUND:    'Booking not found. Please check your reference number.',
   BOOKING_NOT_PAYABLE:  'This booking is no longer awaiting payment — it may have expired. Please start a new booking.',
+  FORBIDDEN:            'You do not have admin access to do this.',
+  INVALID_PAYMENT_STATUS: 'Payment status must be either paid or unpaid.',
   UNKNOWN_ERROR:        'Something went wrong. Please try again or contact us directly.',
+};
+
+// ── Manual Booking (Admin) ──
+// The manual-booking form is an internal tool for Mali/staff, not the
+// international-tourist-facing booking flow above — so, unlike
+// ERROR_MESSAGES, these are Hebrew. Same parseBookingError() codes,
+// same override-the-raw-PG-message pattern as createBooking() uses,
+// just a different dictionary of friendly text.
+
+export interface CreateManualBookingRequest extends CreateBookingRequest {
+  payment_status: 'paid' | 'unpaid';
+  // Defaults to 'manual' server-side (admin_create_manual_booking) if omitted.
+  payment_method?: string;
+}
+
+// Returned by admin_create_manual_booking. Same shape as
+// BookingConfirmation plus payment_status, since a manual booking can
+// come back already 'confirmed' (paid) instead of always
+// 'pending_payment' like the online flow.
+export interface ManualBookingConfirmation {
+  booking_id: string;
+  booking_ref: string;
+  package_name: string;
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+  num_participants: number;
+  instructor_group: 'A' | 'B' | null;
+  is_private: boolean;
+  total_price_thb: number;
+  status: string; // 'confirmed' | 'pending_payment'
+  payment_status: 'paid' | 'unpaid';
+}
+
+export const MANUAL_BOOKING_ERROR_MESSAGES_HE: Record<BookingErrorCode, string> = {
+  INVALID_PACKAGE:      'החבילה שנבחרה אינה זמינה כרגע.',
+  INVALID_PARTICIPANTS: 'מספר המשתתפים אינו תקין — עד 6 בהזמנה קבוצתית, ועד 16 בהזמנה פרטית (בהתאם לחבילה).',
+  INVALID_DATE:         'לא ניתן להזמין בתאריך זה (למשל תאריך שכבר עבר).',
+  INVALID_TIME:         'השעה שנבחרה אינה זמינה עבור החבילה הזו.',
+  INVALID_CUSTOMER:     'יש להזין שם לקוח.',
+  DATE_BLOCKED:         'התאריך הזה חסום להזמנות. יש לבטל את החסימה קודם אם זו הזמנה מכוונת.',
+  CUTOFF_PASSED:        'חלף מועד הסגירה להזמנה בשעה זו.',
+  SLOT_MISSING:         'משבצת הזמן הזו אינה קיימת. נסו לבחור שעה אחרת.',
+  SLOT_BLOCKED:         'משבצת הזמן הזו נחסמה ידנית. יש לבחור שעה אחרת.',
+  CAPACITY_FULL:        'אין מספיק מקום פנוי במשבצת הזמן הזו. נסו שעה או תאריך אחר.',
+  BOOKING_NOT_FOUND:    'ההזמנה לא נמצאה.',
+  BOOKING_NOT_PAYABLE:  'ההזמנה כבר אינה ממתינה לתשלום.',
+  FORBIDDEN:            'אין לך הרשאת מנהל לבצע פעולה זו.',
+  INVALID_PAYMENT_STATUS: 'סטטוס תשלום לא תקין — יש לבחור "שולם" או "לא שולם".',
+  UNKNOWN_ERROR:        'משהו השתבש. נסו שוב או פנו לתמיכה הטכנית.',
 };
