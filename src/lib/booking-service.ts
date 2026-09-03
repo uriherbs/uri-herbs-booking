@@ -16,6 +16,7 @@ import type {
   BookingConfirmation,
   PaymentConfirmation,
   CancelConfirmation,
+  AdminCancelBookingResult,
   DashboardBlock,
   Package,
   CreateBookingRequest,
@@ -281,6 +282,62 @@ export async function cancelBooking(
   }
 
   return data[0] as CancelConfirmation;
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 5b. CANCEL BOOKING  (admin dashboard)
+// ────────────────────────────────────────────────────────────
+// Admin-only sibling of cancelBooking() above — cancels by internal
+// booking id (not booking_ref) via admin_cancel_booking, which
+// requires an active admin_staff session (checked server-side via
+// is_admin() — raises FORBIDDEN otherwise). Idempotent: cancelling an
+// already-cancelled booking is a no-op that returns the current row
+// rather than erroring (see the RPC's own comment).
+//
+// Unlike admin_create_manual_booking, this RPC RETURNS the full
+// `bookings` row directly (not a TABLE(...) set), so the response is
+// a single object, not an array — no `data[0]` here.
+//
+// Usage:
+//   const result = await cancelBookingAsAdmin('a1b2c3d4-...');
+//   → { booking_ref: 'URI-20260728-001', status: 'cancelled', ... }
+
+export async function cancelBookingAsAdmin(
+  bookingId: string
+): Promise<AdminCancelBookingResult> {
+  if (!bookingId) {
+    throw { code: 'BOOKING_NOT_FOUND', message: 'Booking id is required' };
+  }
+
+  const { data, error } = await supabase.rpc('admin_cancel_booking', {
+    p_booking_id: bookingId,
+  });
+
+  if (error) {
+    const bookingError = parseBookingError(error.message);
+    throw { ...bookingError, message: ERROR_MESSAGES[bookingError.code] || bookingError.message };
+  }
+
+  if (!data) {
+    throw { code: 'BOOKING_NOT_FOUND', message: ERROR_MESSAGES.BOOKING_NOT_FOUND };
+  }
+
+  const cancelled = data as AdminCancelBookingResult;
+
+  // Best-effort cancellation email — same reasoning as
+  // confirmPayLaterBooking()'s notify-confirmed call above: this runs
+  // in the browser with the anon key and can't send emails directly
+  // (RESEND_API_KEY is server-only). A cancellation that already
+  // succeeded in the database must not fail because the email
+  // couldn't be sent.
+  fetch('/api/bookings/notify-cancelled', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_ref: cancelled.booking_ref }),
+  }).catch((err) => console.error('notify-cancelled request failed:', err?.message));
+
+  return cancelled;
 }
 
 
