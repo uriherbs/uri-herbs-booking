@@ -263,8 +263,8 @@ export async function confirmPayLaterBooking(
 // (checked server-side via is_admin() — raises FORBIDDEN otherwise).
 //
 // This is an internal tool for Mali/staff, not the tourist-facing
-// booking flow — so unlike createBooking(), errors are surfaced in
-// Hebrew (MANUAL_BOOKING_ERROR_MESSAGES_HE), not English.
+// booking flow — errors are surfaced via its own dictionary
+// (MANUAL_BOOKING_ERROR_MESSAGES_HE), separate from createBooking()'s.
 //
 // Usage:
 //   const result = await createManualBooking({
@@ -283,22 +283,22 @@ export async function createManualBooking(
   // ── Client-side validation ──
   const errors: string[] = [];
 
-  if (!req.package_slug)   errors.push('יש לבחור חבילה');
-  if (!req.date)           errors.push('יש לבחור תאריך');
-  if (!req.start_time)     errors.push('יש לבחור שעת התחלה');
-  if (!req.customer_name?.trim()) errors.push('יש להזין שם לקוח');
+  if (!req.package_slug)   errors.push('Please select a package');
+  if (!req.date)           errors.push('Please select a date');
+  if (!req.start_time)     errors.push('Please select a start time');
+  if (!req.customer_name?.trim()) errors.push('Please enter a customer name');
 
   const maxGuests = req.is_private ? 16 : 6;
   if (req.num_participants < 1 || req.num_participants > maxGuests) {
-    errors.push(`מספר המשתתפים חייב להיות בין 1 ל-${maxGuests}`);
+    errors.push(`Number of guests must be between 1 and ${maxGuests}`);
   }
 
   if (req.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.customer_email)) {
-    errors.push('כתובת האימייל אינה תקינה');
+    errors.push('Please enter a valid email address');
   }
 
   if (req.payment_status !== 'paid' && req.payment_status !== 'unpaid') {
-    errors.push('סטטוס תשלום חייב להיות "שולם" או "לא שולם"');
+    errors.push('Payment status must be "Paid" or "Unpaid"');
   }
 
   if (errors.length > 0) {
@@ -328,8 +328,8 @@ export async function createManualBooking(
 
   if (error) {
     // Parse the structured error from PostgreSQL — same CODE: message
-    // shape as create_booking, overridden with the Hebrew dictionary
-    // instead of the tourist-facing English one.
+    // shape as create_booking, overridden with this form's own
+    // dictionary instead of the tourist-facing one.
     const bookingError = parseBookingError(error.message);
     const userMessage = MANUAL_BOOKING_ERROR_MESSAGES_HE[bookingError.code] || bookingError.message;
     throw { ...bookingError, message: userMessage };

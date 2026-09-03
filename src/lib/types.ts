@@ -210,11 +210,10 @@ export const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
 };
 
 // ── Manual Booking (Admin) ──
-// The manual-booking form is an internal tool for Mali/staff, not the
-// international-tourist-facing booking flow above — so, unlike
-// ERROR_MESSAGES, these are Hebrew. Same parseBookingError() codes,
-// same override-the-raw-PG-message pattern as createBooking() uses,
-// just a different dictionary of friendly text.
+// The manual-booking form is an internal tool for Mali/staff. Same
+// parseBookingError() codes, same override-the-raw-PG-message pattern
+// as createBooking() uses, just a different dictionary of friendly
+// text tailored to this form's copy.
 
 export interface CreateManualBookingRequest extends CreateBookingRequest {
   payment_status: 'paid' | 'unpaid';
@@ -242,19 +241,19 @@ export interface ManualBookingConfirmation {
 }
 
 export const MANUAL_BOOKING_ERROR_MESSAGES_HE: Record<BookingErrorCode, string> = {
-  INVALID_PACKAGE:      'החבילה שנבחרה אינה זמינה כרגע.',
-  INVALID_PARTICIPANTS: 'מספר המשתתפים אינו תקין — עד 6 בהזמנה קבוצתית, ועד 16 בהזמנה פרטית (בהתאם לחבילה).',
-  INVALID_DATE:         'לא ניתן להזמין בתאריך זה (למשל תאריך שכבר עבר).',
-  INVALID_TIME:         'השעה שנבחרה אינה זמינה עבור החבילה הזו.',
-  INVALID_CUSTOMER:     'יש להזין שם לקוח.',
-  DATE_BLOCKED:         'התאריך הזה חסום להזמנות. יש לבטל את החסימה קודם אם זו הזמנה מכוונת.',
-  CUTOFF_PASSED:        'חלף מועד הסגירה להזמנה בשעה זו.',
-  SLOT_MISSING:         'משבצת הזמן הזו אינה קיימת. נסו לבחור שעה אחרת.',
-  SLOT_BLOCKED:         'משבצת הזמן הזו נחסמה ידנית. יש לבחור שעה אחרת.',
-  CAPACITY_FULL:        'אין מספיק מקום פנוי במשבצת הזמן הזו. נסו שעה או תאריך אחר.',
-  BOOKING_NOT_FOUND:    'ההזמנה לא נמצאה.',
-  BOOKING_NOT_PAYABLE:  'ההזמנה כבר אינה ממתינה לתשלום.',
-  FORBIDDEN:            'אין לך הרשאת מנהל לבצע פעולה זו.',
-  INVALID_PAYMENT_STATUS: 'סטטוס תשלום לא תקין — יש לבחור "שולם" או "לא שולם".',
-  UNKNOWN_ERROR:        'משהו השתבש. נסו שוב או פנו לתמיכה הטכנית.',
+  INVALID_PACKAGE:      'This package is not currently available.',
+  INVALID_PARTICIPANTS: 'Guest count is invalid — up to 6 for a group booking, or up to 16 for a private booking (depending on the package).',
+  INVALID_DATE:         'This date can\'t be booked (e.g. it may already be in the past).',
+  INVALID_TIME:         'This time is not available for this package.',
+  INVALID_CUSTOMER:     'Please enter a customer name.',
+  DATE_BLOCKED:         'This date is blocked for bookings. Remove the block first if this is intentional.',
+  CUTOFF_PASSED:        'The booking cutoff for this time has passed.',
+  SLOT_MISSING:         'This time slot doesn\'t exist. Please choose a different time.',
+  SLOT_BLOCKED:         'This time slot has been manually blocked. Please choose a different time.',
+  CAPACITY_FULL:        'There isn\'t enough room in this time slot. Please try a different time or date.',
+  BOOKING_NOT_FOUND:    'Booking not found.',
+  BOOKING_NOT_PAYABLE:  'This booking is no longer awaiting payment.',
+  FORBIDDEN:            'You don\'t have admin permission to do this.',
+  INVALID_PAYMENT_STATUS: 'Invalid payment status — please choose "Paid" or "Unpaid".',
+  UNKNOWN_ERROR:        'Something went wrong. Please try again or contact technical support.',
 };

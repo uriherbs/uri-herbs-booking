@@ -3,7 +3,7 @@
 // ============================================================
 // src/components/admin/ManualBookingModal.tsx
 // ============================================================
-// "הזמנה ידנית" — lets Mali/staff key in a booking taken over the
+// "New Booking" — lets Mali/staff key in a booking taken over the
 // phone or in person (walk-in, or a guest who paid by cash/PromptPay
 // before Uri Herbs had online payment). All capacity/pricing/blocked-
 // date logic lives in the already-tested admin_create_manual_booking
@@ -17,9 +17,8 @@
 // booking gets (via POST /api/bookings/notify-confirmed →
 // sendBookingConfirmationEmails) — nothing extra to do here for that.
 //
-// Internal admin tool, so — unlike the tourist-facing booking flow —
-// this is in Hebrew throughout, including error messages (see
-// MANUAL_BOOKING_ERROR_MESSAGES_HE in src/lib/types.ts).
+// Internal admin tool — English throughout, including error messages
+// (see MANUAL_BOOKING_ERROR_MESSAGES_HE in src/lib/types.ts).
 // ============================================================
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -78,7 +77,7 @@ function emptyForm(date: string): FormState {
 function formatTime12(t: string): string {
   const h = parseInt(t.split(':')[0], 10);
   const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return `${hour12}:00 ${h >= 12 ? 'אחה"צ' : 'לפנה"צ'}`;
+  return `${hour12}:00 ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -125,7 +124,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
     setPackagesError(null);
     getPackages()
       .then(setPackages)
-      .catch((err: any) => setPackagesError(err?.message || 'טעינת רשימת החבילות נכשלה'))
+      .catch((err: any) => setPackagesError(err?.message || 'Failed to load package list'))
       .finally(() => setLoadingPackages(false));
   }, [open, initialDate]);
 
@@ -185,7 +184,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
       setSuccess(confirmation);
       onCreated?.(confirmation);
     } catch (err: any) {
-      setError(err?.message || 'משהו השתבש. נסו שוב.');
+      setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -215,7 +214,6 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
       <div
         role="dialog"
         aria-modal="true"
-        dir="rtl"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: 460, maxHeight: '90vh', overflowY: 'auto',
@@ -230,11 +228,11 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.white }}>
-            🌿 הזמנה ידנית
+            🌿 New Manual Booking
           </span>
           <button
             onClick={handleClose}
-            aria-label="סגור"
+            aria-label="Close"
             style={{
               width: 32, height: 32, borderRadius: '50%', border: 'none',
               background: 'rgba(255,255,255,0.15)', cursor: 'pointer',
@@ -256,10 +254,10 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
             }}>
               <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
               <div style={{ fontFamily: "'Crimson Pro'", fontSize: 18, fontWeight: 700, color: C.forest, marginBottom: 4 }}>
-                ההזמנה נוצרה בהצלחה
+                Booking created successfully
               </div>
               <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.sageDark, fontWeight: 600 }}>
-                מס' הזמנה: {success.booking_ref}
+                Booking ref: {success.booking_ref}
               </div>
             </div>
 
@@ -267,12 +265,12 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
               background: C.white, border: `1px solid ${C.sand}`, borderRadius: 12,
               padding: '14px 16px', fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.8,
             }}>
-              <div>{success.package_name} · {success.num_participants} משתתפים</div>
+              <div>{success.package_name} · {success.num_participants} guests</div>
               <div>{success.slot_date} · {formatTime12(String(success.start_time).slice(0, 5))}</div>
-              <div>סה"כ: ฿{success.total_price_thb.toLocaleString()}</div>
+              <div>Total: ฿{success.total_price_thb.toLocaleString()}</div>
               <div>
-                תשלום: {success.payment_status === 'paid' ? 'שולם ✓' : 'טרם שולם'}
-                {success.payment_status === 'paid' && ' — מייל אישור נשלח ללקוח'}
+                Payment: {success.payment_status === 'paid' ? 'Paid ✓' : 'Unpaid'}
+                {success.payment_status === 'paid' && ' — confirmation email sent to customer'}
               </div>
             </div>
 
@@ -282,14 +280,14 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                 border: `1.5px solid ${C.sage}`, background: C.white, color: C.sageDark,
                 fontFamily: "'DM Sans'", fontSize: 14, fontWeight: 600,
               }}>
-                הזמנה נוספת
+                Add Another Booking
               </button>
               <button onClick={handleClose} style={{
                 flex: 1, padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
                 border: 'none', background: C.sage, color: C.white,
                 fontFamily: "'DM Sans'", fontSize: 14, fontWeight: 600,
               }}>
-                סגור
+                Close
               </button>
             </div>
           </div>
@@ -305,7 +303,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
               </div>
             )}
 
-            <Field label="חבילה" required>
+            <Field label="Package" required>
               <select
                 value={form.packageSlug}
                 onChange={(e) => update({ packageSlug: e.target.value, startTime: '' })}
@@ -313,17 +311,17 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                 disabled={loadingPackages}
                 style={inputStyle}
               >
-                <option value="">{loadingPackages ? 'טוען חבילות…' : 'בחרו חבילה'}</option>
+                <option value="">{loadingPackages ? 'Loading packages…' : 'Select a package'}</option>
                 {packages.map((p) => (
                   <option key={p.slug} value={p.slug}>
-                    {p.name} — ฿{p.price_thb.toLocaleString()} ({p.calendar_type === 'aromatherapy' ? 'ארומתרפיה' : 'הרבל'})
+                    {p.name} — ฿{p.price_thb.toLocaleString()} ({p.calendar_type === 'aromatherapy' ? 'Aromatherapy' : 'Herbal'})
                   </option>
                 ))}
               </select>
             </Field>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="תאריך" required>
+              <Field label="Date" required>
                 <input
                   type="date"
                   value={form.date}
@@ -332,7 +330,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                   style={inputStyle}
                 />
               </Field>
-              <Field label="שעה" required>
+              <Field label="Time" required>
                 <select
                   value={form.startTime}
                   onChange={(e) => update({ startTime: e.target.value })}
@@ -341,7 +339,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                   style={inputStyle}
                 >
                   <option value="">
-                    {!selectedPackage ? '— בחרו חבילה קודם —' : timeOptions.length === 0 ? 'אין משבצות ביום זה' : 'בחרו שעה'}
+                    {!selectedPackage ? '— Select a package first —' : timeOptions.length === 0 ? 'No slots available on this day' : 'Select a time'}
                   </option>
                   {timeOptions.map((t) => (
                     <option key={t} value={t}>{formatTime12(t)}</option>
@@ -350,12 +348,12 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
               </Field>
             </div>
 
-            {/* קבוצתי / פרטי */}
-            <Field label="סוג הזמנה">
+            {/* Group / Private */}
+            <Field label="Booking Type">
               <div style={{ display: 'flex', gap: 8 }}>
                 {([
-                  { value: false, label: 'קבוצתי' },
-                  { value: true, label: 'פרטי' },
+                  { value: false, label: 'Group' },
+                  { value: true, label: 'Private' },
                 ] as const).map((opt) => (
                   <button
                     key={String(opt.value)}
@@ -375,7 +373,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
               </div>
             </Field>
 
-            <Field label={`מספר אורחים (עד ${maxGuests})`} required>
+            <Field label={`Number of Guests (up to ${maxGuests})`} required>
               <input
                 type="number"
                 min={1}
@@ -394,12 +392,12 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                 onChange={(e) => update({ hasMinors: e.target.checked })}
                 style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark }}>הקבוצה כוללת קטינים (מתחת לגיל 18)</span>
+              <span style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark }}>Group includes minors (under 18)</span>
             </label>
 
             <div style={{ height: 1, background: C.sand, margin: '2px 0' }} />
 
-            <Field label="שם הלקוח" required>
+            <Field label="Customer Name" required>
               <input
                 type="text"
                 value={form.customerName}
@@ -410,7 +408,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
             </Field>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="טלפון">
+              <Field label="Phone">
                 <input
                   type="tel"
                   value={form.customerPhone}
@@ -418,7 +416,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                   style={inputStyle}
                 />
               </Field>
-              <Field label="אימייל">
+              <Field label="Email">
                 <input
                   type="email"
                   value={form.customerEmail}
@@ -428,7 +426,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
               </Field>
             </div>
 
-            <Field label="הערות">
+            <Field label="Notes">
               <textarea
                 value={form.customerNotes}
                 onChange={(e) => update({ customerNotes: e.target.value })}
@@ -439,12 +437,12 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
 
             <div style={{ height: 1, background: C.sand, margin: '2px 0' }} />
 
-            {/* שולם כבר? */}
-            <Field label="שולם כבר?">
+            {/* Already paid? */}
+            <Field label="Payment Status">
               <div style={{ display: 'flex', gap: 8 }}>
                 {([
-                  { value: 'unpaid', label: 'טרם שולם' },
-                  { value: 'paid', label: 'שולם ✓' },
+                  { value: 'unpaid', label: 'Unpaid' },
+                  { value: 'paid', label: 'Paid ✓' },
                 ] as const).map((opt) => (
                   <button
                     key={opt.value}
@@ -464,7 +462,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
               </div>
               {form.paymentStatus === 'paid' && (
                 <div style={{ marginTop: 6, fontFamily: "'DM Sans'", fontSize: 11.5, color: C.barkLight }}>
-                  ההזמנה תסומן כמאושרת מיד, והלקוח (אם הוזן אימייל) יקבל מייל אישור.
+                  The booking will be marked confirmed immediately, and the customer (if an email was entered) will receive a confirmation email.
                 </div>
               )}
             </Field>
@@ -478,7 +476,7 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                 fontFamily: "'DM Sans'", fontSize: 15, fontWeight: 700,
               }}
             >
-              {submitting ? 'יוצר הזמנה…' : 'צור הזמנה'}
+              {submitting ? 'Creating booking…' : 'Create Booking'}
             </button>
           </form>
         )}

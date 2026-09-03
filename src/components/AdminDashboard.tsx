@@ -725,7 +725,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               unnoticed until asked about directly. */}
           <button
             onClick={() => setShowManualBooking(true)}
-            title="הזמנה ידנית"
+            title="New Booking"
             style={{
               background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 20,
               padding: "6px 12px", cursor: "pointer",
@@ -735,7 +735,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            הזמנה ידנית
+            New Booking
           </button>
           <Link
             href="/admin/content"
