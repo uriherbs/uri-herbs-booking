@@ -8,6 +8,7 @@ import {
   adminUpdateBookingStatus,
   adminToggleSlotBlock,
 } from "@/lib/hooks";
+import { cancelBookingAsAdmin } from "@/lib/booking-service";
 import { C } from "@/lib/admin-theme";
 import { HERBAL_BLOCKS, getAromaBlocksForDate } from "@/lib/admin-schedule";
 import ManualBookingModal from "@/components/admin/ManualBookingModal";
@@ -204,7 +205,7 @@ function StatusBadge({ status, type }) {
 // BOOKING ROW — individual participant with action toggles
 // ══════════════════════════════════════════════════════════════════
 
-function BookingRow({ booking, onUpdate }) {
+function BookingRow({ booking, onUpdate, onCancel }) {
   const [expanded, setExpanded] = useState(false);
 
   const cycleAttendance = () => {
@@ -214,6 +215,14 @@ function BookingRow({ booking, onUpdate }) {
 
   const togglePayment = () => {
     onUpdate(booking.id, "payment", booking.payment === "paid" ? "unpaid" : "paid");
+  };
+
+  const handleCancel = () => {
+    if (window.confirm(
+      `Cancel booking ${booking.ref} for ${booking.name}?\n\nTheir spot will be released immediately. This cannot be undone.`
+    )) {
+      onCancel(booking.id);
+    }
   };
 
   return (
@@ -371,6 +380,22 @@ function BookingRow({ booking, onUpdate }) {
               {booking.payment === "paid" ? "Paid ✓" : "Mark Paid"}
             </button>
           </div>
+
+          {/* Cancel — deliberately its own low-key row below the two
+              routine toggles above, not a third button in that flex
+              row: cancelling releases the spot immediately and can't
+              be undone, so it shouldn't sit at the same visual weight
+              as "Mark Arrived"/"Mark Paid". confirm() below is the
+              only guard against a stray tap. */}
+          <button onClick={(e) => { e.stopPropagation(); handleCancel(); }} style={{
+            width: "100%", marginTop: 8, padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+            border: "none", background: "none",
+            fontFamily: "'DM Sans'", fontSize: 12.5, fontWeight: 600, color: C.coral,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+          }}>
+            {Icons.ban(13, C.coral)}
+            Cancel Booking
+          </button>
         </div>
       )}
     </div>
@@ -381,7 +406,7 @@ function BookingRow({ booking, onUpdate }) {
 // SLOT CARD — one hourly block with all its bookings
 // ══════════════════════════════════════════════════════════════════
 
-function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking }) {
+function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking, onCancelBooking }) {
   const [open, setOpen] = useState(bookings.length > 0);
   const isBlocked = blockedSlots.has(block.time);
 
@@ -483,7 +508,7 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
       {open && !isBlocked && bookings.length > 0 && (
         <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
           {bookings.map(b => (
-            <BookingRow key={b.id} booking={b} onUpdate={onUpdateBooking}/>
+            <BookingRow key={b.id} booking={b} onUpdate={onUpdateBooking} onCancel={onCancelBooking}/>
           ))}
         </div>
       )}
@@ -581,6 +606,17 @@ export default function AdminDashboard({ adminName, onSignOut }) {
       await adminUpdateBookingStatus(id, { [field]: value });
     } catch (err) {
       alert(`Couldn't update booking: ${err.message}`);
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const handleCancelBooking = async (id) => {
+    setPendingAction(id);
+    try {
+      await cancelBookingAsAdmin(id);
+    } catch (err) {
+      alert(`Couldn't cancel booking: ${err.message}`);
     } finally {
       setPendingAction(null);
     }
@@ -885,6 +921,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                     blockedSlots={blockedTimesByCalendar.herbal}
                     onToggleBlock={handleToggleBlock}
                     onUpdateBooking={handleUpdateBooking}
+                    onCancelBooking={handleCancelBooking}
                   />
                 ))}
               </div>
@@ -923,6 +960,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                     blockedSlots={blockedTimesByCalendar.herbal}
                     onToggleBlock={handleToggleBlock}
                     onUpdateBooking={handleUpdateBooking}
+                    onCancelBooking={handleCancelBooking}
                   />
                 ))}
               </div>
@@ -953,6 +991,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                       blockedSlots={blockedTimesByCalendar.aromatherapy}
                       onToggleBlock={handleToggleBlock}
                       onUpdateBooking={handleUpdateBooking}
+                      onCancelBooking={handleCancelBooking}
                     />
                   ))}
                 </div>

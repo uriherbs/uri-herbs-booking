@@ -66,6 +66,21 @@ export interface CancelConfirmation {
   freed_spots: number;
 }
 
+// Returned by admin_cancel_booking — that RPC RETURNS the full
+// `bookings` row (not a curated TABLE like the other admin RPCs), so
+// this only names the columns the admin dashboard actually reads off
+// it rather than mirroring every column.
+export interface AdminCancelBookingResult {
+  id: string;
+  booking_ref: string;
+  status: string; // 'cancelled' (or unchanged if it already was — see the RPC's own no-op-on-double-cancel note)
+  customer_name: string;
+  customer_email: string | null;
+  slot_date: string;
+  start_time: string;
+  num_participants: number;
+}
+
 export interface DashboardBlock {
   block_start_time: string;
   block_end_time: string;
