@@ -18,6 +18,7 @@ import { Hero } from '@/components/home/Hero';
 import { WorkshopCircles } from '@/components/home/WorkshopCircles';
 import { Intro } from '@/components/home/Intro';
 import { VideoMoment } from '@/components/home/VideoMoment';
+import { HomeReviews } from '@/components/home/HomeReviews';
 import { GetInTouch } from '@/components/home/GetInTouch';
 import { C, FONT_IMPORT, FONT_BODY } from '@/lib/theme';
 
@@ -50,6 +51,7 @@ export default function Home() {
         <Hero />
         <WorkshopCircles />
         <Intro />
+        <HomeReviews />
         <VideoMoment />
         <GetInTouch />
       </main>

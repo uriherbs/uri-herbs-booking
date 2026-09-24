@@ -10,6 +10,7 @@ import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButto
 import { PaymentLoadingBox } from "@/components/payments/PaymentStatusBoxes";
 import LegalModal from "@/components/legal/LegalModal";
 import { legalDocs } from "@/lib/legal-content";
+import { GoogleReviewsClient } from "@/components/reviews/GoogleReviewsClient";
 
 // ════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -434,7 +435,7 @@ function ModeToggle({ isPrivate, onChange }) {
   );
 }
 
-function PackageStep({ packages, selected, onSelect, participants, onParticipantsChange, isPrivate, onIsPrivateChange }) {
+function PackageStep({ packages, selected, onSelect, participants, onParticipantsChange, isPrivate, onIsPrivateChange, footer = null }) {
   // Most expensive/longest first, per business request — highest-value
   // option gets first look before the customer scrolls past it.
   const categories = [
@@ -606,6 +607,9 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
           </p>
         </div>
       )}
+      {/* Rendered inside the 100px bottom padding reserved for the
+          sticky CTA, so it isn't hidden behind the button. */}
+      {footer}
     </div>
   );
 }
@@ -1807,6 +1811,7 @@ export default function BookingFlow() {
             selected={selectedPkg} onSelect={handleSelectPackage}
             participants={participants} onParticipantsChange={setParticipants}
             isPrivate={isPrivate} onIsPrivateChange={handleIsPrivateChange}
+            footer={<div style={{ marginTop: 24 }}><GoogleReviewsClient/></div>}
           />
         )
       )}
