@@ -395,7 +395,8 @@ export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): st
 <html><body style="margin:0; padding:24px; background-color:#F5F2EC; font-family: Arial, sans-serif;">
   <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
     <tr><td style="background-color:#2D4639; padding:24px; text-align:center;">
-      <div style="font-family: Georgia, serif; font-size:18px; color:#ffffff;">🌿 New Booking — ${data.bookingRef}</div>
+      <div style="font-family: Georgia, serif; font-size:20px; color:#ffffff;">${data.packageIcon} ${data.packageName}</div>
+      <div style="font-family: Arial, sans-serif; font-size:12px; color:#C9D6CC; margin-top:6px; letter-spacing:0.5px;">New booking · ${data.bookingRef}</div>
     </td></tr>
     <tr><td style="padding:24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden; margin-bottom:16px;">
@@ -429,9 +430,9 @@ export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): st
 
 export function buildOwnerNotificationEmailText(data: OwnerNotificationData): string {
   return `
-New Booking — ${data.bookingRef}
-
 ${data.packageIcon} ${data.packageName}
+New booking · ${data.bookingRef}
+
 ${data.numParticipants} guest${data.numParticipants > 1 ? 's' : ''} • ${groupLabel(data.instructorGroup, data.isPrivate)}
 ${formatDateLong(data.date)}, ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
 
