@@ -28,6 +28,10 @@ const SHOP_MAPS_URL =
 const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66812345678'; // set NEXT_PUBLIC_WHATSAPP_NUMBER in Vercel — this fallback is a placeholder only
 const SHOP_INSTAGRAM = 'https://instagram.com/uriherbsworkshop';
 const SHOP_WEBSITE = 'https://www.uriherbs.com';
+// Base URL for links that must reach the NEW booking site (e.g. the
+// customer cancel page). Set NEXT_PUBLIC_SITE_URL=https://www.uriherbs.com
+// in Vercel once the domain is switched from SimplyBook to Vercel.
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://uri-herbs-booking.vercel.app').replace(/\/$/, '');
 
 // ────────────────────────────────────────────────────────────
 // 1. WHATSAPP CLICK-TO-CHAT LINKS
@@ -85,6 +89,7 @@ export interface BookingEmailData {
   totalPriceThb: number;
   takeawayDescription: string;
   paymentMethod: string; // 'stripe' | 'paypal' | 'later' | ...
+  cancelUrl?: string; // customer self-cancel page (/cancel/<cancel_token>)
 }
 
 // Mirrors the group-label logic in src/app/book/page.tsx's
@@ -259,7 +264,10 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
                 <strong>Good to know:</strong><br/>
                 • Minimum age is 12+. Guests aged 12–17 must be accompanied by an adult.<br/>
                 • Please arrive 10 minutes before your session start time.<br/>
-                • Need to reschedule or cancel? Just reply to this email or message us on WhatsApp.
+                • Need to reschedule? Just reply to this email or message us on WhatsApp.<br/>
+                ${data.cancelUrl
+                  ? `• Want to <strong>cancel</strong>? <a href="${data.cancelUrl}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Cancel my booking</a> (free cancellation up to 48 hours before your workshop).`
+                  : `• Want to <strong>cancel</strong>? Just reply to this email (free cancellation up to 48 hours before your workshop).`}
               </div>
             </td>
           </tr>
@@ -316,6 +324,9 @@ Map: ${SHOP_MAPS_URL}
 
 Please arrive 10 minutes early. Minimum age 12+ (12-17 must be with an adult).
 
+Want to cancel? ${data.cancelUrl ? `Cancel your booking here: ${data.cancelUrl}` : 'Just reply to this email.'}
+(Free cancellation up to 48 hours before your workshop.)
+
 Questions? Message us on WhatsApp: ${buildCustomerToShopWhatsAppLink(data.bookingRef)}
 
 — ${SHOP_NAME}
@@ -327,7 +338,7 @@ Questions? Message us on WhatsApp: ${buildCustomerToShopWhatsAppLink(data.bookin
 // 3. CANCELLATION EMAIL
 // ────────────────────────────────────────────────────────────
 
-export function buildCancellationEmailHtml(bookingRef: string, customerName: string): string {
+export function buildCancellationEmailHtml(bookingRef: string, customerName: string, refundNote?: string): string {
   return `
 <!DOCTYPE html>
 <html><body style="margin:0; padding:24px; background-color:#F5F2EC; font-family: Arial, sans-serif;">
@@ -340,6 +351,7 @@ export function buildCancellationEmailHtml(bookingRef: string, customerName: str
       <p style="font-size:14px; color:#5C4A3D; line-height:1.6;">
         Your booking <strong>${bookingRef}</strong> has been cancelled as requested. Your spot has been released.
       </p>
+      ${refundNote ? `<p style="font-size:14px; color:#5C4A3D; line-height:1.6; background:#FFF8E8; border-radius:10px; padding:12px 14px;">${refundNote}</p>` : ''}
       <p style="font-size:14px; color:#5C4A3D; line-height:1.6;">
         We hope to welcome you another time! Feel free to book again anytime at
         <a href="${SHOP_WEBSITE}" style="color:#6B8F71;">${SHOP_WEBSITE}</a>.
@@ -350,14 +362,14 @@ export function buildCancellationEmailHtml(bookingRef: string, customerName: str
 `.trim();
 }
 
-export function buildCancellationEmailText(bookingRef: string, customerName: string): string {
+export function buildCancellationEmailText(bookingRef: string, customerName: string, refundNote?: string): string {
   return `
 Booking Cancelled — ${SHOP_NAME}
 
 Dear ${customerName},
 
 Your booking ${bookingRef} has been cancelled as requested. Your spot has been released.
-
+${refundNote ? `\n${refundNote}\n` : ''}
 We hope to welcome you another time! Feel free to book again anytime at ${SHOP_WEBSITE}.
 
 — ${SHOP_NAME}
@@ -545,7 +557,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
   const { data: booking, error: fetchError } = await db
     .from('bookings')
     .select(
-      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, packages ( name, slug )'
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, cancel_token, packages ( name, slug )'
     )
     .eq('id', bookingId)
     .single();
@@ -573,6 +585,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     customerEmail: booking.customer_email || undefined,
     customerPhone: booking.customer_phone || undefined,
     paymentMethod: booking.payment_method || 'later',
+    cancelUrl: booking.cancel_token ? `${SITE_URL}/cancel/${booking.cancel_token}` : undefined,
   };
 
   // Atomic claim helper: flips `flag` false → true for this booking and
@@ -599,6 +612,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
       await sendEmailViaResend(
         {
           to: booking.customer_email,
+          replyTo: OWNER_EMAIL, // "Just reply to this email" must reach the shop inbox
           subject: `Booking Confirmed — ${booking.booking_ref} · ${SHOP_NAME}`,
           html: buildConfirmationEmailHtml(emailData),
           text: buildConfirmationEmailText(emailData),
@@ -644,7 +658,19 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
 // instead. Customer-only (no owner copy): cancellation is always
 // admin-initiated here, so Mali already knows it happened — she's the
 // one who clicked Cancel.
-export async function sendCancellationEmail(db: any, bookingId: string): Promise<void> {
+export async function sendCancellationEmail(
+  db: any,
+  bookingId: string,
+  opts: { byCustomer?: boolean } = {}
+): Promise<void> {
+  // Key check BEFORE the claim, so a misconfiguration never marks an
+  // unsent email as sent.
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId} cancelled but no email sent`);
+    return;
+  }
+
   const { data: claimed, error: claimError } = await db
     .from('bookings')
     .update({ cancellation_email_sent: true })
@@ -662,15 +688,9 @@ export async function sendCancellationEmail(db: any, bookingId: string): Promise
     return;
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.error(`sendCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId} cancelled but no email sent`);
-    return;
-  }
-
   const { data: booking, error: fetchError } = await db
     .from('bookings')
-    .select('booking_ref, customer_name, customer_email')
+    .select('booking_ref, customer_name, customer_email, payment_method, slot_date, start_time, cancelled_at')
     .eq('id', bookingId)
     .single();
 
@@ -682,18 +702,134 @@ export async function sendCancellationEmail(db: any, bookingId: string): Promise
   // Best-effort, only if they gave an email (it's optional at booking time).
   if (!booking.customer_email) return;
 
+  // Refund wording only for customer self-cancellations of online
+  // payments (Terms §4). Shop-initiated cancellations are handled
+  // personally by the shop.
+  let refundNote: string | undefined;
+  if (opts.byCustomer && isPaidOnlineMethod(booking.payment_method)) {
+    const cancelledAt = booking.cancelled_at ? new Date(booking.cancelled_at) : new Date();
+    const hours = hoursBeforeStart(booking.slot_date, booking.start_time, cancelledAt);
+    refundNote = hours >= 48
+      ? 'You paid online, so your refund will go back to your original payment method. Please allow 5–10 business days for it to appear, depending on your bank.'
+      : 'As this cancellation was made less than 48 hours before your workshop, it is non-refundable under our cancellation policy.';
+  }
+
   try {
     await sendEmailViaResend(
       {
         to: booking.customer_email,
+        replyTo: OWNER_EMAIL,
         subject: `Booking Cancelled — ${booking.booking_ref} · ${SHOP_NAME}`,
-        html: buildCancellationEmailHtml(booking.booking_ref, booking.customer_name),
-        text: buildCancellationEmailText(booking.booking_ref, booking.customer_name),
+        html: buildCancellationEmailHtml(booking.booking_ref, booking.customer_name, refundNote),
+        text: buildCancellationEmailText(booking.booking_ref, booking.customer_name, refundNote),
       },
       apiKey
     );
   } catch (err: any) {
     console.error(`sendCancellationEmail: email failed for ${booking.booking_ref}:`, err.message);
+  }
+}
+
+function isPaidOnlineMethod(m: string | null | undefined): boolean {
+  return m === 'stripe' || m === 'paypal';
+}
+
+function hoursBeforeStart(slotDate: string, startTime: string, at: Date): number {
+  const start = new Date(`${slotDate}T${String(startTime).slice(0, 5)}:00+07:00`);
+  return (start.getTime() - at.getTime()) / 36e5;
+}
+
+// Shop alert for a CUSTOMER self-cancellation (from /cancel/<token>).
+// Only called by /api/bookings/cancel right after customer_cancel_booking()
+// succeeds — that function only succeeds once per booking, so no claim
+// flag is needed. Admin cancellations don't send this (Mali clicked it).
+export async function sendOwnerCancellationEmail(db: any, bookingId: string, reason: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendOwnerCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId}`);
+    return;
+  }
+
+  const { data: b, error } = await db
+    .from('bookings')
+    .select('booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, total_price_thb, payment_method, cancelled_at, packages ( name, slug )')
+    .eq('id', bookingId)
+    .single();
+  if (error || !b) {
+    console.error(`sendOwnerCancellationEmail: could not fetch booking ${bookingId}:`, error?.message);
+    return;
+  }
+
+  const pkg = Array.isArray(b.packages) ? b.packages[0] : b.packages;
+  const icon = (PACKAGE_EMAIL_META[pkg?.slug] || { icon: '🌿' }).icon;
+  const pkgName = pkg?.name || 'Uri Herbs Workshop';
+  const paidOnline = isPaidOnlineMethod(b.payment_method);
+  const hours = hoursBeforeStart(b.slot_date, b.start_time, b.cancelled_at ? new Date(b.cancelled_at) : new Date());
+  const refundLine = !paidOnline
+    ? 'Pay on arrival: nothing to refund.'
+    : hours >= 48
+      ? `REFUND DUE: ฿${Number(b.total_price_thb).toLocaleString()} via ${b.payment_method === 'paypal' ? 'PayPal' : 'Stripe'} (cancelled ${Math.floor(hours)}h before, 48h+ = full refund). Please refund in the ${b.payment_method === 'paypal' ? 'PayPal' : 'Stripe'} dashboard.`
+      : `No refund: cancelled ${Math.max(0, Math.floor(hours))}h before the workshop (inside 48h).`;
+  const when = `${formatDateLong(b.slot_date)}, ${formatTime12(String(b.start_time).slice(0, 5))} – ${formatTime12(String(b.end_time).slice(0, 5))}`;
+  const safeReason = reason ? escapeHtml(reason) : '';
+  const safeName = escapeHtml(String(b.customer_name || ''));
+
+  const html = `
+<!DOCTYPE html>
+<html><body style="margin:0; padding:24px; background-color:#F5F2EC; font-family: Arial, sans-serif;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
+    <tr><td style="background-color:#8A4B3C; padding:24px; text-align:center;">
+      <div style="font-family: Georgia, serif; font-size:20px; color:#ffffff;">${icon} ${escapeHtml(pkgName)}</div>
+      <div style="font-size:12px; color:#F1D9D2; margin-top:6px; letter-spacing:0.5px;">Booking cancelled by customer · ${b.booking_ref}</div>
+    </td></tr>
+    <tr><td style="padding:24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">When</div>
+          <div style="font-size:14px; color:#2D4639;">${when} · ${b.num_participants} guest${b.num_participants > 1 ? 's' : ''}</div>
+        </td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Customer</div>
+          <div style="font-size:14px; color:#2D4639;">${safeName}</div>
+          ${b.customer_phone ? `<div style="font-size:13px; color:#5C4A3D;">${escapeHtml(b.customer_phone)}</div>` : ''}
+          ${b.customer_email ? `<div style="font-size:13px; color:#5C4A3D;">${escapeHtml(b.customer_email)}</div>` : ''}
+        </td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Reason</div>
+          <div style="font-size:14px; color:#2D4639;">${safeReason || '<span style="color:#8A7668;">(no reason given)</span>'}</div>
+        </td></tr>
+        <tr><td style="padding:12px 16px; background-color:${paidOnline && hours >= 48 ? '#FFF3D6' : '#FAF7F0'};">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
+          <div style="font-size:14px; color:#2D4639;${paidOnline && hours >= 48 ? ' font-weight:bold;' : ''}">${escapeHtml(refundLine)}</div>
+        </td></tr>
+      </table>
+      <p style="font-size:12px; color:#8A7668; text-align:center; margin:16px 0 0;">The spot has been released automatically. Uri Herbs Booking Admin</p>
+    </td></tr>
+  </table>
+</body></html>`.trim();
+
+  const text = `Booking cancelled by customer — ${b.booking_ref}
+
+${icon} ${pkgName}
+${when} · ${b.num_participants} guest${b.num_participants > 1 ? 's' : ''}
+Customer: ${b.customer_name}${b.customer_phone ? ` · ${b.customer_phone}` : ''}${b.customer_email ? ` · ${b.customer_email}` : ''}
+Reason: ${reason || '(no reason given)'}
+Payment: ${refundLine}
+
+The spot has been released automatically.`;
+
+  try {
+    await sendEmailViaResend(
+      {
+        to: OWNER_EMAIL,
+        subject: `Booking cancelled — ${pkgName} · ${b.booking_ref}${paidOnline && hours >= 48 ? ' · REFUND DUE' : ''}`,
+        html,
+        text,
+      },
+      apiKey
+    );
+  } catch (err: any) {
+    console.error(`sendOwnerCancellationEmail: email failed for ${b.booking_ref}:`, err.message);
   }
 }
 
