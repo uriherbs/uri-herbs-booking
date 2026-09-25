@@ -90,6 +90,8 @@ export interface BookingEmailData {
   takeawayDescription: string;
   paymentMethod: string; // 'stripe' | 'paypal' | 'later' | ...
   cancelUrl?: string; // customer self-cancel page (/cancel/<cancel_token>)
+  rescheduleUrl?: string; // customer self-reschedule page (/reschedule/<cancel_token>)
+  headline?: string; // banner text, default "Booking Confirmed!"
 }
 
 // Mirrors the group-label logic in src/app/book/page.tsx's
@@ -145,7 +147,7 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
           <tr>
             <td style="background-color:#6B8F71; padding: 24px; text-align:center;">
               <div style="font-family: Georgia, serif; font-size:20px; font-weight:bold; color:#ffffff; margin-bottom:6px;">
-                Booking Confirmed!
+                ${data.headline || 'Booking Confirmed!'}
               </div>
               <div style="font-family: Arial, sans-serif; font-size:13px; color:#E7EFEA; margin-bottom:14px;">
                 Your herbal experience is reserved
@@ -264,7 +266,9 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
                 <strong>Good to know:</strong><br/>
                 • Minimum age is 12+. Guests aged 12–17 must be accompanied by an adult.<br/>
                 • Please arrive 10 minutes before your session start time.<br/>
-                • Need to reschedule? Just reply to this email or message us on WhatsApp.<br/>
+                ${data.rescheduleUrl
+                  ? `• Need to <strong>reschedule</strong>? <a href="${data.rescheduleUrl}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Change date or time</a> (same workshop and guests, up to 2 hours before your workshop).`
+                  : `• Need to reschedule? Just reply to this email or message us on WhatsApp.`}<br/>
                 ${data.cancelUrl
                   ? `• Want to <strong>cancel</strong>? <a href="${data.cancelUrl}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Cancel my booking</a> (free cancellation up to 48 hours before your workshop).`
                   : `• Want to <strong>cancel</strong>? Just reply to this email (free cancellation up to 48 hours before your workshop).`}
@@ -323,6 +327,9 @@ Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
 
 Please arrive 10 minutes early. Minimum age 12+ (12-17 must be with an adult).
+
+Need to reschedule? ${data.rescheduleUrl ? `Change date or time here: ${data.rescheduleUrl}` : 'Just reply to this email.'}
+(Same workshop and guests, up to 2 hours before your workshop.)
 
 Want to cancel? ${data.cancelUrl ? `Cancel your booking here: ${data.cancelUrl}` : 'Just reply to this email.'}
 (Free cancellation up to 48 hours before your workshop.)
@@ -392,6 +399,7 @@ export interface OwnerNotificationData extends BookingEmailData {
   customerEmail?: string;
   customerPhone?: string;
   paymentMethod: string; // 'stripe' | 'paypal' | 'later' | ...
+  ownerHeadline?: string; // small line under the workshop name, default "New booking · URI-…"
 }
 
 export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): string {
@@ -408,7 +416,7 @@ export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): st
   <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
     <tr><td style="background-color:#2D4639; padding:24px; text-align:center;">
       <div style="font-family: Georgia, serif; font-size:20px; color:#ffffff;">${data.packageIcon} ${data.packageName}</div>
-      <div style="font-family: Arial, sans-serif; font-size:12px; color:#C9D6CC; margin-top:6px; letter-spacing:0.5px;">New booking · ${data.bookingRef}</div>
+      <div style="font-family: Arial, sans-serif; font-size:12px; color:#C9D6CC; margin-top:6px; letter-spacing:0.5px;">${data.ownerHeadline || `New booking · ${data.bookingRef}`}</div>
     </td></tr>
     <tr><td style="padding:24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden; margin-bottom:16px;">
@@ -443,7 +451,7 @@ export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): st
 export function buildOwnerNotificationEmailText(data: OwnerNotificationData): string {
   return `
 ${data.packageIcon} ${data.packageName}
-New booking · ${data.bookingRef}
+${data.ownerHeadline || `New booking · ${data.bookingRef}`}
 
 ${data.numParticipants} guest${data.numParticipants > 1 ? 's' : ''} • ${groupLabel(data.instructorGroup, data.isPrivate)}
 ${formatDateLong(data.date)}, ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
@@ -586,6 +594,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     customerPhone: booking.customer_phone || undefined,
     paymentMethod: booking.payment_method || 'later',
     cancelUrl: booking.cancel_token ? `${SITE_URL}/cancel/${booking.cancel_token}` : undefined,
+    rescheduleUrl: booking.cancel_token ? `${SITE_URL}/reschedule/${booking.cancel_token}` : undefined,
   };
 
   // Atomic claim helper: flips `flag` false → true for this booking and
@@ -640,6 +649,93 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
       console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
     }
   }
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 4b-2. CUSTOMER RESCHEDULE — both emails
+// ────────────────────────────────────────────────────────────
+// Called by /api/bookings/reschedule right after
+// customer_reschedule_booking() succeeds. Each successful reschedule
+// is its own event (customers may reschedule more than once), so no
+// claim flag: one call = one pair of emails. Customer gets the same
+// confirmation layout with the NEW date/time and a "Booking
+// Rescheduled" banner; the shop gets the owner layout with "was …".
+export async function sendRescheduleEmails(
+  db: any,
+  bookingId: string,
+  previous: { date: string; startTime: string }
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendRescheduleEmails: RESEND_API_KEY not configured — booking ${bookingId}`);
+    return;
+  }
+
+  const { data: booking, error } = await db
+    .from('bookings')
+    .select(
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, cancel_token, packages ( name, slug )'
+    )
+    .eq('id', bookingId)
+    .single();
+  if (error || !booking) {
+    console.error(`sendRescheduleEmails: could not fetch booking ${bookingId}:`, error?.message);
+    return;
+  }
+
+  const pkg = Array.isArray(booking.packages) ? booking.packages[0] : booking.packages;
+  const meta = PACKAGE_EMAIL_META[pkg?.slug] || { icon: '🌿', takeaway: 'Your take-home items will be ready for you.' };
+  const wasText = `${formatDateLong(previous.date)}, ${formatTime12(String(previous.startTime).slice(0, 5))}`;
+  const emailData: OwnerNotificationData = {
+    bookingRef: booking.booking_ref,
+    customerName: booking.customer_name,
+    packageName: pkg?.name || 'Uri Herbs Workshop',
+    packageIcon: meta.icon,
+    date: booking.slot_date,
+    startTime: String(booking.start_time).slice(0, 5),
+    endTime: String(booking.end_time).slice(0, 5),
+    numParticipants: booking.num_participants,
+    instructorGroup: booking.instructor_group,
+    isPrivate: booking.is_private,
+    totalPriceThb: booking.total_price_thb,
+    takeawayDescription: meta.takeaway,
+    customerEmail: booking.customer_email || undefined,
+    customerPhone: booking.customer_phone || undefined,
+    paymentMethod: booking.payment_method || 'later',
+    cancelUrl: booking.cancel_token ? `${SITE_URL}/cancel/${booking.cancel_token}` : undefined,
+    rescheduleUrl: booking.cancel_token ? `${SITE_URL}/reschedule/${booking.cancel_token}` : undefined,
+    headline: 'Booking Rescheduled!',
+    ownerHeadline: `Rescheduled by customer · ${booking.booking_ref} · was ${wasText}`,
+  };
+
+  const sends: Promise<unknown>[] = [];
+  if (booking.customer_email) {
+    sends.push(
+      sendEmailViaResend(
+        {
+          to: booking.customer_email,
+          replyTo: OWNER_EMAIL,
+          subject: `Booking Rescheduled — ${booking.booking_ref} · ${SHOP_NAME}`,
+          html: buildConfirmationEmailHtml(emailData),
+          text: buildConfirmationEmailText(emailData).replace(/^Booking Confirmed/, 'Booking Rescheduled'),
+        },
+        apiKey
+      ).catch((err: any) => console.error(`sendRescheduleEmails: customer email failed for ${booking.booking_ref}:`, err.message))
+    );
+  }
+  sends.push(
+    sendEmailViaResend(
+      {
+        to: OWNER_EMAIL,
+        subject: `Booking rescheduled — ${emailData.packageName} · ${booking.booking_ref}`,
+        html: buildOwnerNotificationEmailHtml(emailData),
+        text: buildOwnerNotificationEmailText(emailData),
+      },
+      apiKey
+    ).catch((err: any) => console.error(`sendRescheduleEmails: owner email failed for ${booking.booking_ref}:`, err.message))
+  );
+  await Promise.all(sends);
 }
 
 
