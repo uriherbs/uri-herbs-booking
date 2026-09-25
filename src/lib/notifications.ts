@@ -259,7 +259,8 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
                 <strong>Good to know:</strong><br/>
                 • Minimum age is 12+. Guests aged 12–17 must be accompanied by an adult.<br/>
                 • Please arrive 10 minutes before your session start time.<br/>
-                • Need to reschedule or cancel? Just reply to this email or message us on WhatsApp.
+                • Need to reschedule? Just reply to this email or message us on WhatsApp.<br/>
+                • Want to <strong>cancel</strong>? <a href="${buildCancelMailtoLink(data)}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Tap here to email us</a> (free cancellation up to 48 hours before your workshop).
               </div>
             </td>
           </tr>
@@ -295,6 +296,20 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
 `.trim();
 }
 
+// Pre-filled "cancel my booking" email: opens the customer's mail app
+// addressed to the shop, with subject + body filled in. The customer
+// only has to add their reason and press Send.
+function buildCancelMailtoLink(data: BookingEmailData): string {
+  const subject = `Cancel booking ${data.bookingRef}`;
+  const body =
+    `Hi ${SHOP_NAME},\r\n\r\n` +
+    `I would like to cancel my booking ${data.bookingRef} ` +
+    `(${data.packageName}, ${formatDateLong(data.date)}, ${formatTime12(data.startTime)}).\r\n\r\n` +
+    `Reason: \r\n\r\n` +
+    `Thank you,\r\n${data.customerName}`;
+  return `mailto:${OWNER_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 export function buildConfirmationEmailText(data: BookingEmailData): string {
   return `
 Booking Confirmed — ${SHOP_NAME}
@@ -315,6 +330,9 @@ Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
 
 Please arrive 10 minutes early. Minimum age 12+ (12-17 must be with an adult).
+
+Want to cancel? Email us: ${buildCancelMailtoLink(data)}
+(Free cancellation up to 48 hours before your workshop.)
 
 Questions? Message us on WhatsApp: ${buildCustomerToShopWhatsAppLink(data.bookingRef)}
 
@@ -599,6 +617,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
       await sendEmailViaResend(
         {
           to: booking.customer_email,
+          replyTo: OWNER_EMAIL, // "Just reply to this email" must reach the shop inbox
           subject: `Booking Confirmed — ${booking.booking_ref} · ${SHOP_NAME}`,
           html: buildConfirmationEmailHtml(emailData),
           text: buildConfirmationEmailText(emailData),
