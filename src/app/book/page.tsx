@@ -1287,7 +1287,8 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
 // STEP 5: CONFIRMATION
 // ════════════════════════════════════════════════════════════
 
-function ConfirmationStep({ pkg, result, form, onReset }) {
+function ConfirmationStep({ pkg, result, form, onReset, paymentMethod }) {
+  const paidOnline = paymentMethod === "stripe" || paymentMethod === "paypal";
   const dateObj = new Date(result.slot_date + "T00:00:00");
   const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];
   const monthName = MONTHS[dateObj.getMonth()];
@@ -1417,21 +1418,29 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
       }}>
         <div style={{
           fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 600, color: C.forest, marginBottom: 8,
-        }}>Pay When You Arrive</div>
-        <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.6 }}>
-          No prepayment needed. Pay on the spot at our workshop:
-        </div>
-        <div style={{
-          display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap",
-        }}>
-          {["Cash (THB)", "PromptPay QR", "WeChat Pay"].map(m => (
-            <span key={m} style={{
-              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 500,
-              background: C.white, border: `1px solid rgba(107,143,113,0.25)`,
-              borderRadius: 20, padding: "5px 12px", color: C.forest,
-            }}>{m}</span>
-          ))}
-        </div>
+        }}>{paidOnline ? "Payment Received" : "Pay When You Arrive"}</div>
+        {paidOnline ? (
+          <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.6 }}>
+            You've already paid in full online. Nothing more to pay when you arrive — just show up and enjoy!
+          </div>
+        ) : (
+          <>
+            <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.6 }}>
+              No prepayment needed. Pay on the spot at our workshop:
+            </div>
+            <div style={{
+              display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap",
+            }}>
+              {["Cash (THB)", "PromptPay QR", "WeChat Pay"].map(m => (
+                <span key={m} style={{
+                  fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 500,
+                  background: C.white, border: `1px solid rgba(107,143,113,0.25)`,
+                  borderRadius: 20, padding: "5px 12px", color: C.forest,
+                }}>{m}</span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Takeaway reminder */}
@@ -1864,7 +1873,7 @@ export default function BookingFlow() {
           // 'confirmed' here without re-fetching; every other field on
           // `result` was already correct since create_booking().
           pkg={pkg} result={{ ...result, status: "confirmed" }} form={form}
-          onReset={handleReset}
+          onReset={handleReset} paymentMethod={paymentMethod}
         />
       )}
 
