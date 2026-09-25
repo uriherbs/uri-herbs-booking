@@ -45,8 +45,6 @@ const ERROR_TEXT: Record<string, string> = {
   reschedule_failed: 'Something went wrong. Please try again, or contact us on WhatsApp.',
 };
 
-const WHATSAPP = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66643349890'}`;
-
 function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
@@ -181,8 +179,7 @@ export default function RescheduleBookingPage({ params }: { params: { token: str
               <div style={note('#FBEFEA', '#EBC8BC')}>This booking has been cancelled, so it can&apos;t be rescheduled.</div>
             ) : data.too_late ? (
               <div style={note('#FBEFEA', '#EBC8BC')}>
-                Online rescheduling closes 2 hours before your workshop. Please{' '}
-                <a href={WHATSAPP} style={{ color: C.sageDark, fontWeight: 700 }}>message us on WhatsApp</a>.
+                Online rescheduling closes 2 hours before your workshop. Please message us on WhatsApp.
               </div>
             ) : data.can_reschedule ? (
               <>
@@ -190,8 +187,7 @@ export default function RescheduleBookingPage({ params }: { params: { token: str
                   You can change the <strong>date and time</strong> only. The workshop and number of guests stay the same.
                   Want a different workshop or number of guests? Please{' '}
                   <Link href={`/cancel/${params.token}`} style={{ color: C.sageDark, fontWeight: 700 }}>cancel this booking</Link>{' '}
-                  and book again, or{' '}
-                  <a href={WHATSAPP} style={{ color: C.sageDark, fontWeight: 700 }}>contact us</a>.
+                  and book again, or contact us.
                 </div>
                 {data.calendar_type === 'aromatherapy' && (
                   <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.barkLight, marginTop: 10 }}>
