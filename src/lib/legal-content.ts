@@ -46,11 +46,12 @@ export interface LegalDoc {
 }
 
 export const SHOP_NAME = 'Uri Herbs Workshop';
+export const COMPANY_LEGAL_NAME = 'ZIGI Co., Ltd.';
 export const SHOP_EMAIL = 'uherbhouse@gmail.com';
 export const SHOP_PHONE = '+66 64 334 9890';
 export const SHOP_ADDRESS = '44, 3 Si Phum Soi 9, Old City, Tambon Si Phum, Mueang, Chiang Mai 50200, Thailand';
 
-const EFFECTIVE_DATE = 'August 17, 2026';
+const EFFECTIVE_DATE = 'September 25, 2026';
 
 export const termsDoc: LegalDoc = {
   slug: 'terms',
@@ -63,7 +64,7 @@ export const termsDoc: LegalDoc = {
       blocks: [
         { type: 'paragraph', runs: [
           'These Terms & Conditions ("Terms") govern all bookings made through uriherbs.com for workshops ' +
-          'operated by ZIGI Co. ("Uri Herbs Workshop," "we," "us," "our"), located in the Old City, Chiang Mai, ' +
+          `operated by ${COMPANY_LEGAL_NAME} ("Uri Herbs Workshop," "we," "us," "our"), located in the Old City, Chiang Mai, ` +
           'Thailand. By completing a booking, you ("customer," "you") agree to these Terms.',
         ] },
       ],
@@ -85,6 +86,7 @@ export const termsDoc: LegalDoc = {
           ['Prices are listed in THB (Thai Baht) and include workshop materials unless stated otherwise.'],
           ['Payment can be made online at the time of booking (via Stripe or PayPal) or in person at the workshop location ("Pay on Arrival").'],
           ['Private and group bookings follow minimum-charge pricing as displayed at checkout, based on number of participants.'],
+          ['No shipping or delivery: everything you make is created by you during the workshop and handed to you on-site at the end of your session. We do not ship products.'],
         ] },
       ],
     },
@@ -102,7 +104,7 @@ export const termsDoc: LegalDoc = {
             { text: SHOP_EMAIL, href: `mailto:${SHOP_EMAIL}` },
             ' as early as possible.',
           ],
-          ['Refunds for eligible cancellations are processed manually and may take 5–10 business days (to be confirmed based on actual Stripe/PayPal processing times) to appear on your original payment method.'],
+          ['Refunds for eligible cancellations are made in full to your original payment method. Once we process a refund, it typically appears within 5–10 business days, depending on your bank or card issuer.'],
           ['If Uri Herbs Workshop cancels or reschedules a session (e.g., due to insufficient participants, instructor unavailability, or unforeseen circumstances), you will receive a full refund or the option to reschedule, at your choice.'],
         ] },
       ],
@@ -150,8 +152,9 @@ export const termsDoc: LegalDoc = {
       blocks: [
         { type: 'paragraph', runs: [
           'Uri Herbs Workshop may take photographs or videos during sessions for marketing purposes (e.g., ' +
-          'social media, website). If you do not wish to be photographed, please inform your instructor at ' +
-          'the start of the session.',
+          'social media, website). We will ask for your consent before filming or publishing photos or videos ' +
+          'in which you can be identified. You may tell your instructor at the start of the session, or at any ' +
+          'time, if you prefer not to be photographed or recorded.',
         ] },
       ],
     },
@@ -159,9 +162,10 @@ export const termsDoc: LegalDoc = {
       id: 'liability', number: 10, heading: 'Limitation of Liability',
       blocks: [
         { type: 'paragraph', runs: [
-          'To the extent permitted by Thai law, Uri Herbs Workshop / ZIGI Co. is not liable for indirect, ' +
-          'incidental, or consequential damages arising from participation in a workshop, except where such ' +
-          'liability cannot be excluded by law.',
+          `To the extent permitted by Thai law, Uri Herbs Workshop / ${COMPANY_LEGAL_NAME} is not liable for ` +
+          'indirect, incidental, or consequential damages arising from participation in a workshop. Nothing in ' +
+          'these Terms limits or excludes our liability for death, personal injury, or damage arising from our ' +
+          'gross negligence or willful misconduct, as required by Thai law.',
         ] },
       ],
     },
@@ -191,7 +195,8 @@ export const privacyDoc: LegalDoc = {
       id: 'who-we-are', number: 1, heading: 'Who We Are',
       blocks: [
         { type: 'paragraph', runs: [
-          "Uri Herbs Workshop is operated by ZIGI Co., based in Chiang Mai, Thailand. This policy explains how " +
+          `Uri Herbs Workshop is operated by ${COMPANY_LEGAL_NAME}, located at ${SHOP_ADDRESS}. ` +
+          `${COMPANY_LEGAL_NAME} is the data controller responsible for your personal data. This policy explains how ` +
           "we collect, use, and protect your personal data in accordance with Thailand's Personal Data " +
           "Protection Act (PDPA).",
         ] },
@@ -204,8 +209,8 @@ export const privacyDoc: LegalDoc = {
         { type: 'list', items: [
           ['Name, email address, phone number'],
           ['Number of participants, workshop selection, preferred date/time'],
-          ['Allergy or health information you choose to share (only if relevant to workshop safety)'],
-          ['Payment information (processed securely by Stripe/PayPal — we do not store your full card details)'],
+          ['Allergy or health information, only if you choose to write it in the "Special Requests" box. This is sensitive personal data under the PDPA: by sharing it, you give us your explicit consent to use it solely to keep you safe during the workshop. You can withdraw this consent at any time by contacting us.'],
+          ['Payment information (processed securely by Stripe/PayPal; we do not store your full card details)'],
         ] },
       ],
     },
@@ -244,15 +249,20 @@ export const privacyDoc: LegalDoc = {
           ['Service providers who help us operate our booking system (e.g., hosting providers)'],
           ['Legal authorities, if required by law'],
         ] },
+        { type: 'paragraph', runs: [
+          'Some of these providers (for example Stripe, PayPal, and our website hosting, database, and email ' +
+          'services) store or process data on servers outside Thailand. When this happens, we only use ' +
+          'providers that apply recognised data-protection safeguards, as required by the PDPA.',
+        ] },
       ],
     },
     {
       id: 'data-retention', number: 6, heading: 'Data Retention',
       blocks: [
         { type: 'paragraph', runs: [
-          'We retain booking information for 5 years (recommended default — please confirm with your ' +
-          'accountant for Thai record-keeping requirements) to comply with accounting and legal obligations, ' +
-          'after which it is deleted or anonymized.',
+          'We retain booking records for 5 years to comply with Thai accounting and legal record-keeping ' +
+          'requirements, after which they are deleted or anonymized. Allergy or health information is ' +
+          'deleted once it is no longer needed for your workshop.',
         ] },
       ],
     },
@@ -261,15 +271,17 @@ export const privacyDoc: LegalDoc = {
       blocks: [
         { type: 'paragraph', runs: ["Under Thailand's PDPA, you have the right to:"] },
         { type: 'list', items: [
-          ['Access the personal data we hold about you'],
+          ['Access and obtain a copy of the personal data we hold about you'],
           ['Request correction of inaccurate data'],
-          ['Request deletion of your data (subject to legal retention requirements)'],
-          ['Withdraw consent for marketing communications at any time'],
+          ['Request deletion or anonymization of your data (subject to legal retention requirements)'],
+          ['Request restriction of, or object to, the processing of your data'],
+          ['Request data portability'],
+          ['Withdraw your consent (for marketing, or for use of health/allergy information) at any time'],
         ] },
         { type: 'paragraph', runs: [
           'To exercise these rights, contact us at ',
           { text: SHOP_EMAIL, href: `mailto:${SHOP_EMAIL}` },
-          '.',
+          ". You also have the right to lodge a complaint with Thailand's Personal Data Protection Committee (PDPC).",
         ] },
       ],
     },
@@ -312,10 +324,13 @@ export const privacyDoc: LegalDoc = {
       ],
     },
     {
-      id: 'contact', number: 11, heading: 'Contact',
+      id: 'contact', number: 11, heading: 'Contact & Data Controller',
       blocks: [
-        { type: 'paragraph', runs: ['For privacy-related questions or requests:'] },
-        { type: 'contact', email: SHOP_EMAIL, phone: SHOP_PHONE },
+        { type: 'paragraph', runs: [
+          `Data controller: ${COMPANY_LEGAL_NAME} (Uri Herbs Workshop). For privacy questions, data requests, ` +
+          'or to withdraw consent:',
+        ] },
+        { type: 'contact', email: SHOP_EMAIL, phone: SHOP_PHONE, address: SHOP_ADDRESS },
       ],
     },
   ],
