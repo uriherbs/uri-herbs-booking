@@ -48,6 +48,7 @@ function summary(b: any) {
     booking_ref: b.booking_ref,
     first_name: String(b.customer_name || '').split(' ')[0],
     package_name: pkg?.name || 'Uri Herbs Workshop',
+    package_slug: pkg?.slug || null, // public identifier, used by the site calendar
     calendar_type: pkg?.calendar_type || null,
     slot_date: b.slot_date,
     start_time: String(b.start_time).slice(0, 5),

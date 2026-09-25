@@ -14,11 +14,13 @@ import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import { C, FONT_BODY, FONT_DISPLAY } from '@/lib/theme';
+import MiniCalendar from '@/components/booking/MiniCalendar';
 
 type Summary = {
   booking_ref: string;
   first_name: string;
   package_name: string;
+  package_slug: string | null;
   calendar_type: string | null;
   slot_date: string;
   start_time: string;
@@ -45,15 +47,6 @@ const ERROR_TEXT: Record<string, string> = {
 
 const WHATSAPP = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66643349890'}`;
 
-function bangkokToday(): string {
-  // en-CA formats as YYYY-MM-DD
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-}
-function addDays(ymd: string, n: number): string {
-  const d = new Date(ymd + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
@@ -140,7 +133,6 @@ export default function RescheduleBookingPage({ params }: { params: { token: str
   const value: React.CSSProperties = { fontFamily: FONT_BODY, fontSize: 15, color: C.forest, marginTop: 2 };
 
   const done = !!data?.rescheduled;
-  const today = bangkokToday();
   const available = (times || []).filter((t) => t.is_available);
 
   return (
@@ -207,19 +199,14 @@ export default function RescheduleBookingPage({ params }: { params: { token: str
                   </div>
                 )}
 
-                <label htmlFor="date" style={{ ...label, display: 'block', marginTop: 22 }}>New date</label>
-                <input
-                  id="date"
-                  type="date"
-                  min={today}
-                  max={addDays(today, 180)}
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  style={{
-                    width: '100%', boxSizing: 'border-box', marginTop: 6, padding: '12px 14px',
-                    fontFamily: FONT_BODY, fontSize: 16, color: C.forest,
-                    border: `1.5px solid ${C.sand}`, borderRadius: 12, background: C.white,
-                  }}
+                <div style={{ ...label, marginTop: 22, marginBottom: 8 }}>New date</div>
+                <MiniCalendar
+                  selectedDate={date || null}
+                  onSelectDate={setDate}
+                  packageSlug={data.package_slug}
+                  participants={data.num_participants}
+                  isPrivate={data.is_private}
+                  markedDate={data.slot_date}
                 />
 
                 {date && (
