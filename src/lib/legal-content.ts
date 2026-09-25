@@ -110,12 +110,16 @@ export const termsDoc: LegalDoc = {
       ],
     },
     {
-      id: 'age-policy', number: 5, heading: 'Age Policy',
+      id: 'age-policy', number: 5, heading: 'Children & Families',
       blocks: [
-        { type: 'paragraph', runs: [
-          'Our workshops are a hands-on, family-friendly experience designed for participants of all ages who ' +
-          'can safely engage in the activity. This is not a childcare service — children must be accompanied ' +
-          'and supervised by a participating adult at all times.',
+        { type: 'paragraph', runs: ['We love welcoming families!'] },
+        { type: 'list', items: [
+          ['Children aged 12 and above are welcome when accompanied by an adult or parent.'],
+          ['Children under 12 are welcome as part of a family session.'],
+          ['Parents or accompanying adults remain fully responsible for their children at all times during the session.'],
+          ['While our instructors will happily guide your group through the activity, we are unable to provide childcare, so the accompanying adult remains responsible for them throughout.'],
+          ['For your child\'s safety, we are unable to look after children on their own. If a child is left without an adult, we may need to pause their participation until a parent or guardian returns, and unfortunately this cannot be refunded.'],
+          ['Each child taking part counts as one guest, so please include them in your booking.'],
         ] },
       ],
     },

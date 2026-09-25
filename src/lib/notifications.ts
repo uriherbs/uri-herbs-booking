@@ -264,7 +264,7 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
             <td style="padding: 0 24px 20px;">
               <div style="font-family: Arial, sans-serif; font-size:11px; color:#8A7668; line-height:1.7; border-top:1px solid #E8E2D8; padding-top:14px;">
                 <strong>Good to know:</strong><br/>
-                • Minimum age is 12+. Guests aged 12–17 must be accompanied by an adult.<br/>
+                • Families are very welcome! Children aged 12+ are welcome when accompanied by a parent or adult, and children under 12 are welcome as part of a family session. Please note that parents or adults remain responsible for their children throughout the activity.<br/>
                 • Please arrive 10 minutes before your session start time.<br/>
                 ${data.rescheduleUrl
                   ? `• Need to <strong>reschedule</strong>? <a href="${data.rescheduleUrl}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Change date or time</a> (same workshop and guests, up to 2 hours before your workshop).`
@@ -326,7 +326,8 @@ Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later'
 Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
 
-Please arrive 10 minutes early. Minimum age 12+ (12-17 must be with an adult).
+Please arrive 10 minutes early.
+Families are very welcome! Children aged 12+ are welcome when accompanied by a parent or adult, and children under 12 are welcome as part of a family session. Please note that parents or adults remain responsible for their children throughout the activity.
 
 Need to reschedule? ${data.rescheduleUrl ? `Change date or time here: ${data.rescheduleUrl}` : 'Just reply to this email.'}
 (Same workshop and guests, up to 2 hours before your workshop.)
