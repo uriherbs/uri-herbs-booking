@@ -1011,6 +1011,13 @@ function CustomerStep({ form, onChange, errors }) {
             rows={3}
             style={{ ...inputStyle(false), resize: "vertical", lineHeight: 1.5 }}
           />
+          {/* PDPA: allergy/health info is sensitive data and needs explicit
+              consent. Writing it here is the consent; the wording mirrors
+              Privacy Policy §2 (legal-content.ts). */}
+          <div style={{ fontFamily: "'DM Sans'", fontSize: 11.5, color: C.barkLight, lineHeight: 1.5, marginTop: 6 }}>
+            If you share allergy or health information here, you consent to us using it only to keep you
+            safe during your workshop. You can withdraw this consent at any time.
+          </div>
         </div>
       </form>
     </div>
@@ -1176,7 +1183,19 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
           the same legal-content.ts), just without leaving this flow.
           Local legalModalDoc state only ever calls onClose; it can't
           touch the booking form or the agreement checkbox. */}
-      <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 20 }}>
+      {/* Refund policy stated in plain text right at checkout — card-network
+          rules (quoted in Omise's merchant guide) require the disclosure
+          itself near the confirm button, not only a link to it. Must stay
+          in sync with Terms §4 in legal-content.ts. */}
+      <div style={{
+        fontFamily: "'DM Sans'", fontSize: 12.5, color: C.forest, lineHeight: 1.55,
+        border: `1px solid ${C.sand}`, borderRadius: 10, padding: "12px 16px", marginTop: 20,
+      }}>
+        <strong>Cancellation policy:</strong> Free cancellation up to 48 hours before your workshop
+        (full refund to your original payment method). Cancellations within 48 hours and no-shows are
+        non-refundable.
+      </div>
+      <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 12 }}>
         <label style={{ display: "flex", gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
           <div
             style={{
