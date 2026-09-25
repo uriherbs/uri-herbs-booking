@@ -521,26 +521,19 @@ const PACKAGE_EMAIL_META: Record<string, { icon: string; takeaway: string }> = {
 // from '@/lib/supabase') — typed loosely to avoid importing Supabase's
 // types into this otherwise DB-free file.
 export async function sendBookingConfirmationEmails(db: any, bookingId: string): Promise<void> {
-  // Atomic claim — only the caller that flips this false → true
-  // actually sends. Every other (redundant) call for the same
-  // booking sees 0 rows updated and returns immediately.
-  const { data: claimed, error: claimError } = await db
-    .from('bookings')
-    .update({ confirmation_email_sent: true, confirmation_email_sent_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .eq('confirmation_email_sent', false)
-    .select('id')
-    .maybeSingle();
-
-  if (claimError) {
-    console.error(`sendBookingConfirmationEmails: claim failed for booking ${bookingId}:`, claimError.message);
-    return;
-  }
-  if (!claimed) {
-    // Already sent by another (racing) confirmation path — expected,
-    // not an error.
-    return;
-  }
+  // Two INDEPENDENT atomic claims — one per email — so each email is
+  // sent at most once no matter how many confirmation paths call this:
+  //   - confirmation_email_sent → the customer confirmation. This flag
+  //     is ALSO claimed by the Supabase Edge Function `send-notifications`
+  //     (fired from the notifications-queue triggers on `bookings`), which
+  //     usually wins the race and sends the customer email itself. When
+  //     it does, this function correctly skips the customer email.
+  //   - owner_email_sent → the "New booking" email to the shop. Only this
+  //     function sends it. Before 2026-09-25 the owner email hid behind
+  //     the customer claim, so whenever the Edge Function won, the shop
+  //     was never notified.
+  // Claims are taken only AFTER the API key and booking are confirmed
+  // available, so a misconfiguration never marks an unsent email as sent.
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -581,9 +574,26 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     paymentMethod: booking.payment_method || 'later',
   };
 
-  // Customer confirmation — best-effort, only if they gave an email
-  // (it's optional at booking time).
-  if (booking.customer_email) {
+  // Atomic claim helper: flips `flag` false → true for this booking and
+  // reports whether THIS caller won. Only the winner sends.
+  const claim = async (flag: string, flagAt: string): Promise<boolean> => {
+    const { data, error } = await db
+      .from('bookings')
+      .update({ [flag]: true, [flagAt]: new Date().toISOString() })
+      .eq('id', bookingId)
+      .eq(flag, false)
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      console.error(`sendBookingConfirmationEmails: ${flag} claim failed for ${booking.booking_ref}:`, error.message);
+      return false;
+    }
+    return !!data;
+  };
+
+  // Customer confirmation — only if they gave an email (optional at
+  // booking time) AND nobody (e.g. the Edge Function) sent it already.
+  if (booking.customer_email && (await claim('confirmation_email_sent', 'confirmation_email_sent_at'))) {
     try {
       await sendEmailViaResend(
         {
@@ -599,20 +609,21 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     }
   }
 
-  // Owner notification — always sent, regardless of whether the
-  // customer gave an email.
-  try {
-    await sendEmailViaResend(
-      {
-        to: OWNER_EMAIL,
-        subject: `New booking — ${booking.booking_ref} (${booking.num_participants} guest${booking.num_participants > 1 ? 's' : ''})`,
-        html: buildOwnerNotificationEmailHtml(emailData),
-        text: buildOwnerNotificationEmailText(emailData),
-      },
-      apiKey
-    );
-  } catch (err: any) {
-    console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
+  // Owner notification — its own claim, independent of the customer email.
+  if (await claim('owner_email_sent', 'owner_email_sent_at')) {
+    try {
+      await sendEmailViaResend(
+        {
+          to: OWNER_EMAIL,
+          subject: `New booking — ${booking.booking_ref} (${booking.num_participants} guest${booking.num_participants > 1 ? 's' : ''})`,
+          html: buildOwnerNotificationEmailHtml(emailData),
+          text: buildOwnerNotificationEmailText(emailData),
+        },
+        apiKey
+      );
+    } catch (err: any) {
+      console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
+    }
   }
 }
 
