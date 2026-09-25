@@ -43,6 +43,7 @@ const ERROR_TEXT: Record<string, string> = {
   slot_unavailable: 'That time is no longer available. Please choose another time.',
   slots_failed: "We couldn't load the times for that date. Please try again.",
   reschedule_failed: 'Something went wrong. Please try again, or contact us on WhatsApp.',
+  pick_first: 'Please choose a new date and time first.',
 };
 
 function fmtDate(d: string) {
@@ -91,7 +92,8 @@ export default function RescheduleBookingPage({ params }: { params: { token: str
   }, [date, params.token]);
 
   const confirm = async () => {
-    if (!data || !date || !time) return;
+    if (!data) return;
+    if (!date || !time) { setError('pick_first'); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -242,12 +244,14 @@ export default function RescheduleBookingPage({ params }: { params: { token: str
                 <button
                   type="button"
                   onClick={confirm}
-                  disabled={!date || !time || submitting}
+                  disabled={submitting}
                   style={{
+                    // Owner preference: light brown until tapped (even after a time is
+                    // chosen); turns dark green once the customer taps it.
                     width: '100%', marginTop: 24, padding: '15px 20px', borderRadius: 999, border: 'none',
-                    background: !date || !time || submitting ? C.barkLight : C.forest, color: C.white,
+                    background: submitting ? C.forest : C.barkLight, color: C.white,
                     fontFamily: FONT_BODY, fontSize: 16, fontWeight: 700,
-                    cursor: !date || !time || submitting ? 'default' : 'pointer',
+                    cursor: submitting ? 'default' : 'pointer',
                   }}
                 >
                   {submitting ? 'Moving your booking…' : 'Confirm new date & time'}
