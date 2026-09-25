@@ -84,6 +84,7 @@ export interface BookingEmailData {
   isPrivate: boolean;
   totalPriceThb: number;
   takeawayDescription: string;
+  paymentMethod: string; // 'stripe' | 'paypal' | 'later' | ...
 }
 
 // Mirrors the group-label logic in src/app/book/page.tsx's
@@ -210,17 +211,26 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
             </td>
           </tr>
 
-          <!-- Pay on arrival -->
+          <!-- Payment status -->
           <tr>
             <td style="padding: 8px 24px 16px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#E7EFEA; border-radius:12px;">
                 <tr><td style="padding:16px 18px;">
+                  ${data.paymentMethod === 'later' ? `
                   <div style="font-family: Georgia, serif; font-size:15px; font-weight:bold; color:#2D4639; margin-bottom:6px;">
                     💳 Pay When You Arrive
                   </div>
                   <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
                     No prepayment needed. We accept: <strong>Cash (THB)</strong>, <strong>PromptPay QR</strong>, and <strong>WeChat Pay</strong> on site.
                   </div>
+                  ` : `
+                  <div style="font-family: Georgia, serif; font-size:15px; font-weight:bold; color:#2D4639; margin-bottom:6px;">
+                    ✅ Payment Received
+                  </div>
+                  <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
+                    You've already paid in full online. Nothing more to pay when you arrive — just show up and enjoy!
+                  </div>
+                  `}
                 </td></tr>
               </table>
             </td>
@@ -299,7 +309,7 @@ Experience: ${data.packageName}
 Date: ${formatDateLong(data.date)}
 Time: ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
 Guests: ${data.numParticipants}
-Total: ฿${data.totalPriceThb.toLocaleString()} (pay on arrival — Cash, PromptPay, or WeChat Pay)
+Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later' ? ' (pay on arrival — Cash, PromptPay, or WeChat Pay)' : ' — already paid online, nothing more to pay'}
 
 Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
