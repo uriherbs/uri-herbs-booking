@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAdminWorkshopEditor } from '@/lib/hooks';
 import { saveWorkshopContent, uploadWorkshopImage } from '@/lib/admin-content-service';
+import ImageCropModal from '@/components/admin/ImageCropModal';
 import type { AdminContentBlock } from '@/lib/admin-content-service';
 
 const C = {
@@ -109,6 +110,10 @@ export default function WorkshopContentEditPage() {
     setBlocks(workshop.blocks);
   }, [workshop]);
 
+  // Photo waiting in the crop window (null = closed). Frame shapes match
+  // the public workshop page: hero 16:10, section photos 4:3.
+  const [cropTarget, setCropTarget] = useState<{ file: File; kind: 'hero' } | { file: File; kind: 'block'; index: number } | null>(null);
+
   const handleHeroUpload = async (file: File) => {
     if (!slug) return;
     setHeroUploading(true);
@@ -186,6 +191,20 @@ export default function WorkshopContentEditPage() {
         textarea:focus, input[type="text"]:focus { outline: none; border-color: ${C.sage}; }
       ` }} />
 
+      <ImageCropModal
+        file={cropTarget?.file ?? null}
+        aspect={cropTarget?.kind === 'hero' ? 16 / 10 : 4 / 3}
+        shapeLabel={cropTarget?.kind === 'hero' ? 'Main photo (wide, 16:10)' : 'Section photo (4:3)'}
+        onCancel={() => setCropTarget(null)}
+        onConfirm={(cropped) => {
+          const t = cropTarget;
+          setCropTarget(null);
+          if (!t) return;
+          if (t.kind === 'hero') handleHeroUpload(cropped);
+          else handleBlockUpload(t.index, cropped);
+        }}
+      />
+
       <div style={{ background: C.forest, padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 9 }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff" opacity="0.9"><path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22.5C7.76 17.66 9.41 12.67 18 11.18V14C21.78 10.58 20 2 20 2S13.21 4.58 17 8Z" /></svg>
         <span style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.white }}>Uri Herbs Admin</span>
@@ -216,7 +235,7 @@ export default function WorkshopContentEditPage() {
             <ImagePreview url={heroImageUrl} size={108} uploading={heroUploading} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
               <input ref={heroInputRef} type="file" accept="image/*" hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHeroUpload(f); e.target.value = ''; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) setCropTarget({ file: f, kind: 'hero' }); e.target.value = ''; }} />
               <button type="button" onClick={() => heroInputRef.current?.click()} disabled={heroUploading} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7, justifyContent: 'center', width: 'fit-content',
                 background: C.white, border: `1.5px solid ${C.sand}`, color: C.bark,
@@ -277,7 +296,7 @@ export default function WorkshopContentEditPage() {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <ImagePreview url={block.image_url} size={52} uploading={!!blockUploading[i]} />
               <input ref={(el) => { blockInputRefs.current[i] = el; }} type="file" accept="image/*" hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBlockUpload(i, f); e.target.value = ''; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) setCropTarget({ file: f, kind: 'block', index: i }); e.target.value = ''; }} />
               <button type="button" onClick={() => blockInputRefs.current[i]?.click()} disabled={!!blockUploading[i]} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: C.white, border: `1.5px solid ${C.sand}`, color: C.bark,
