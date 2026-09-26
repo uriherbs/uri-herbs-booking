@@ -23,8 +23,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { C } from '@/lib/admin-theme';
-import { HERBAL_BLOCKS, getAromaBlocksForDate } from '@/lib/admin-schedule';
-import { getPackages, createManualBooking } from '@/lib/booking-service';
+import { getPackages, createManualBooking, getAvailableSlots } from '@/lib/booking-service';
 import type { Package, CreateManualBookingRequest, ManualBookingConfirmation } from '@/lib/types';
 
 interface ManualBookingModalProps {
@@ -56,6 +55,25 @@ interface FormState {
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Current Chiang Mai time as 'HH:MM' (admin may be on a phone set to
+// another timezone while travelling).
+function bangkokNowHHMM(): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false })
+    .format(new Date()).replace(/^24/, '00');
+}
+
+interface TimeOption {
+  time: string;          // 'HH:MM'
+  available: boolean;    // bookable online right now (not full / not past cutoff / not locked)
+  remaining: number | null;
 }
 
 function emptyForm(date: string): FormState {
@@ -133,27 +151,57 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
     [packages, form.packageSlug]
   );
 
-  // Which hourly blocks to offer depends on the selected package's
-  // calendar, and — for aromatherapy — the chosen date's day of week.
-  // Same display grid the dashboard itself renders bookings into
-  // (src/lib/admin-schedule.ts); the RPC has no cutoff/time-rule check
-  // for a manual booking, but a start time still has to land on an
-  // existing hourly `daily_slots` block, so sticking to this grid
-  // keeps the common case error-free without hardcoding it twice.
-  const timeOptions = useMemo(() => {
-    if (!selectedPackage) return [];
-    if (selectedPackage.calendar_type === 'aromatherapy') {
-      if (!form.date) return [];
-      return getAromaBlocksForDate(new Date(`${form.date}T00:00:00`)).map((b) => b.time);
-    }
-    return HERBAL_BLOCKS.map((b) => b.time);
-  }, [selectedPackage, form.date]);
+  // Start times come from the SAME server rules the public /book page
+  // uses (get_available_slots → package_time_rules): each package only
+  // offers its own start times (e.g. Integrated Journey 10 AM / 2 PM,
+  // Ya Dom 11 AM / 3 PM), aromatherapy only on its Mon–Thu slot, and
+  // nothing on closed days (Sunday, blocked dates).
+  //
+  // Manual bookings are allowed to go past the online cutoff (walk-ins),
+  // so for TODAY we also look up the same weekday next week to learn the
+  // package's normal start times, and keep any that haven't started yet
+  // even if online booking for them has already closed.
+  const [timeOptions, setTimeOptions] = useState<TimeOption[]>([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
+  const [timesError, setTimesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !form.packageSlug || !form.date) { setTimeOptions([]); return; }
+    let cancelled = false;
+    setLoadingTimes(true);
+    setTimesError(null);
+    const isToday = form.date === todayStr();
+    Promise.all([
+      getAvailableSlots(form.date, form.packageSlug, 1, false),
+      isToday ? getAvailableSlots(addDays(form.date, 7), form.packageSlug, 1, false) : Promise.resolve([]),
+    ])
+      .then(([day, pattern]) => {
+        if (cancelled) return;
+        const map = new Map<string, TimeOption>();
+        day.forEach((s) => {
+          const t = String(s.start_time).slice(0, 5);
+          map.set(t, { time: t, available: !!s.is_available, remaining: s.remaining_capacity ?? null });
+        });
+        if (isToday) {
+          const now = bangkokNowHHMM();
+          pattern.forEach((s) => {
+            const t = String(s.start_time).slice(0, 5);
+            if (t > now && !map.has(t)) map.set(t, { time: t, available: false, remaining: null });
+          });
+          for (const t of Array.from(map.keys())) if (t <= now) map.delete(t);
+        }
+        setTimeOptions(Array.from(map.values()).sort((a, b) => a.time.localeCompare(b.time)));
+      })
+      .catch((err: any) => { if (!cancelled) { setTimeOptions([]); setTimesError(err?.message || 'Could not load times'); } })
+      .finally(() => { if (!cancelled) setLoadingTimes(false); });
+    return () => { cancelled = true; };
+  }, [open, form.packageSlug, form.date]);
 
   // Drop a previously-chosen time that's no longer valid for the
   // current package/date combination.
   useEffect(() => {
-    setForm((f) => (f.startTime && !timeOptions.includes(f.startTime) ? { ...f, startTime: '' } : f));
-  }, [timeOptions]);
+    setForm((f) => (f.startTime && !loadingTimes && !timeOptions.some((o) => o.time === f.startTime) ? { ...f, startTime: '' } : f));
+  }, [timeOptions, loadingTimes]);
 
   if (!open) return null;
 
@@ -335,14 +383,17 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
                   value={form.startTime}
                   onChange={(e) => update({ startTime: e.target.value })}
                   required
-                  disabled={!selectedPackage || timeOptions.length === 0}
+                  disabled={!selectedPackage || loadingTimes || timeOptions.length === 0}
                   style={inputStyle}
                 >
                   <option value="">
-                    {!selectedPackage ? '— Select a package first —' : timeOptions.length === 0 ? 'No slots available on this day' : 'Select a time'}
+                    {!selectedPackage ? '— Select a package first —' : loadingTimes ? 'Loading times…' : timesError ? "Couldn't load times" : timeOptions.length === 0 ? 'Closed on this day' : 'Select a time'}
                   </option>
-                  {timeOptions.map((t) => (
-                    <option key={t} value={t}>{formatTime12(t)}</option>
+                  {timeOptions.map((o) => (
+                    <option key={o.time} value={o.time}>
+                      {formatTime12(o.time)}
+                      {o.available ? '' : ' · full / closed online'}
+                    </option>
                   ))}
                 </select>
               </Field>
