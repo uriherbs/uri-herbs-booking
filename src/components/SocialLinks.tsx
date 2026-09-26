@@ -39,7 +39,11 @@ const LineSVG = ({ size = 18, color = C.sage }: { size?: number; color?: string 
 // Same accounts linked from the "Follow Us" card on the Contact page.
 const SOCIAL_LINKS = [
   { name: 'Instagram', href: 'https://www.instagram.com/uriherbsworkshop', Icon: InstagramSVG },
-  { name: 'Facebook', href: 'https://www.facebook.com/uriherbworkshop', Icon: FacebookSVG },
+  // Verified directly with the owner (2026-08-23) — the old
+  // 'uriherbworkshop' (missing the 's') 404s. This is the page's own
+  // share link, confirmed pointing at the real page rather than
+  // guessed at from the vanity-URL spelling.
+  { name: 'Facebook', href: 'https://www.facebook.com/share/19Hr3S8YfY/', Icon: FacebookSVG },
   { name: 'LINE', href: 'https://line.me/R/ti/p/@458fguvz', Icon: LineSVG },
   { name: 'TikTok', href: 'https://www.tiktok.com/@uriherbsworkshop', Icon: TikTokSVG },
 ];

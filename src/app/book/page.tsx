@@ -10,6 +10,7 @@ import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButto
 import { PaymentLoadingBox } from "@/components/payments/PaymentStatusBoxes";
 import LegalModal from "@/components/legal/LegalModal";
 import { legalDocs } from "@/lib/legal-content";
+import { ReviewsStripClient } from "@/components/ReviewsStripClient";
 
 // ════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -1011,6 +1012,13 @@ function CustomerStep({ form, onChange, errors }) {
             rows={3}
             style={{ ...inputStyle(false), resize: "vertical", lineHeight: 1.5 }}
           />
+          {/* PDPA: allergy/health info is sensitive data and needs explicit
+              consent. Writing it here is the consent; the wording mirrors
+              Privacy Policy §2 (legal-content.ts). */}
+          <div style={{ fontFamily: "'DM Sans'", fontSize: 11.5, color: C.barkLight, lineHeight: 1.5, marginTop: 6 }}>
+            If you share allergy or health information here, you consent to us using it only to keep you
+            safe during your workshop. You can withdraw this consent at any time.
+          </div>
         </div>
       </form>
     </div>
@@ -1176,7 +1184,19 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
           the same legal-content.ts), just without leaving this flow.
           Local legalModalDoc state only ever calls onClose; it can't
           touch the booking form or the agreement checkbox. */}
-      <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 20 }}>
+      {/* Refund policy stated in plain text right at checkout — card-network
+          rules (quoted in Omise's merchant guide) require the disclosure
+          itself near the confirm button, not only a link to it. Must stay
+          in sync with Terms §4 in legal-content.ts. */}
+      <div style={{
+        fontFamily: "'DM Sans'", fontSize: 12.5, color: C.forest, lineHeight: 1.55,
+        border: `1px solid ${C.sand}`, borderRadius: 10, padding: "12px 16px", marginTop: 20,
+      }}>
+        <strong>Cancellation policy:</strong> Free cancellation up to 48 hours before your workshop
+        (full refund to your original payment method). Cancellations within 48 hours and no-shows are
+        non-refundable.
+      </div>
+      <div style={{ background: C.mist, borderRadius: 10, padding: "14px 16px", marginTop: 12 }}>
         <label style={{ display: "flex", gap: 12, cursor: "pointer", alignItems: "flex-start" }}>
           <div
             style={{
@@ -1268,7 +1288,8 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
 // STEP 5: CONFIRMATION
 // ════════════════════════════════════════════════════════════
 
-function ConfirmationStep({ pkg, result, form, onReset }) {
+function ConfirmationStep({ pkg, result, form, onReset, paymentMethod }) {
+  const paidOnline = paymentMethod === "stripe" || paymentMethod === "paypal";
   const dateObj = new Date(result.slot_date + "T00:00:00");
   const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];
   const monthName = MONTHS[dateObj.getMonth()];
@@ -1398,21 +1419,29 @@ function ConfirmationStep({ pkg, result, form, onReset }) {
       }}>
         <div style={{
           fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 600, color: C.forest, marginBottom: 8,
-        }}>Pay When You Arrive</div>
-        <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.6 }}>
-          No prepayment needed. Pay on the spot at our workshop:
-        </div>
-        <div style={{
-          display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap",
-        }}>
-          {["Cash (THB)", "PromptPay QR", "WeChat Pay"].map(m => (
-            <span key={m} style={{
-              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 500,
-              background: C.white, border: `1px solid rgba(107,143,113,0.25)`,
-              borderRadius: 20, padding: "5px 12px", color: C.forest,
-            }}>{m}</span>
-          ))}
-        </div>
+        }}>{paidOnline ? "Payment Received" : "Pay When You Arrive"}</div>
+        {paidOnline ? (
+          <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.6 }}>
+            You've already paid in full online. Nothing more to pay when you arrive — just show up and enjoy!
+          </div>
+        ) : (
+          <>
+            <div style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.6 }}>
+              No prepayment needed. Pay on the spot at our workshop:
+            </div>
+            <div style={{
+              display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap",
+            }}>
+              {["Cash (THB)", "PromptPay QR", "WeChat Pay"].map(m => (
+                <span key={m} style={{
+                  fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 500,
+                  background: C.white, border: `1px solid rgba(107,143,113,0.25)`,
+                  borderRadius: 20, padding: "5px 12px", color: C.forest,
+                }}>{m}</span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Takeaway reminder */}
@@ -1810,6 +1839,9 @@ export default function BookingFlow() {
           />
         )
       )}
+      {step === 0 && !packagesLoading && !packagesError && (
+        <ReviewsStripClient gold={C.gold} forest={C.forest} bark={C.bark} />
+      )}
       {step === 1 && pkg && (
         <DateTimeStep
           selectedDate={selectedDate} onSelectDate={(d) => { setSelectedDate(d); setSelectedTime(null); }}
@@ -1845,7 +1877,7 @@ export default function BookingFlow() {
           // 'confirmed' here without re-fetching; every other field on
           // `result` was already correct since create_booking().
           pkg={pkg} result={{ ...result, status: "confirmed" }} form={form}
-          onReset={handleReset}
+          onReset={handleReset} paymentMethod={paymentMethod}
         />
       )}
 

@@ -9,11 +9,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmailViaResend, buildContactEmailHtml, buildContactEmailText } from '@/lib/notifications';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const CONTACT_EMAIL_TO = 'uherbhouse@gmail.com';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
+  // 5 submissions per 15 minutes per IP — a genuine visitor never
+  // needs more than that; a script hammering the form does.
+  const rate = await checkRateLimit('contact', getClientIp(request), { maxHits: 5, windowSeconds: 15 * 60 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many messages sent from this connection. Please try again in a few minutes, or message us on WhatsApp." },
+      { status: 429 }
+    );
+  }
+
   let body: any;
   try {
     body = await request.json();

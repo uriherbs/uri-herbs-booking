@@ -7,6 +7,7 @@ import {
   useAdminMonthSummary,
   adminUpdateBookingStatus,
   adminToggleSlotBlock,
+  adminCancelBooking,
 } from "@/lib/hooks";
 
 // ══════════════════════════════════════════════════════════════════
@@ -253,7 +254,7 @@ function StatusBadge({ status, type }) {
 // BOOKING ROW — individual participant with action toggles
 // ══════════════════════════════════════════════════════════════════
 
-function BookingRow({ booking, onUpdate }) {
+function BookingRow({ booking, onUpdate, onCancel }) {
   const [expanded, setExpanded] = useState(false);
 
   const cycleAttendance = () => {
@@ -263,6 +264,14 @@ function BookingRow({ booking, onUpdate }) {
 
   const togglePayment = () => {
     onUpdate(booking.id, "payment", booking.payment === "paid" ? "unpaid" : "paid");
+  };
+
+  const handleCancel = () => {
+    if (window.confirm(
+      `Cancel ${booking.name}'s booking (${booking.ref})?\n\nThis frees the spot immediately and can't be undone here — the customer will get a cancellation email if they gave one.`
+    )) {
+      onCancel(booking.id);
+    }
   };
 
   return (
@@ -420,6 +429,17 @@ function BookingRow({ booking, onUpdate }) {
               {booking.payment === "paid" ? "Paid ✓" : "Mark Paid"}
             </button>
           </div>
+
+          {/* Cancel — destructive, kept visually separate from the two
+              status toggles above so it isn't a stray misclick. */}
+          <button onClick={(e) => { e.stopPropagation(); handleCancel(); }} style={{
+            width: "100%", marginTop: 8, padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+            fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600,
+            border: "none", background: "transparent", color: C.coral,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}>
+            {Icons.x(12, C.coral)} Cancel Booking
+          </button>
         </div>
       )}
     </div>
@@ -430,7 +450,7 @@ function BookingRow({ booking, onUpdate }) {
 // SLOT CARD — one hourly block with all its bookings
 // ══════════════════════════════════════════════════════════════════
 
-function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking }) {
+function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking, onCancelBooking }) {
   const [open, setOpen] = useState(bookings.length > 0);
   const isBlocked = blockedSlots.has(block.time);
 
@@ -532,7 +552,7 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
       {open && !isBlocked && bookings.length > 0 && (
         <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
           {bookings.map(b => (
-            <BookingRow key={b.id} booking={b} onUpdate={onUpdateBooking}/>
+            <BookingRow key={b.id} booking={b} onUpdate={onUpdateBooking} onCancel={onCancelBooking}/>
           ))}
         </div>
       )}
@@ -632,6 +652,29 @@ export default function AdminDashboard({ adminName, onSignOut }) {
     } finally {
       setPendingAction(null);
     }
+  };
+
+  // Cancellation is a two-step affair, same shape as the Pay Later
+  // confirmation path: the RPC (no mailer access) flips the DB row,
+  // then a best-effort server route sends the customer's cancellation
+  // email. The RPC itself is what actually frees the spot — realtime
+  // picks that up and refreshes the grid regardless of whether the
+  // email step succeeds, so a Resend hiccup never blocks the cancel.
+  const handleCancelBooking = async (id) => {
+    setPendingAction(id);
+    try {
+      await adminCancelBooking(id);
+    } catch (err) {
+      alert(`Couldn't cancel booking: ${err.message}`);
+      return;
+    } finally {
+      setPendingAction(null);
+    }
+    fetch('/api/bookings/notify-cancelled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: id }),
+    }).catch((err) => console.error('notify-cancelled failed:', err));
   };
 
   const handleToggleBlock = async (time) => {
@@ -919,6 +962,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                     blockedSlots={blockedTimesByCalendar.herbal}
                     onToggleBlock={handleToggleBlock}
                     onUpdateBooking={handleUpdateBooking}
+                    onCancelBooking={handleCancelBooking}
                   />
                 ))}
               </div>
@@ -957,6 +1001,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                     blockedSlots={blockedTimesByCalendar.herbal}
                     onToggleBlock={handleToggleBlock}
                     onUpdateBooking={handleUpdateBooking}
+                    onCancelBooking={handleCancelBooking}
                   />
                 ))}
               </div>
@@ -987,6 +1032,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                       blockedSlots={blockedTimesByCalendar.aromatherapy}
                       onToggleBlock={handleToggleBlock}
                       onUpdateBooking={handleUpdateBooking}
+                      onCancelBooking={handleCancelBooking}
                     />
                   ))}
                 </div>

@@ -232,7 +232,19 @@ export function useCreateBooking() {
     setResult(null);
   }, []);
 
-  return { submit, submitting, error, result, reset };
+  // Rehydrates `result` directly, bypassing submit()/create_booking().
+  // Used only by the Stripe 3D-Secure return flow (src/app/book/page.tsx):
+  // a full-page bank redirect reloads the tab and wipes this hook's
+  // in-memory state, so on return the booking is re-fetched by ref
+  // (src/app/api/bookings/status) and pushed back in here instead of
+  // being recreated.
+  const restore = useCallback((confirmation: BookingConfirmation) => {
+    setSubmitting(false);
+    setError(null);
+    setResult(confirmation);
+  }, []);
+
+  return { submit, submitting, error, result, reset, restore };
 }
 
 
@@ -447,6 +459,20 @@ export async function adminUpdateBookingStatus(
     p_booking_id: bookingId,
     p_attendance: updates.attendance ?? null,
     p_payment: updates.payment ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+// Cancels an admin-selected booking (council review 2026-08-23, task
+// 15). Frees the slot's capacity via the same trigger the customer
+// self-cancel flow relies on (admin_cancel_booking deletes the row's
+// booking_slots entries server-side). Doesn't send the cancellation
+// email itself — the RPC has no mailer access — so the caller should
+// best-effort POST to /api/bookings/notify-cancelled right after this
+// resolves, same two-step pattern as the Pay Later confirmation flow.
+export async function adminCancelBooking(bookingId: string) {
+  const { error } = await supabase.rpc('admin_cancel_booking', {
+    p_booking_id: bookingId,
   });
   if (error) throw new Error(error.message);
 }

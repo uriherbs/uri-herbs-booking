@@ -25,7 +25,12 @@ const SHOP_MAPS_URL =
   'https://www.google.com/maps/search/?api=1&query=' +
   encodeURIComponent('Uri Herbs Workshop') +
   '&query_place_id=0x30da3bb4d505e7c5:0x41cac3c3a753cc10&hl=en';
-const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66812345678'; // set NEXT_PUBLIC_WHATSAPP_NUMBER in Vercel — this fallback is a placeholder only
+// Fallback matches the real number hardcoded in FloatingWhatsApp.tsx and
+// trade/page.tsx — was a placeholder ('66812345678') until council review
+// 2026-08-20 flagged the inconsistency: if NEXT_PUBLIC_WHATSAPP_NUMBER is
+// ever unset in a deploy, every WhatsApp link in these emails must still
+// go to the real shop number, not a dead one.
+const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66643349890';
 const SHOP_INSTAGRAM = 'https://instagram.com/uriherbsworkshop';
 const SHOP_WEBSITE = 'https://www.uriherbs.com';
 
@@ -106,7 +111,7 @@ function formatTime12(t: string): string {
   return `${hour12}:00 ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-export function buildConfirmationEmailHtml(data: BookingEmailData): string {
+export function buildConfirmationEmailHtml(data: BookingEmailData & { paymentMethod?: string }): string {
   const dateLong = formatDateLong(data.date);
   const startStr = formatTime12(data.startTime);
   const endStr = formatTime12(data.endTime);
@@ -210,17 +215,29 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
             </td>
           </tr>
 
-          <!-- Pay on arrival -->
+          <!-- Payment status — mirrors the same paymentMethod-aware
+               fix on the confirmation page (council review 2026-08-23):
+               a customer who already paid online must not be told to
+               pay on arrival. -->
           <tr>
             <td style="padding: 8px 24px 16px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#E7EFEA; border-radius:12px;">
                 <tr><td style="padding:16px 18px;">
+                  ${data.paymentMethod === 'stripe' || data.paymentMethod === 'paypal' ? `
+                  <div style="font-family: Georgia, serif; font-size:15px; font-weight:bold; color:#2D4639; margin-bottom:6px;">
+                    ✅ Payment Received
+                  </div>
+                  <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
+                    You've already paid the full amount via ${data.paymentMethod === 'stripe' ? 'card' : 'PayPal'} — there's nothing more to pay on arrival.
+                  </div>
+                  ` : `
                   <div style="font-family: Georgia, serif; font-size:15px; font-weight:bold; color:#2D4639; margin-bottom:6px;">
                     💳 Pay When You Arrive
                   </div>
                   <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
                     No prepayment needed. We accept: <strong>Cash (THB)</strong>, <strong>PromptPay QR</strong>, and <strong>WeChat Pay</strong> on site.
                   </div>
+                  `}
                 </td></tr>
               </table>
             </td>
@@ -285,7 +302,8 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
 `.trim();
 }
 
-export function buildConfirmationEmailText(data: BookingEmailData): string {
+export function buildConfirmationEmailText(data: BookingEmailData & { paymentMethod?: string }): string {
+  const paidOnline = data.paymentMethod === 'stripe' || data.paymentMethod === 'paypal';
   return `
 Booking Confirmed — ${SHOP_NAME}
 
@@ -299,7 +317,7 @@ Experience: ${data.packageName}
 Date: ${formatDateLong(data.date)}
 Time: ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
 Guests: ${data.numParticipants}
-Total: ฿${data.totalPriceThb.toLocaleString()} (pay on arrival — Cash, PromptPay, or WeChat Pay)
+Total: ฿${data.totalPriceThb.toLocaleString()} (${paidOnline ? `already paid via ${data.paymentMethod === 'stripe' ? 'card' : 'PayPal'} — nothing more to pay` : 'pay on arrival — Cash, PromptPay, or WeChat Pay'})
 
 Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
@@ -337,6 +355,18 @@ export function buildCancellationEmailHtml(bookingRef: string, customerName: str
     </td></tr>
   </table>
 </body></html>
+`.trim();
+}
+
+export function buildCancellationEmailText(bookingRef: string, customerName: string): string {
+  return `
+Dear ${customerName},
+
+Your booking ${bookingRef} has been cancelled as requested. Your spot has been released.
+
+We hope to welcome you another time! Feel free to book again anytime at ${SHOP_WEBSITE}.
+
+— ${SHOP_NAME}
 `.trim();
 }
 
@@ -589,6 +619,70 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     );
   } catch (err: any) {
     console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
+  }
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 4c. BOOKING CANCELLATION — ORCHESTRATION
+// ────────────────────────────────────────────────────────────
+// Called from /api/bookings/notify-cancelled, right after the admin
+// dashboard's admin_cancel_booking() RPC succeeds (council review
+// 2026-08-23, task 15 — that RPC only flips the DB row; it can't send
+// email itself since it has no Resend API key). Same atomic-claim /
+// never-throws shape as sendBookingConfirmationEmails() above, guarded
+// by the twin `cancellation_email_sent` flag so a redundant call never
+// double-emails the customer.
+export async function sendBookingCancellationEmail(db: any, bookingId: string): Promise<void> {
+  const { data: claimed, error: claimError } = await db
+    .from('bookings')
+    .update({ cancellation_email_sent: true })
+    .eq('id', bookingId)
+    .eq('cancellation_email_sent', false)
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) {
+    console.error(`sendBookingCancellationEmail: claim failed for booking ${bookingId}:`, claimError.message);
+    return;
+  }
+  if (!claimed) {
+    // Already sent (or never needed — e.g. no customer email) —
+    // expected, not an error.
+    return;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendBookingCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId} cancelled but no email sent`);
+    return;
+  }
+
+  const { data: booking, error: fetchError } = await db
+    .from('bookings')
+    .select('booking_ref, customer_name, customer_email')
+    .eq('id', bookingId)
+    .single();
+
+  if (fetchError || !booking) {
+    console.error(`sendBookingCancellationEmail: could not fetch booking ${bookingId}:`, fetchError?.message);
+    return;
+  }
+
+  if (!booking.customer_email) return; // optional at booking time — nothing to send to
+
+  try {
+    await sendEmailViaResend(
+      {
+        to: booking.customer_email,
+        subject: `Booking Cancelled — ${booking.booking_ref} · ${SHOP_NAME}`,
+        html: buildCancellationEmailHtml(booking.booking_ref, booking.customer_name),
+        text: buildCancellationEmailText(booking.booking_ref, booking.customer_name),
+      },
+      apiKey
+    );
+  } catch (err: any) {
+    console.error(`sendBookingCancellationEmail: email failed for ${booking.booking_ref}:`, err.message);
   }
 }
 

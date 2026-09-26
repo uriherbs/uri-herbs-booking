@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmailViaResend, buildContactEmailHtml, buildContactEmailText } from '@/lib/notifications';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const LEAD_EMAIL_TO = 'uherbhouse@gmail.com';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,6 +30,15 @@ function str(v: unknown): string {
 }
 
 export async function POST(request: NextRequest) {
+  // 5 submissions per 15 minutes per IP — same reasoning as /api/contact.
+  const rate = await checkRateLimit('trade', getClientIp(request), { maxHits: 5, windowSeconds: 15 * 60 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many submissions from this connection. Please try again in a few minutes, or message us on WhatsApp.' },
+      { status: 429 }
+    );
+  }
+
   let body: any;
   try {
     body = await request.json();
