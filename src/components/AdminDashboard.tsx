@@ -9,58 +9,10 @@ import {
   adminToggleSlotBlock,
   adminCancelBooking,
 } from "@/lib/hooks";
-
-// ══════════════════════════════════════════════════════════════════
-// DESIGN TOKENS (shared with booking flow, slightly cooler for admin)
-// ══════════════════════════════════════════════════════════════════
-
-const C = {
-  sage:       "#6B8F71",
-  sageDark:   "#4A7050",
-  sageLight:  "#E7EFEA",
-  sagePale:   "#F2F7F3",
-  forest:     "#2D4639",
-  parchment:  "#F5F2EC",
-  white:      "#FFFFFF",
-  gold:       "#A89068",
-  goldLight:  "#F5F0E5",
-  goldPale:   "#FAF7F0",
-  bark:       "#5C4A3D",
-  barkLight:  "#8A7668",
-  sand:       "#E8E2D8",
-  mist:       "#F0EDE6",
-  coral:      "#C07A6E",
-  coralLight: "#FCEAE6",
-  coralPale:  "#FFF5F3",
-  blue:       "#5B7FA6",
-  blueLight:  "#E8F0F8",
-};
-
-// ══════════════════════════════════════════════════════════════════
-// SCHEDULE CONSTANTS (fixed operating hours — the actual truth
-// for which slots exist lives server-side in package_time_rules;
-// this is just the display grid the dashboard renders bookings into)
-// ══════════════════════════════════════════════════════════════════
-
-const HERBAL_BLOCKS = [
-  { time: "10:00", end: "11:00", session: "morning" },
-  { time: "11:00", end: "12:00", session: "morning" },
-  { time: "12:00", end: "13:00", session: "morning" },
-  { time: "14:00", end: "15:00", session: "afternoon" },
-  { time: "15:00", end: "16:00", session: "afternoon" },
-  { time: "16:00", end: "17:00", session: "afternoon" },
-];
-
-// Aromatherapy's valid block(s) depend on day of week — Mon/Wed 14:00,
-// Tue/Thu 11:00, closed Fri–Sun. Mirrors package_time_rules exactly
-// (see schedule-sync-migration.sql) so the admin view never disagrees
-// with what customers can actually book.
-function getAromaBlocksForDate(dateObj) {
-  const dow = dateObj.getDay(); // 0=Sun..6=Sat
-  if (dow === 1 || dow === 3) return [{ time: "14:00", end: "15:00" }, { time: "15:00", end: "16:00" }];
-  if (dow === 2 || dow === 4) return [{ time: "11:00", end: "12:00" }, { time: "12:00", end: "13:00" }];
-  return [];
-}
+import { cancelBookingAsAdmin } from "@/lib/booking-service";
+import { C } from "@/lib/admin-theme";
+import { HERBAL_BLOCKS, getAromaBlocksForDate } from "@/lib/admin-schedule";
+import ManualBookingModal from "@/components/admin/ManualBookingModal";
 
 // Presentation-only icon lookup, matching the customer booking flow
 const ICON_MAP = {
@@ -268,7 +220,7 @@ function BookingRow({ booking, onUpdate, onCancel }) {
 
   const handleCancel = () => {
     if (window.confirm(
-      `Cancel ${booking.name}'s booking (${booking.ref})?\n\nThis frees the spot immediately and can't be undone here — the customer will get a cancellation email if they gave one.`
+      `Cancel booking ${booking.ref} for ${booking.name}?\n\nTheir spot will be released immediately. This cannot be undone.`
     )) {
       onCancel(booking.id);
     }
@@ -430,15 +382,20 @@ function BookingRow({ booking, onUpdate, onCancel }) {
             </button>
           </div>
 
-          {/* Cancel — destructive, kept visually separate from the two
-              status toggles above so it isn't a stray misclick. */}
+          {/* Cancel — deliberately its own low-key row below the two
+              routine toggles above, not a third button in that flex
+              row: cancelling releases the spot immediately and can't
+              be undone, so it shouldn't sit at the same visual weight
+              as "Mark Arrived"/"Mark Paid". confirm() below is the
+              only guard against a stray tap. */}
           <button onClick={(e) => { e.stopPropagation(); handleCancel(); }} style={{
             width: "100%", marginTop: 8, padding: "8px 12px", borderRadius: 8, cursor: "pointer",
-            fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600,
-            border: "none", background: "transparent", color: C.coral,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            border: "none", background: "none",
+            fontFamily: "'DM Sans'", fontSize: 12.5, fontWeight: 600, color: C.coral,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
           }}>
-            {Icons.x(12, C.coral)} Cancel Booking
+            {Icons.ban(13, C.coral)}
+            Cancel Booking
           </button>
         </div>
       )}
@@ -580,6 +537,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
   const [activeTab, setActiveTab] = useState("herbal");
   const [pendingAction, setPendingAction] = useState(null); // booking/slot id currently mid-request, for button disabling
     const [showMonthView, setShowMonthView] = useState(false);
+  const [showManualBooking, setShowManualBooking] = useState(false);
 
   // Compute the actual calendar date from dayOffset (today + N days)
   const viewDate = useMemo(() => {
@@ -654,27 +612,15 @@ export default function AdminDashboard({ adminName, onSignOut }) {
     }
   };
 
-  // Cancellation is a two-step affair, same shape as the Pay Later
-  // confirmation path: the RPC (no mailer access) flips the DB row,
-  // then a best-effort server route sends the customer's cancellation
-  // email. The RPC itself is what actually frees the spot — realtime
-  // picks that up and refreshes the grid regardless of whether the
-  // email step succeeds, so a Resend hiccup never blocks the cancel.
   const handleCancelBooking = async (id) => {
     setPendingAction(id);
     try {
-      await adminCancelBooking(id);
+      await cancelBookingAsAdmin(id);
     } catch (err) {
       alert(`Couldn't cancel booking: ${err.message}`);
-      return;
     } finally {
       setPendingAction(null);
     }
-    fetch('/api/bookings/notify-cancelled', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: id }),
-    }).catch((err) => console.error('notify-cancelled failed:', err));
   };
 
   const handleToggleBlock = async (time) => {
@@ -778,6 +724,20 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               invisible on a touch device (no hover state), which is
               exactly why these two existing CMS screens went
               unnoticed until asked about directly. */}
+          <button
+            onClick={() => setShowManualBooking(true)}
+            title="New Booking"
+            style={{
+              background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 20,
+              padding: "6px 12px", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+            }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            New Booking
+          </button>
           <Link
             href="/admin/content"
             title="Workshop Content"
@@ -1069,6 +1029,13 @@ export default function AdminDashboard({ adminName, onSignOut }) {
           </div>
         </div>
       </div>
+
+      <ManualBookingModal
+        open={showManualBooking}
+        initialDate={dateStr}
+        onClose={() => setShowManualBooking(false)}
+        onCreated={refresh}
+      />
     </div>
   );
 }

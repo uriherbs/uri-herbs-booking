@@ -16,12 +16,15 @@ import type {
   BookingConfirmation,
   PaymentConfirmation,
   CancelConfirmation,
+  AdminCancelBookingResult,
   DashboardBlock,
   Package,
   CreateBookingRequest,
+  CreateManualBookingRequest,
+  ManualBookingConfirmation,
   BookingError,
 } from './types';
-import { parseBookingError, ERROR_MESSAGES } from './types';
+import { parseBookingError, ERROR_MESSAGES, MANUAL_BOOKING_ERROR_MESSAGES_HE } from './types';
 
 
 // ────────────────────────────────────────────────────────────
@@ -248,6 +251,120 @@ export async function confirmPayLaterBooking(
 
 
 // ────────────────────────────────────────────────────────────
+// 4c. CREATE MANUAL BOOKING  (admin dashboard — phone/walk-in bookings)
+// ────────────────────────────────────────────────────────────
+// Same capacity/pricing engine as createBooking() above (this just
+// calls admin_create_manual_booking, the admin-only sibling of
+// create_booking — see that RPC's own comment for the full rules: no
+// cutoff/time-rule check since a walk-in may fall outside the normal
+// online window, but still the same capacity/blocked-date checks).
+// Two admin-only differences: it can mark the booking already paid
+// (p_payment_status), and it requires an active admin_staff session
+// (checked server-side via is_admin() — raises FORBIDDEN otherwise).
+//
+// This is an internal tool for Mali/staff, not the tourist-facing
+// booking flow — errors are surfaced via its own dictionary
+// (MANUAL_BOOKING_ERROR_MESSAGES_HE), separate from createBooking()'s.
+//
+// Usage:
+//   const result = await createManualBooking({
+//     package_slug: 'combo-tea-inhaler',
+//     date: '2026-07-28',
+//     start_time: '10:00',
+//     num_participants: 2,
+//     customer_name: 'Sophie Martin',
+//     payment_status: 'paid',
+//   });
+//   → { booking_ref: 'URI-20260728-001', status: 'confirmed', payment_status: 'paid', ... }
+
+export async function createManualBooking(
+  req: CreateManualBookingRequest
+): Promise<ManualBookingConfirmation> {
+  // ── Client-side validation ──
+  const errors: string[] = [];
+
+  if (!req.package_slug)   errors.push('Please select a package');
+  if (!req.date)           errors.push('Please select a date');
+  if (!req.start_time)     errors.push('Please select a start time');
+  if (!req.customer_name?.trim()) errors.push('Please enter a customer name');
+
+  const maxGuests = req.is_private ? 16 : 6;
+  if (req.num_participants < 1 || req.num_participants > maxGuests) {
+    errors.push(`Number of guests must be between 1 and ${maxGuests}`);
+  }
+
+  if (req.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.customer_email)) {
+    errors.push('Please enter a valid email address');
+  }
+
+  if (req.payment_status !== 'paid' && req.payment_status !== 'unpaid') {
+    errors.push('Payment status must be "Paid" or "Unpaid"');
+  }
+
+  if (errors.length > 0) {
+    throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as any;
+  }
+
+  // ── Normalize time format (accept '10:00' or '10:00:00') ──
+  const normalizedTime = req.start_time.length === 5
+    ? `${req.start_time}:00`
+    : req.start_time;
+
+  // ── Call the atomic PG function ──
+  const { data, error } = await supabase.rpc('admin_create_manual_booking', {
+    p_package_slug:     req.package_slug,
+    p_date:             req.date,
+    p_start_time:       normalizedTime,
+    p_num_participants: req.num_participants,
+    p_customer_name:    req.customer_name.trim(),
+    p_customer_email:   req.customer_email?.trim() || null,
+    p_customer_phone:   req.customer_phone?.trim() || null,
+    p_customer_notes:   req.customer_notes?.trim() || null,
+    p_has_minors:       req.has_minors ?? false,
+    p_is_private:       req.is_private ?? false,
+    p_payment_status:   req.payment_status,
+    p_payment_method:   req.payment_method || 'manual',
+  });
+
+  if (error) {
+    // Parse the structured error from PostgreSQL — same CODE: message
+    // shape as create_booking, overridden with this form's own
+    // dictionary instead of the tourist-facing one.
+    const bookingError = parseBookingError(error.message);
+    const userMessage = MANUAL_BOOKING_ERROR_MESSAGES_HE[bookingError.code] || bookingError.message;
+    throw { ...bookingError, message: userMessage };
+  }
+
+  if (!data || data.length === 0) {
+    throw { code: 'UNKNOWN_ERROR', message: MANUAL_BOOKING_ERROR_MESSAGES_HE.UNKNOWN_ERROR };
+  }
+
+  const confirmation = data[0] as ManualBookingConfirmation;
+
+  // A manual booking marked "already paid" comes back 'confirmed'
+  // immediately (see admin_create_manual_booking) — send the same
+  // confirmation emails an online-paid booking gets, via the same
+  // server route the Pay Later flow already uses for this (see
+  // confirmPayLaterBooking above): this function runs in the browser
+  // with the anon key, so it can't send emails directly
+  // (RESEND_API_KEY is server-only). Fire-and-forget — a booking
+  // that's confirmed and paid must not fail because the email
+  // couldn't be sent.
+  // Every manual booking (paid OR unpaid/pay-on-arrival) is 'confirmed'
+  // since 2026-09-26, so both get the customer + shop emails.
+  if (confirmation.status === 'confirmed') {
+    fetch('/api/bookings/notify-confirmed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_ref: confirmation.booking_ref }),
+    }).catch((err) => console.error('notify-confirmed request failed:', err?.message));
+  }
+
+  return confirmation;
+}
+
+
+// ────────────────────────────────────────────────────────────
 // 5. CANCEL BOOKING
 // ────────────────────────────────────────────────────────────
 // Cancels by reference code and releases capacity back to the pool.
@@ -281,6 +398,62 @@ export async function cancelBooking(
   }
 
   return data[0] as CancelConfirmation;
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 5b. CANCEL BOOKING  (admin dashboard)
+// ────────────────────────────────────────────────────────────
+// Admin-only sibling of cancelBooking() above — cancels by internal
+// booking id (not booking_ref) via admin_cancel_booking, which
+// requires an active admin_staff session (checked server-side via
+// is_admin() — raises FORBIDDEN otherwise). Idempotent: cancelling an
+// already-cancelled booking is a no-op that returns the current row
+// rather than erroring (see the RPC's own comment).
+//
+// Unlike admin_create_manual_booking, this RPC RETURNS the full
+// `bookings` row directly (not a TABLE(...) set), so the response is
+// a single object, not an array — no `data[0]` here.
+//
+// Usage:
+//   const result = await cancelBookingAsAdmin('a1b2c3d4-...');
+//   → { booking_ref: 'URI-20260728-001', status: 'cancelled', ... }
+
+export async function cancelBookingAsAdmin(
+  bookingId: string
+): Promise<AdminCancelBookingResult> {
+  if (!bookingId) {
+    throw { code: 'BOOKING_NOT_FOUND', message: 'Booking id is required' };
+  }
+
+  const { data, error } = await supabase.rpc('admin_cancel_booking', {
+    p_booking_id: bookingId,
+  });
+
+  if (error) {
+    const bookingError = parseBookingError(error.message);
+    throw { ...bookingError, message: ERROR_MESSAGES[bookingError.code] || bookingError.message };
+  }
+
+  if (!data) {
+    throw { code: 'BOOKING_NOT_FOUND', message: ERROR_MESSAGES.BOOKING_NOT_FOUND };
+  }
+
+  const cancelled = data as AdminCancelBookingResult;
+
+  // Best-effort cancellation email — same reasoning as
+  // confirmPayLaterBooking()'s notify-confirmed call above: this runs
+  // in the browser with the anon key and can't send emails directly
+  // (RESEND_API_KEY is server-only). A cancellation that already
+  // succeeded in the database must not fail because the email
+  // couldn't be sent.
+  fetch('/api/bookings/notify-cancelled', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_ref: cancelled.booking_ref }),
+  }).catch((err) => console.error('notify-cancelled request failed:', err?.message));
+
+  return cancelled;
 }
 
 

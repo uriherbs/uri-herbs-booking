@@ -601,9 +601,9 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             fontFamily: "'DM Sans'", fontSize: 12.5, lineHeight: 1.6, color: C.barkLight,
             margin: "0 2px 4px",
           }}>
-            Uri Herbs Workshop is a hands-on family experience, not childcare. Children under 12 are
-            welcome as part of a family booking, but must be seated with and actively supervised by a
-            participating parent throughout. Guests aged 12–17 need an accompanying adult in the group.
+            Children aged 12 and older are welcome with an adult or parent, and children under 12 are
+            welcome as part of a family session. Parents or accompanying adults are responsible for
+            supervising their children during the workshop.
           </p>
         </div>
       )}

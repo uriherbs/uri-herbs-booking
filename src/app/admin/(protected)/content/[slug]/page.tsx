@@ -18,7 +18,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAdminWorkshopEditor } from '@/lib/hooks';
-import { saveWorkshopContent, uploadWorkshopImage } from '@/lib/admin-content-service';
+import { saveWorkshopContent, uploadWorkshopImage, uploadWorkshopVideo } from '@/lib/admin-content-service';
+import { parseVideoUrl, parseYouTube } from '@/lib/video-url';
+import ImageCropModal from '@/components/admin/ImageCropModal';
 import type { AdminContentBlock } from '@/lib/admin-content-service';
 
 const C = {
@@ -91,6 +93,12 @@ export default function WorkshopContentEditPage() {
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<AdminContentBlock[]>([]);
   const [heroUploading, setHeroUploading] = useState(false);
+  // Detail-page top video: a YouTube link OR an uploaded file URL.
+  const [heroVideoUrl, setHeroVideoUrl] = useState<string | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [youtubeInput, setYoutubeInput] = useState('');
+  const [youtubeError, setYoutubeError] = useState<string | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [blockUploading, setBlockUploading] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -106,8 +114,13 @@ export default function WorkshopContentEditPage() {
     if (!workshop) return;
     setIntro(workshop.intro_paragraph ?? '');
     setHeroImageUrl(workshop.hero_image_url);
+    setHeroVideoUrl(workshop.hero_video_url);
     setBlocks(workshop.blocks);
   }, [workshop]);
+
+  // Photo waiting in the crop window (null = closed). Frame shapes match
+  // the public workshop page: hero 16:10, section photos 4:3.
+  const [cropTarget, setCropTarget] = useState<{ file: File; kind: 'hero' } | { file: File; kind: 'block'; index: number } | null>(null);
 
   const handleHeroUpload = async (file: File) => {
     if (!slug) return;
@@ -121,6 +134,29 @@ export default function WorkshopContentEditPage() {
     } finally {
       setHeroUploading(false);
     }
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    if (!slug) return;
+    setVideoUploading(true);
+    setSaveError(null);
+    try {
+      setHeroVideoUrl(await uploadWorkshopVideo(file, slug));
+    } catch (err: any) {
+      alert(`Couldn't upload video: ${err.message}`);
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const applyYoutubeLink = () => {
+    if (!parseYouTube(youtubeInput)) {
+      setYoutubeError('That doesn\'t look like a YouTube link. Copy it from the Share button on YouTube.');
+      return;
+    }
+    setYoutubeError(null);
+    setHeroVideoUrl(youtubeInput.trim());
+    setYoutubeInput('');
   };
 
   const handleBlockUpload = async (index: number, file: File) => {
@@ -146,7 +182,7 @@ export default function WorkshopContentEditPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveWorkshopContent(workshop.id, { intro_paragraph: intro, hero_image_url: heroImageUrl }, blocks);
+      await saveWorkshopContent(workshop.id, { intro_paragraph: intro, hero_image_url: heroImageUrl, hero_video_url: heroVideoUrl }, blocks);
       await refresh();
       setSavedJustNow(true);
       setTimeout(() => setSavedJustNow(false), 3000);
@@ -186,6 +222,20 @@ export default function WorkshopContentEditPage() {
         textarea:focus, input[type="text"]:focus { outline: none; border-color: ${C.sage}; }
       ` }} />
 
+      <ImageCropModal
+        file={cropTarget?.file ?? null}
+        aspect={4 / 3}
+        shapeLabel={cropTarget?.kind === 'hero' ? 'Homepage photo (4:3)' : 'Section photo (4:3)'}
+        onCancel={() => setCropTarget(null)}
+        onConfirm={(cropped) => {
+          const t = cropTarget;
+          setCropTarget(null);
+          if (!t) return;
+          if (t.kind === 'hero') handleHeroUpload(cropped);
+          else handleBlockUpload(t.index, cropped);
+        }}
+      />
+
       <div style={{ background: C.forest, padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 9 }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff" opacity="0.9"><path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22.5C7.76 17.66 9.41 12.67 18 11.18V14C21.78 10.58 20 2 20 2S13.21 4.58 17 8Z" /></svg>
         <span style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.white }}>Uri Herbs Admin</span>
@@ -209,14 +259,14 @@ export default function WorkshopContentEditPage() {
         {/* Hero image */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: C.barkLight, display: 'flex', justifyContent: 'space-between' }}>
-            <span>Hero Image</span>
-            <span style={{ textTransform: 'none', fontWeight: 500, letterSpacing: 0 }}>shown at the top of the public page</span>
+            <span>Homepage Photo</span>
+            <span style={{ textTransform: 'none', fontWeight: 500, letterSpacing: 0 }}>shown on the homepage workshop card</span>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
             <ImagePreview url={heroImageUrl} size={108} uploading={heroUploading} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
               <input ref={heroInputRef} type="file" accept="image/*" hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHeroUpload(f); e.target.value = ''; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) setCropTarget({ file: f, kind: 'hero' }); e.target.value = ''; }} />
               <button type="button" onClick={() => heroInputRef.current?.click()} disabled={heroUploading} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7, justifyContent: 'center', width: 'fit-content',
                 background: C.white, border: `1.5px solid ${C.sand}`, color: C.bark,
@@ -227,6 +277,63 @@ export default function WorkshopContentEditPage() {
               {!heroImageUrl && <span style={{ fontSize: 11.5, color: C.barkLight }}>No photo yet</span>}
             </div>
           </div>
+        </div>
+
+        {/* Detail page video */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: C.barkLight, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Detail Page Video</span>
+            <span style={{ textTransform: 'none', fontWeight: 500, letterSpacing: 0 }}>shown at the top of this workshop&apos;s page</span>
+          </div>
+          {(() => {
+            const v = parseVideoUrl(heroVideoUrl);
+            if (videoUploading) {
+              return <div style={{ fontSize: 13, color: C.barkLight, padding: '14px 0' }}>Uploading video… this can take a minute.</div>;
+            }
+            if (!v) {
+              return <div style={{ fontSize: 12.5, color: C.barkLight }}>No video yet. The page shows the homepage photo instead.</div>;
+            }
+            return (
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {v.kind === 'youtube' ? (
+                  <img src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} alt="YouTube video" style={{ width: 160, borderRadius: 10, display: 'block' }} />
+                ) : (
+                  <video src={v.url} muted playsInline preload="metadata" style={{ width: 160, maxHeight: 180, borderRadius: 10, background: '#000', display: 'block' }} />
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 12.5, color: C.bark, fontWeight: 600 }}>{v.kind === 'youtube' ? 'YouTube video' : 'Uploaded video'}</span>
+                  <button type="button" onClick={() => setHeroVideoUrl(null)} style={{
+                    background: 'none', border: 'none', padding: 0, color: C.coral, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                  }}>Remove video</button>
+                </div>
+              </div>
+            );
+          })()}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input ref={videoInputRef} type="file" accept="video/*" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); e.target.value = ''; }} />
+            <button type="button" onClick={() => videoInputRef.current?.click()} disabled={videoUploading} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              background: C.white, border: `1.5px solid ${C.sand}`, color: C.bark,
+              fontSize: 13, fontWeight: 600, padding: '9px 14px', borderRadius: 9, cursor: videoUploading ? 'default' : 'pointer',
+            }}>
+              <UploadIcon /> Upload video
+            </button>
+            <span style={{ fontSize: 12, color: C.barkLight }}>or</span>
+            <input
+              type="text"
+              value={youtubeInput}
+              onChange={(e) => { setYoutubeInput(e.target.value); setYoutubeError(null); }}
+              placeholder="Paste a YouTube link"
+              style={{ flex: 1, minWidth: 160, fontSize: 13, color: C.bark, background: C.white, border: `1.5px solid ${C.sand}`, borderRadius: 9, padding: '9px 12px' }}
+            />
+            <button type="button" onClick={applyYoutubeLink} disabled={!youtubeInput.trim()} style={{
+              background: youtubeInput.trim() ? C.sage : C.sand, border: 'none', color: C.white,
+              fontSize: 13, fontWeight: 700, padding: '9px 14px', borderRadius: 9, cursor: youtubeInput.trim() ? 'pointer' : 'default',
+            }}>Use link</button>
+          </div>
+          {youtubeError && <span style={{ fontSize: 12, color: C.coral }}>{youtubeError}</span>}
+          <span style={{ fontSize: 11.5, color: C.barkLight }}>Upload: MP4 or MOV, up to 50MB. Longer videos: put them on YouTube and paste the link. Tap Save Changes afterwards.</span>
         </div>
 
         {/* Intro paragraph */}
@@ -277,7 +384,7 @@ export default function WorkshopContentEditPage() {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <ImagePreview url={block.image_url} size={52} uploading={!!blockUploading[i]} />
               <input ref={(el) => { blockInputRefs.current[i] = el; }} type="file" accept="image/*" hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBlockUpload(i, f); e.target.value = ''; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) setCropTarget({ file: f, kind: 'block', index: i }); e.target.value = ''; }} />
               <button type="button" onClick={() => blockInputRefs.current[i]?.click()} disabled={!!blockUploading[i]} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: C.white, border: `1.5px solid ${C.sand}`, color: C.bark,

@@ -14,6 +14,12 @@ import { createClient } from '@supabase/supabase-js';
 const publicClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+        global: {
+          fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+            fetch(input, { ...init, cache: 'no-store' }),
+        },
+      },
     );
 
 export interface WorkshopContentBlock {
@@ -39,6 +45,7 @@ export interface WorkshopPageData {
       description: string | null;
       takeaway_description: string | null;
       hero_image_url: string | null;
+      hero_video_url: string | null; // detail-page top video (YouTube link or uploaded file URL)
       intro_paragraph: string | null;
       price_thb: number | null;
       content_blocks: WorkshopContentBlock[];
@@ -71,7 +78,7 @@ export async function getActiveWorkshopSummaries(): Promise<WorkshopSummary[]> {
 export async function getWorkshopPageData(slug: string): Promise<WorkshopPageData | null> {
       const { data: workshop, error } = await publicClient
         .from('workshops')
-        .select('id, name, slug, duration_minutes, description, takeaway_description, hero_image_url, intro_paragraph')
+        .select('id, name, slug, duration_minutes, description, takeaway_description, hero_image_url, hero_video_url, intro_paragraph')
         .eq('slug', slug)
         .eq('is_active', true)
         .maybeSingle();

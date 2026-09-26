@@ -23,9 +23,35 @@
 import Link from 'next/link';
 import { C, FONT_BODY } from '@/lib/theme';
 
+// Policy links: shown on every public page so merchant reviewers
+// (Omise KYC) and customers can find the cancellation/refund, terms,
+// and privacy policies without starting a booking. Legible, not muted.
+const POLICY_LINKS = [
+  { href: '/terms', label: 'Terms & Conditions' },
+  { href: '/terms#cancellation', label: 'Cancellation & Refunds' },
+  { href: '/privacy', label: 'Privacy Policy' },
+];
+
 export default function SiteFooter() {
   return (
     <footer style={{ borderTop: `1px solid ${C.sand}`, padding: '18px 24px' }}>
+      <nav
+        aria-label="Policies"
+        style={{
+          maxWidth: 1000, margin: '0 auto 12px',
+          display: 'flex', flexWrap: 'wrap', gap: '8px 20px', justifyContent: 'center',
+        }}
+      >
+        {POLICY_LINKS.map(l => (
+          <Link
+            key={l.href}
+            href={l.href}
+            style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: C.forest, textDecoration: 'underline' }}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </nav>
       <div style={{
         maxWidth: 1000, margin: '0 auto',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

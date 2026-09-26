@@ -60,7 +60,11 @@ export function StripeCardForm({ bookingId, amountLabel, onSuccess }: StripeCard
   }
 
   return (
-    <Elements stripe={getStripePromise(publishableKey)} options={{ clientSecret }}>
+    // locale: 'en' — otherwise Stripe.js auto-detects the card form's
+    // language from the buyer's browser/IP, which renders in Thai for
+    // local visitors even though our customers are international
+    // tourists. Same fix as PayPalCheckoutButtons.tsx's `locale: 'en_US'`.
+    <Elements stripe={getStripePromise(publishableKey)} options={{ clientSecret, locale: 'en' }}>
       <StripeCardFormInner amountLabel={amountLabel} onSuccess={onSuccess} />
     </Elements>
   );

@@ -22,6 +22,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import ImageCropModal from '@/components/admin/ImageCropModal';
 import { useParams, useRouter } from 'next/navigation';
 import { useAdminBlogEditor } from '@/lib/hooks';
 import {
@@ -158,6 +159,10 @@ export default function BlogPostEditPage() {
     );
   }, [post]);
 
+  // Photo waiting in the crop window (null = closed). Blog main photo is
+  // shown 16:10 on the post page.
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
   const handleHeroUpload = async (file: File) => {
     if (!slug) return;
     setHeroUploading(true);
@@ -245,6 +250,14 @@ export default function BlogPostEditPage() {
         textarea, input[type="text"], input[type="date"], input[type="number"] { font-family: 'DM Sans', sans-serif; }
         textarea:focus, input:focus { outline: none; border-color: ${C.sage}; }
       ` }} />
+
+      <ImageCropModal
+        file={cropFile}
+        aspect={16 / 10}
+        shapeLabel="Main photo (wide, 16:10)"
+        onCancel={() => setCropFile(null)}
+        onConfirm={(cropped) => { setCropFile(null); handleHeroUpload(cropped); }}
+      />
 
       <div style={{ background: C.forest, padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 9 }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff" opacity="0.9"><path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22.5C7.76 17.66 9.41 12.67 18 11.18V14C21.78 10.58 20 2 20 2S13.21 4.58 17 8Z" /></svg>
@@ -342,7 +355,7 @@ export default function BlogPostEditPage() {
             <ImagePreview url={heroImageUrl} size={90} uploading={heroUploading} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
               <input ref={heroInputRef} type="file" accept="image/*" hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHeroUpload(f); e.target.value = ''; }} />
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) setCropFile(f); e.target.value = ''; }} />
               <button type="button" onClick={() => heroInputRef.current?.click()} disabled={heroUploading} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7, justifyContent: 'center', width: 'fit-content',
                 background: C.white, border: `1.5px solid ${C.sand}`, color: C.bark,
