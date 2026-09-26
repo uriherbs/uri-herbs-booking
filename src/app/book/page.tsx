@@ -10,6 +10,7 @@ import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButto
 import { PaymentLoadingBox } from "@/components/payments/PaymentStatusBoxes";
 import LegalModal from "@/components/legal/LegalModal";
 import { legalDocs } from "@/lib/legal-content";
+import { ReviewsStripClient } from "@/components/ReviewsStripClient";
 
 // ════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -1837,6 +1838,9 @@ export default function BookingFlow() {
             isPrivate={isPrivate} onIsPrivateChange={handleIsPrivateChange}
           />
         )
+      )}
+      {step === 0 && !packagesLoading && !packagesError && (
+        <ReviewsStripClient gold={C.gold} forest={C.forest} bark={C.bark} />
       )}
       {step === 1 && pkg && (
         <DateTimeStep
