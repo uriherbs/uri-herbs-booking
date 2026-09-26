@@ -729,10 +729,17 @@ export default function AdminDashboard({ adminName, onSignOut }) {
           .ua-lunch { display: none !important; }
           .ua-legend { margin-top: 20px; }
         }
+        /* Big laptop / desktop screens: use the extra width and make all
+           text ~15% bigger (zoom scales fonts, icons and spacing together).
+           The New Booking popup is not zoomed so it always fits the screen. */
+        @media (min-width: 1280px) {
+          .ua-root { max-width: 1760px !important; }
+          .ua-zoom { zoom: 1.15; }
+        }
       ` }} />
 
       {/* Header */}
-      <div style={{
+      <div className="ua-zoom" style={{
         background: C.forest, padding: "18px 16px 14px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 10,
@@ -809,7 +816,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
       </div>
 
       {/* Day navigation */}
-      <div style={{
+      <div className="ua-zoom" style={{
         background: C.white, borderBottom: `1px solid ${C.sand}`,
         padding: "12px 16px", position: "relative",
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -833,7 +840,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
       </div>
       {showMonthView && React.createElement("div", { className: "ua-mobile-only" }, React.createElement(MonthCalendar, { initialDate: viewDate, onSelectDate: (picked) => { const now = new Date(); const diffDays = Math.round((Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate()) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000); setDayOffset(diffDays); setShowMonthView(false); } }))}
 
-      <div className="ua-body">
+      <div className="ua-body ua-zoom">
       <aside className="ua-side">
         {React.createElement(MonthCalendar, { initialDate: viewDate, selectedDateStr: dateStr, onSelectDate: (picked) => { const now = new Date(); const diffDays = Math.round((Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate()) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000); setDayOffset(diffDays); } })}
       </aside>
@@ -1046,7 +1053,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
       </div>
 
       {/* Legend footer */}
-      <div className="ua-legend" style={{
+      <div className="ua-legend ua-zoom" style={{
         background: C.white, borderTop: `1px solid ${C.sand}`,
         padding: "14px 16px",
       }}>
