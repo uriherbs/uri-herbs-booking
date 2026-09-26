@@ -88,17 +88,12 @@ function StripeCardFormInner({ amountLabel, onSuccess }: { amountLabel: string; 
       // Stripe still redirects automatically when a card DOES require
       // it, this just skips the round-trip for the common case.
       redirect: 'if_required',
-      // return_url is REQUIRED whenever Stripe does have to redirect
-      // (some banks' 3D Secure only supports a full-page redirect, not
-      // an in-page modal) — confirmPayment() throws immediately without
-      // it, which was a real gap (council review 2026-08-23): a
-      // customer whose bank required that redirect could never
-      // complete payment at all. ?resume=1 is read back on /book's
-      // mount (see book/page.tsx) to reconstruct the wizard from
-      // sessionStorage + /api/bookings/status, since the redirect
-      // reloads the tab and wipes all in-memory state.
+      // return_url is required whenever Stripe has to do a full-page
+      // bank redirect (some 3D Secure flows) — without it
+      // confirmPayment() throws. The Stripe webhook confirms the booking
+      // and sends the confirmation email either way.
       confirmParams: {
-        return_url: `${window.location.origin}/book?resume=1`,
+        return_url: `${window.location.origin}/book`,
       },
     });
 
