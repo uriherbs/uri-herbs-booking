@@ -7,7 +7,6 @@ import {
   useAdminMonthSummary,
   adminUpdateBookingStatus,
   adminToggleSlotBlock,
-  adminCancelBooking,
 } from "@/lib/hooks";
 import { cancelBookingAsAdmin } from "@/lib/booking-service";
 import { C } from "@/lib/admin-theme";

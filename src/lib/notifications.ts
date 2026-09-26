@@ -25,12 +25,7 @@ const SHOP_MAPS_URL =
   'https://www.google.com/maps/search/?api=1&query=' +
   encodeURIComponent('Uri Herbs Workshop') +
   '&query_place_id=0x30da3bb4d505e7c5:0x41cac3c3a753cc10&hl=en';
-// Fallback matches the real number hardcoded in FloatingWhatsApp.tsx and
-// trade/page.tsx — was a placeholder ('66812345678') until council review
-// 2026-08-20 flagged the inconsistency: if NEXT_PUBLIC_WHATSAPP_NUMBER is
-// ever unset in a deploy, every WhatsApp link in these emails must still
-// go to the real shop number, not a dead one.
-const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66643349890';
+const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66812345678'; // set NEXT_PUBLIC_WHATSAPP_NUMBER in Vercel — this fallback is a placeholder only
 const SHOP_INSTAGRAM = 'https://instagram.com/uriherbsworkshop';
 const SHOP_WEBSITE = 'https://www.uriherbs.com';
 // Base URL for links that must reach the NEW booking site (e.g. the
@@ -119,7 +114,7 @@ function formatTime12(t: string): string {
   return `${hour12}:00 ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-export function buildConfirmationEmailHtml(data: BookingEmailData & { paymentMethod?: string }): string {
+export function buildConfirmationEmailHtml(data: BookingEmailData): string {
   const dateLong = formatDateLong(data.date);
   const startStr = formatTime12(data.startTime);
   const endStr = formatTime12(data.endTime);
@@ -235,6 +230,97 @@ export function buildConfirmationEmailHtml(data: BookingEmailData & { paymentMet
                   <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
                     No prepayment needed. We accept: <strong>Cash (THB)</strong>, <strong>PromptPay QR</strong>, and <strong>WeChat Pay</strong> on site.
                   </div>
+                  ` : `
+                  <div style="font-family: Georgia, serif; font-size:15px; font-weight:bold; color:#2D4639; margin-bottom:6px;">
+                    ✅ Payment Received
+                  </div>
+                  <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
+                    You've already paid in full. Nothing more to pay when you arrive — just show up and enjoy!
+                  </div>
+                  `}
+                </td></tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Takeaway -->
+          <tr>
+            <td style="padding: 0 24px 16px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1.5px solid #E8E2D8; border-radius:12px;">
+                <tr><td style="padding:16px 18px;">
+                  <div style="font-family: Georgia, serif; font-size:15px; font-weight:bold; color:#2D4639; margin-bottom:6px;">
+                    🎁 You'll Take Home
+                  </div>
+                  <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
+                    ${data.takeawayDescription}
+                  </div>
+                </td></tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Policies -->
+          <tr>
+            <td style="padding: 0 24px 20px;">
+              <div style="font-family: Arial, sans-serif; font-size:11px; color:#8A7668; line-height:1.7; border-top:1px solid #E8E2D8; padding-top:14px;">
+                <strong>Good to know:</strong><br/>
+                • Families are very welcome! Children aged 12+ are welcome when accompanied by a parent or adult, and children under 12 are welcome as part of a family session. Please note that parents or adults remain responsible for their children throughout the activity.<br/>
+                • Please arrive 10 minutes before your session start time.<br/>
+                ${data.rescheduleUrl
+                  ? `• Need to <strong>reschedule</strong>? <a href="${data.rescheduleUrl}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Change date or time</a> (same workshop and guests, up to 2 hours before your workshop).`
+                  : `• Need to reschedule? Just reply to this email or message us on WhatsApp.`}<br/>
+                ${data.cancelUrl
+                  ? `• Want to <strong>cancel</strong>? <a href="${data.cancelUrl}" style="color:#2D4639; font-weight:bold; text-decoration:underline;">Cancel my booking</a> (free cancellation up to 48 hours before your workshop).`
+                  : `• Want to <strong>cancel</strong>? Just reply to this email (free cancellation up to 48 hours before your workshop).`}
+              </div>
+            </td>
+          </tr>
+
+          <!-- WhatsApp CTA -->
+          <tr>
+            <td style="padding: 0 24px 28px; text-align:center;">
+              <a href="${whatsappLink}" style="display:inline-block; background-color:#25D366; color:#ffffff; font-family: Arial, sans-serif; font-size:14px; font-weight:bold; text-decoration:none; padding:12px 28px; border-radius:24px;">
+                💬 Chat with us on WhatsApp
+              </a>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#2D4639; padding:20px 24px; text-align:center;">
+              <div style="font-family: Arial, sans-serif; font-size:12px; color:#B8CCC0; margin-bottom:8px;">
+                ${SHOP_NAME} · ${SHOP_ADDRESS}
+              </div>
+              <div style="font-family: Arial, sans-serif; font-size:11px; color:#8FA89A;">
+                <a href="${SHOP_WEBSITE}" style="color:#8FA89A; text-decoration:none;">Website</a> ·
+                <a href="${SHOP_INSTAGRAM}" style="color:#8FA89A; text-decoration:none;"> Instagram</a>
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+}
+
+export function buildConfirmationEmailText(data: BookingEmailData): string {
+  return `
+Booking Confirmed — ${SHOP_NAME}
+
+Booking Reference: ${data.bookingRef}
+
+Dear ${data.customerName},
+
+Thank you for booking with us! Here are your details:
+
+Experience: ${data.packageName}
+Date: ${formatDateLong(data.date)}
+Time: ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
+Guests: ${data.numParticipants}
 Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later' ? ' (pay on arrival — Cash, PromptPay, or WeChat Pay)' : ' — already paid, nothing more to pay'}
 
 Location: ${SHOP_ADDRESS}
@@ -1012,70 +1098,6 @@ The spot has been released automatically.`;
     );
   } catch (err: any) {
     console.error(`sendOwnerCancellationEmail: email failed for ${b.booking_ref}:`, err.message);
-  }
-}
-
-
-// ────────────────────────────────────────────────────────────
-// 4c. BOOKING CANCELLATION — ORCHESTRATION
-// ────────────────────────────────────────────────────────────
-// Called from /api/bookings/notify-cancelled, right after the admin
-// dashboard's admin_cancel_booking() RPC succeeds (council review
-// 2026-08-23, task 15 — that RPC only flips the DB row; it can't send
-// email itself since it has no Resend API key). Same atomic-claim /
-// never-throws shape as sendBookingConfirmationEmails() above, guarded
-// by the twin `cancellation_email_sent` flag so a redundant call never
-// double-emails the customer.
-export async function sendBookingCancellationEmail(db: any, bookingId: string): Promise<void> {
-  const { data: claimed, error: claimError } = await db
-    .from('bookings')
-    .update({ cancellation_email_sent: true })
-    .eq('id', bookingId)
-    .eq('cancellation_email_sent', false)
-    .select('id')
-    .maybeSingle();
-
-  if (claimError) {
-    console.error(`sendBookingCancellationEmail: claim failed for booking ${bookingId}:`, claimError.message);
-    return;
-  }
-  if (!claimed) {
-    // Already sent (or never needed — e.g. no customer email) —
-    // expected, not an error.
-    return;
-  }
-
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.error(`sendBookingCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId} cancelled but no email sent`);
-    return;
-  }
-
-  const { data: booking, error: fetchError } = await db
-    .from('bookings')
-    .select('booking_ref, customer_name, customer_email')
-    .eq('id', bookingId)
-    .single();
-
-  if (fetchError || !booking) {
-    console.error(`sendBookingCancellationEmail: could not fetch booking ${bookingId}:`, fetchError?.message);
-    return;
-  }
-
-  if (!booking.customer_email) return; // optional at booking time — nothing to send to
-
-  try {
-    await sendEmailViaResend(
-      {
-        to: booking.customer_email,
-        subject: `Booking Cancelled — ${booking.booking_ref} · ${SHOP_NAME}`,
-        html: buildCancellationEmailHtml(booking.booking_ref, booking.customer_name),
-        text: buildCancellationEmailText(booking.booking_ref, booking.customer_name),
-      },
-      apiKey
-    );
-  } catch (err: any) {
-    console.error(`sendBookingCancellationEmail: email failed for ${booking.booking_ref}:`, err.message);
   }
 }
 
