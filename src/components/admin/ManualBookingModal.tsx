@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { C } from '@/lib/admin-theme';
-import { HERBAL_BLOCKS, getAromaBlocksForDate } from '@/lib/admin-schedule';
+import { HERBAL_BLOCKS } from '@/lib/admin-schedule';
 import { getPackages, createManualBooking } from '@/lib/booking-service';
 import type { Package, CreateManualBookingRequest, ManualBookingConfirmation } from '@/lib/types';
 
@@ -142,12 +142,10 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
   // keeps the common case error-free without hardcoding it twice.
   const timeOptions = useMemo(() => {
     if (!selectedPackage) return [];
-    if (selectedPackage.calendar_type === 'aromatherapy') {
-      if (!form.date) return [];
-      return getAromaBlocksForDate(new Date(`${form.date}T00:00:00`)).map((b) => b.time);
-    }
+    // Admin side: any day, any hour, for BOTH calendars (customer special
+    // requests). The public booking page still follows the normal schedule.
     return HERBAL_BLOCKS.map((b) => b.time);
-  }, [selectedPackage, form.date]);
+  }, [selectedPackage]);
 
   // Drop a previously-chosen time that's no longer valid for the
   // current package/date combination.
