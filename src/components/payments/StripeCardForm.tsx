@@ -18,7 +18,7 @@ import { PaymentErrorBox, PaymentLoadingBox } from './PaymentStatusBoxes';
 let stripePromiseCache: { key: string; promise: Promise<StripeJs | null> } | null = null;
 function getStripePromise(publishableKey: string) {
   if (stripePromiseCache?.key !== publishableKey) {
-    stripePromiseCache = { key: publishableKey, promise: loadStripe(publishableKey) };
+    stripePromiseCache = { key: publishableKey, promise: loadStripe(publishableKey, { locale: 'en' }) };
   }
   return stripePromiseCache.promise;
 }
