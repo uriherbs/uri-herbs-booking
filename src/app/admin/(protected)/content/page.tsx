@@ -51,7 +51,7 @@ export default function WorkshopContentListPage() {
   const { workshops, loading, error, refresh } = useAdminWorkshopList();
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="ua-page" style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, fontFamily: "'DM Sans', sans-serif" }}>
       <style dangerouslySetInnerHTML={{ __html: `
         @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   useAdminDayData,
@@ -526,7 +526,7 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
     </div>
   );
 }
-function MonthCalendar({ initialDate, onSelectDate }) { const [viewYear, setViewYear] = useState(initialDate.getFullYear()); const [viewMonth, setViewMonth] = useState(initialDate.getMonth() + 1); const { summary, loading, error } = useAdminMonthSummary(viewYear, viewMonth); const monthLabel = new Date(viewYear, viewMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }); const firstOfMonth = new Date(viewYear, viewMonth - 1, 1); const startWeekday = firstOfMonth.getDay(); const daysInMonth = new Date(viewYear, viewMonth, 0).getDate(); const todayStr = new Date().toISOString().slice(0, 10); const cells = []; for (let i = 0; i < startWeekday; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d); const goPrevMonth = () => { if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }; const goNextMonth = () => { if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }; const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]; const dotFor = (row) => { if (!row) return null; if (row.blocked_count > 0 && row.total_booked === 0) return C.barkLight; const ratio = row.total_capacity > 0 ? row.total_booked / row.total_capacity : 0; if (ratio >= 1) return C.coral; if (ratio > 0) return C.gold; return C.sageLight; }; return React.createElement("div", { style: { background: C.white, borderBottom: `1px solid ${C.sand}`, padding: "14px 16px 18px" } }, React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 } }, React.createElement("button", { onClick: goPrevMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevLeft()), React.createElement("div", { style: { fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest } }, monthLabel), React.createElement("button", { onClick: goNextMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevRight())), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 } }, weekdayLabels.map((w, i) => React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 11, fontWeight: 600, color: C.barkLight } }, w))), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 } }, cells.map((d, i) => { if (d === null) return React.createElement("div", { key: "blank-" + i }); const dateStr = viewYear + "-" + String(viewMonth).padStart(2, "0") + "-" + String(d).padStart(2, "0"); const row = summary[dateStr]; const isToday = dateStr === todayStr; const isClosed = !row; const dot = dotFor(row); return React.createElement("button", { key: dateStr, onClick: () => !isClosed && onSelectDate(new Date(viewYear, viewMonth - 1, d)), disabled: isClosed, style: { aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, border: isToday ? `1.5px solid ${C.sage}` : "1px solid transparent", borderRadius: 10, background: isToday ? C.sagePale : "transparent", cursor: isClosed ? "default" : "pointer", opacity: isClosed ? 0.35 : 1, fontFamily: "'DM Sans'" } }, React.createElement("span", { style: { fontSize: 13, fontWeight: isToday ? 700 : 500, color: C.forest } }, d), dot && React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: dot } })); })), loading && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.barkLight, marginTop: 10 } }, "Loading…"), error && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.coral, marginTop: 10 } }, error), React.createElement("div", { style: { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 14, marginTop: 14, fontSize: 11, color: C.barkLight } }, React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.sageLight, display: "inline-block" } }), "Open"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.gold, display: "inline-block" } }), "Booked"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.coral, display: "inline-block" } }), "Full"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.barkLight, display: "inline-block" } }), "Blocked")));  }
+function MonthCalendar({ initialDate, onSelectDate, selectedDateStr = null }) { const [viewYear, setViewYear] = useState(initialDate.getFullYear()); const [viewMonth, setViewMonth] = useState(initialDate.getMonth() + 1); const followKey = initialDate.getFullYear() * 100 + initialDate.getMonth(); useEffect(() => { setViewYear(Math.floor(followKey / 100)); setViewMonth((followKey % 100) + 1); }, [followKey]); const { summary, loading, error } = useAdminMonthSummary(viewYear, viewMonth); const monthLabel = new Date(viewYear, viewMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }); const firstOfMonth = new Date(viewYear, viewMonth - 1, 1); const startWeekday = firstOfMonth.getDay(); const daysInMonth = new Date(viewYear, viewMonth, 0).getDate(); const todayStr = new Date().toISOString().slice(0, 10); const cells = []; for (let i = 0; i < startWeekday; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d); const goPrevMonth = () => { if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }; const goNextMonth = () => { if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }; const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]; const dotFor = (row) => { if (!row) return null; if (row.blocked_count > 0 && row.total_booked === 0) return C.barkLight; const ratio = row.total_capacity > 0 ? row.total_booked / row.total_capacity : 0; if (ratio >= 1) return C.coral; if (ratio > 0) return C.gold; return C.sageLight; }; return React.createElement("div", { style: { background: C.white, borderBottom: `1px solid ${C.sand}`, padding: "14px 16px 18px" } }, React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 } }, React.createElement("button", { onClick: goPrevMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevLeft()), React.createElement("div", { style: { fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest } }, monthLabel), React.createElement("button", { onClick: goNextMonth, style: { background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.chevRight())), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 } }, weekdayLabels.map((w, i) => React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 11, fontWeight: 600, color: C.barkLight } }, w))), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 } }, cells.map((d, i) => { if (d === null) return React.createElement("div", { key: "blank-" + i }); const dateStr = viewYear + "-" + String(viewMonth).padStart(2, "0") + "-" + String(d).padStart(2, "0"); const row = summary[dateStr]; const isToday = dateStr === todayStr; const isSelected = dateStr === selectedDateStr; const isClosed = !row; const dot = dotFor(row); return React.createElement("button", { key: dateStr, onClick: () => !isClosed && onSelectDate(new Date(viewYear, viewMonth - 1, d)), disabled: isClosed, style: { aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, border: isSelected ? `2px solid ${C.gold}` : isToday ? `1.5px solid ${C.sage}` : "1px solid transparent", borderRadius: 10, background: isToday ? C.sagePale : "transparent", cursor: isClosed ? "default" : "pointer", opacity: isClosed ? 0.35 : 1, fontFamily: "'DM Sans'" } }, React.createElement("span", { style: { fontSize: 13, fontWeight: isToday ? 700 : 500, color: C.forest } }, d), dot && React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: dot } })); })), loading && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.barkLight, marginTop: 10 } }, "Loading…"), error && React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: C.coral, marginTop: 10 } }, error), React.createElement("div", { style: { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 14, marginTop: 14, fontSize: 11, color: C.barkLight } }, React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.sageLight, display: "inline-block" } }), "Open"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.gold, display: "inline-block" } }), "Booked"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.coral, display: "inline-block" } }), "Full"), React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: C.barkLight, display: "inline-block" } }), "Blocked")));  }
 
 // ══════════════════════════════════════════════════════════════════
 // MAIN ADMIN DASHBOARD
@@ -691,7 +691,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
   };
 
   return (
-    <div style={{
+    <div className="ua-root" style={{
       maxWidth: 600, margin: "0 auto", minHeight: "100vh",
       background: C.parchment, fontFamily: "'DM Sans', sans-serif",
     }}>
@@ -700,20 +700,36 @@ export default function AdminDashboard({ adminName, onSignOut }) {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         button:active { transform: scale(0.97); }
         a { text-decoration: none; }
+        /* Phone (default): single column, exactly as before. */
+        .ua-side { display: none; }
+        /* Laptop / desktop: wide layout with the month calendar as a
+           sidebar and Morning/Afternoon sessions side by side. */
+        @media (min-width: 1024px) {
+          .ua-root { max-width: 1320px !important; box-shadow: 0 0 0 1px ${C.sand}; }
+          .ua-mobile-only { display: none !important; }
+          .ua-body { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; padding: 20px 24px 0; align-items: start; }
+          .ua-side { display: block; position: sticky; top: 16px; border: 1px solid ${C.sand}; border-radius: 14px; overflow: hidden; }
+          .ua-main { border: 1px solid ${C.sand}; border-radius: 14px; background: ${C.parchment}; overflow: hidden; }
+          .ua-sessions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+          .ua-session { margin-bottom: 0 !important; }
+          .ua-lunch { display: none !important; }
+          .ua-legend { margin-top: 20px; }
+        }
       ` }} />
 
       {/* Header */}
       <div style={{
         background: C.forest, padding: "18px 16px 14px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexWrap: "wrap", gap: 10,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icons.leaf(20, "#fff")}
-          <span style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.white }}>
+          <span style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, color: C.white, whiteSpace: "nowrap" }}>
             Uri Herbs Admin
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {adminName && (
             <span style={{
               fontFamily: "'DM Sans'", fontSize: 12, color: "rgba(255,255,255,0.7)",
@@ -731,7 +747,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 20,
               padding: "6px 12px", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 6,
-              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
             }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12h14" />
@@ -745,7 +761,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               background: "rgba(255,255,255,0.12)", borderRadius: 20,
               padding: "6px 12px",
               display: "flex", alignItems: "center", gap: 6,
-              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
             }}>
             {Icons.edit(13)}
             Content
@@ -757,7 +773,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               background: "rgba(255,255,255,0.12)", borderRadius: 20,
               padding: "6px 12px",
               display: "flex", alignItems: "center", gap: 6,
-              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
             }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
@@ -770,7 +786,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             style={{
               background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 20,
               padding: "6px 14px", cursor: "pointer",
-              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
               display: "flex", alignItems: "center", gap: 6,
             }}>
             Sign Out
@@ -799,9 +815,15 @@ export default function AdminDashboard({ adminName, onSignOut }) {
         <button onClick={() => setDayOffset(d => d + 1)} style={{
           background: "none", border: "none", cursor: "pointer", padding: 4,
         }}>{Icons.chevRight()}</button>
-        {React.createElement("button", { onClick: () => setShowMonthView(v => !v), style: { position: "absolute", right: 16, background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.calendar(15, showMonthView ? C.sage : C.barkLight))}
+        {React.createElement("button", { className: "ua-mobile-only", onClick: () => setShowMonthView(v => !v), style: { position: "absolute", right: 16, background: "none", border: "none", cursor: "pointer", padding: 4 } }, Icons.calendar(15, showMonthView ? C.sage : C.barkLight))}
       </div>
-      {showMonthView && React.createElement(MonthCalendar, { initialDate: viewDate, onSelectDate: (picked) => { const now = new Date(); const diffDays = Math.round((Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate()) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000); setDayOffset(diffDays); setShowMonthView(false); } })}
+      {showMonthView && React.createElement("div", { className: "ua-mobile-only" }, React.createElement(MonthCalendar, { initialDate: viewDate, onSelectDate: (picked) => { const now = new Date(); const diffDays = Math.round((Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate()) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000); setDayOffset(diffDays); setShowMonthView(false); } }))}
+
+      <div className="ua-body">
+      <aside className="ua-side">
+        {React.createElement(MonthCalendar, { initialDate: viewDate, selectedDateStr: dateStr, onSelectDate: (picked) => { const now = new Date(); const diffDays = Math.round((Date.UTC(picked.getFullYear(), picked.getMonth(), picked.getDate()) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000); setDayOffset(diffDays); } })}
+      </aside>
+      <main className="ua-main">
 
       {error && (
         <div style={{
@@ -902,9 +924,9 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             Loading schedule…
           </div>
         ) : activeTab === "herbal" ? (
-          <>
+          <div className="ua-sessions">
             {/* Morning session */}
-            <div style={{ marginBottom: 24 }}>
+            <div className="ua-session" style={{ marginBottom: 24 }}>
               <div style={{
                 display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
               }}>
@@ -929,7 +951,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             </div>
 
             {/* Lunch break */}
-            <div style={{
+            <div className="ua-lunch" style={{
               textAlign: "center", padding: "8px 0 8px",
               marginBottom: 16,
               display: "flex", alignItems: "center", gap: 12,
@@ -943,7 +965,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             </div>
 
             {/* Afternoon session */}
-            <div>
+            <div className="ua-session">
               <div style={{
                 display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
               }}>
@@ -966,7 +988,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                 ))}
               </div>
             </div>
-          </>
+          </div>
         ) : (
           /* Aromatherapy tab */
           <div>
@@ -1002,8 +1024,11 @@ export default function AdminDashboard({ adminName, onSignOut }) {
         )}
       </div>
 
+      </main>
+      </div>
+
       {/* Legend footer */}
-      <div style={{
+      <div className="ua-legend" style={{
         background: C.white, borderTop: `1px solid ${C.sand}`,
         padding: "14px 16px",
       }}>
@@ -1011,7 +1036,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
           fontFamily: "'DM Sans'", fontSize: 11, fontWeight: 600, color: C.barkLight,
           textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8,
         }}>Instructor Groups</div>
-        <div style={{ display: "flex", gap: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 12, height: 12, borderRadius: 3, background: C.sage }}/>
             <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group A · Mali (up to 6, 8 if private)</span>
