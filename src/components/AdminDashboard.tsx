@@ -559,7 +559,22 @@ export default function AdminDashboard({ adminName, onSignOut }) {
     return map;
   }, [rawSlots]);
 
-  const aromaBlocksToday = useMemo(() => getAromaBlocksForDate(viewDate), [viewDate]);
+  const aromaScheduled = useMemo(() => getAromaBlocksForDate(viewDate), [viewDate]);
+  // Normal aromatherapy hours for this weekday, PLUS any hour that has a
+  // special booking made from the admin side outside those hours (e.g. a
+  // customer request on a Saturday) — so those bookings are always visible.
+  const aromaBlocksToday = useMemo(() => {
+    const byTime = new Map(aromaScheduled.map(b => [b.time, b]));
+    bookings.filter(b => b.calendar === "aromatherapy").forEach(b => {
+      b.blocks.forEach(t => {
+        if (!byTime.has(t)) {
+          const h = parseInt(t.slice(0, 2), 10) + 1;
+          byTime.set(t, { time: t, end: `${String(h).padStart(2, "0")}:${t.slice(3, 5)}` });
+        }
+      });
+    });
+    return Array.from(byTime.values()).sort((a, b) => a.time.localeCompare(b.time));
+  }, [aromaScheduled, bookings]);
 
   // Compute per-block booking lists
   const herbalByBlock = useMemo(() => {
@@ -1003,7 +1018,11 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                   padding: "10px 14px", marginBottom: 16,
                   fontFamily: "'DM Sans'", fontSize: 12, color: "#6A4A62", lineHeight: 1.5,
                 }}>
-                  <strong>{viewDate.toLocaleDateString("en-US", { weekday: "long" })} schedule:</strong> {formatTime12(aromaBlocksToday[0].time)} – {formatTime12(aromaBlocksToday[aromaBlocksToday.length - 1].end)}. Booking cutoff is 2 hours before session start.
+                  {aromaScheduled.length > 0 ? (
+                    <><strong>{viewDate.toLocaleDateString("en-US", { weekday: "long" })} schedule:</strong> {formatTime12(aromaScheduled[0].time)} – {formatTime12(aromaScheduled[aromaScheduled.length - 1].end)}. Booking cutoff is 2 hours before session start.</>
+                  ) : (
+                    <><strong>Special booking:</strong> aromatherapy is normally closed on {viewDate.toLocaleDateString("en-US", { weekday: "long" })}s — this was added from the admin side.</>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {aromaBlocksToday.map(block => (
