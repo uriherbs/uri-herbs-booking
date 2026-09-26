@@ -235,7 +235,7 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
                     ✅ Payment Received
                   </div>
                   <div style="font-family: Arial, sans-serif; font-size:13px; color:#5C4A3D; line-height:1.6;">
-                    You've already paid in full online. Nothing more to pay when you arrive — just show up and enjoy!
+                    You've already paid in full. Nothing more to pay when you arrive — just show up and enjoy!
                   </div>
                   `}
                 </td></tr>
@@ -321,7 +321,7 @@ Experience: ${data.packageName}
 Date: ${formatDateLong(data.date)}
 Time: ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
 Guests: ${data.numParticipants}
-Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later' ? ' (pay on arrival — Cash, PromptPay, or WeChat Pay)' : ' — already paid online, nothing more to pay'}
+Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later' ? ' (pay on arrival — Cash, PromptPay, or WeChat Pay)' : ' — already paid, nothing more to pay'}
 
 Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
@@ -403,6 +403,20 @@ export interface OwnerNotificationData extends BookingEmailData {
   ownerHeadline?: string; // small line under the workshop name, default "New booking · URI-…"
 }
 
+function ownerPaymentLabel(method: string): string {
+  if (method === 'later') return 'Pay on arrival';
+  if (method === 'stripe') return 'Paid online (card)';
+  if (method === 'paypal') return 'Paid online (PayPal)';
+  return 'Paid (recorded by staff)';
+}
+
+// payment_status 'unpaid' (manual/pay-later) always means "pay on arrival",
+// whatever payment_method says (manual bookings store 'manual' there).
+function effectivePaymentMethod(b: { payment_status?: string | null; payment_method?: string | null }): string {
+  if (b.payment_status === 'unpaid') return 'later';
+  return b.payment_method || 'later';
+}
+
 export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): string {
   const dateLong = formatDateLong(data.date);
   const startStr = formatTime12(data.startTime);
@@ -438,7 +452,7 @@ export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): st
         </tr></td>
         <tr><td style="padding:12px 16px; background-color:#FAF7F0;">
           <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
-          <div style="font-size:14px; color:#2D4639;">฿${data.totalPriceThb.toLocaleString()} — ${data.paymentMethod === 'later' ? 'Pay on arrival' : `Paid online (${data.paymentMethod})`}</div>
+          <div style="font-size:14px; color:#2D4639;">฿${data.totalPriceThb.toLocaleString()} — ${ownerPaymentLabel(data.paymentMethod)}</div>
         </tr></td>
       </table>
       ${whatsappLink ? `<p style="text-align:center; margin:0 0 12px;"><a href="${whatsappLink}" style="display:inline-block; background:#6B8F71; color:#ffffff; text-decoration:none; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold;">Message ${data.customerName.split(' ')[0]} on WhatsApp</a></p>` : ''}
@@ -459,7 +473,7 @@ ${formatDateLong(data.date)}, ${formatTime12(data.startTime)} – ${formatTime12
 
 Customer: ${data.customerName}
 ${data.customerPhone ? `Phone: ${data.customerPhone}\n` : ''}${data.customerEmail ? `Email: ${data.customerEmail}\n` : ''}
-Total: ฿${data.totalPriceThb.toLocaleString()} — ${data.paymentMethod === 'later' ? 'Pay on arrival' : `Paid online (${data.paymentMethod})`}
+Total: ฿${data.totalPriceThb.toLocaleString()} — ${ownerPaymentLabel(data.paymentMethod)}
 `.trim();
 }
 
@@ -566,7 +580,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
   const { data: booking, error: fetchError } = await db
     .from('bookings')
     .select(
-      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, cancel_token, packages ( name, slug )'
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
     )
     .eq('id', bookingId)
     .single();
@@ -593,7 +607,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     takeawayDescription: meta.takeaway,
     customerEmail: booking.customer_email || undefined,
     customerPhone: booking.customer_phone || undefined,
-    paymentMethod: booking.payment_method || 'later',
+    paymentMethod: effectivePaymentMethod(booking),
     cancelUrl: booking.cancel_token ? `${SITE_URL}/cancel/${booking.cancel_token}` : undefined,
     rescheduleUrl: booking.cancel_token ? `${SITE_URL}/reschedule/${booking.cancel_token}` : undefined,
   };
@@ -676,7 +690,7 @@ export async function sendRescheduleEmails(
   const { data: booking, error } = await db
     .from('bookings')
     .select(
-      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, cancel_token, packages ( name, slug )'
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
     )
     .eq('id', bookingId)
     .single();
@@ -703,7 +717,7 @@ export async function sendRescheduleEmails(
     takeawayDescription: meta.takeaway,
     customerEmail: booking.customer_email || undefined,
     customerPhone: booking.customer_phone || undefined,
-    paymentMethod: booking.payment_method || 'later',
+    paymentMethod: effectivePaymentMethod(booking),
     cancelUrl: booking.cancel_token ? `${SITE_URL}/cancel/${booking.cancel_token}` : undefined,
     rescheduleUrl: booking.cancel_token ? `${SITE_URL}/reschedule/${booking.cancel_token}` : undefined,
     headline: 'Booking Rescheduled!',
@@ -737,6 +751,163 @@ export async function sendRescheduleEmails(
     ).catch((err: any) => console.error(`sendRescheduleEmails: owner email failed for ${booking.booking_ref}:`, err.message))
   );
   await Promise.all(sends);
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 4b-3. 1-HOUR REMINDER — both emails
+// ────────────────────────────────────────────────────────────
+// Sent by /api/cron/reminders (called every 5 minutes by a Supabase
+// pg_cron job) for confirmed bookings starting within the next hour.
+// Claims bookings.reminder_sent atomically so each booking gets one
+// reminder (a reschedule resets the flag). Owner decision 2026-09-26:
+// NO reschedule/cancel links here — online changes close before this.
+export async function sendReminderEmails(db: any, bookingId: string): Promise<'sent' | 'skipped'> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(`sendReminderEmails: RESEND_API_KEY not configured — booking ${bookingId}`);
+    return 'skipped';
+  }
+
+  const { data: claimed, error: claimError } = await db
+    .from('bookings')
+    .update({ reminder_sent: true })
+    .eq('id', bookingId)
+    .eq('reminder_sent', false)
+    .eq('status', 'confirmed')
+    .select('id')
+    .maybeSingle();
+  if (claimError) {
+    console.error(`sendReminderEmails: claim failed for ${bookingId}:`, claimError.message);
+    return 'skipped';
+  }
+  if (!claimed) return 'skipped';
+
+  const { data: b, error } = await db
+    .from('bookings')
+    .select('booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, payment_status, customer_notes, packages ( name, slug )')
+    .eq('id', bookingId)
+    .single();
+  if (error || !b) {
+    console.error(`sendReminderEmails: could not fetch booking ${bookingId}:`, error?.message);
+    return 'skipped';
+  }
+
+  const pkg = Array.isArray(b.packages) ? b.packages[0] : b.packages;
+  const icon = (PACKAGE_EMAIL_META[pkg?.slug] || { icon: '🌿' }).icon;
+  const pkgName = pkg?.name || 'Uri Herbs Workshop';
+  const start = formatTime12(String(b.start_time).slice(0, 5));
+  const end = formatTime12(String(b.end_time).slice(0, 5));
+  const guests = `${b.num_participants} guest${b.num_participants > 1 ? 's' : ''}`;
+  const method = effectivePaymentMethod(b);
+  const payLine = method === 'later'
+    ? `Pay on arrival: ฿${Number(b.total_price_thb).toLocaleString()} (Cash, PromptPay QR or WeChat Pay)`
+    : 'Already paid, nothing more to pay';
+  const whatsapp = buildCustomerToShopWhatsAppLink(b.booking_ref);
+  const safeName = escapeHtml(String(b.customer_name || ''));
+
+  const customerHtml = `
+<!DOCTYPE html>
+<html><body style="margin:0; padding:24px; background-color:#F5F2EC; font-family: Arial, sans-serif;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
+    <tr><td style="background-color:#2D4639; padding:24px; text-align:center;">
+      <div style="font-family: Georgia, serif; font-size:21px; color:#ffffff;">See you soon! 🌿</div>
+      <div style="font-size:13px; color:#C9D6CC; margin-top:6px;">Your workshop starts in about 1 hour</div>
+    </td></tr>
+    <tr><td style="padding:24px;">
+      <p style="font-size:15px; color:#2D4639; margin:0 0 14px;">Dear ${safeName},</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Workshop</div>
+          <div style="font-size:15px; color:#2D4639; font-weight:bold;">${icon} ${escapeHtml(pkgName)}</div>
+          <div style="font-size:12px; color:#8A7668;">${guests} · ${b.booking_ref}</div>
+        </td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Today</div>
+          <div style="font-size:15px; color:#2D4639; font-weight:bold;">${start} – ${end}</div>
+          <div style="font-size:12px; color:#5C4A3D;">Please arrive about 10 minutes early.</div>
+        </td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Where</div>
+          <div style="font-size:14px; color:#2D4639;">${SHOP_ADDRESS}</div>
+          <a href="${SHOP_MAPS_URL}" style="font-size:13px; color:#6B8F71; font-weight:bold;">📍 Open in Google Maps</a>
+        </td></tr>
+        <tr><td style="padding:12px 16px; background-color:#FAF7F0;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
+          <div style="font-size:14px; color:#2D4639;">${payLine}</div>
+        </td></tr>
+      </table>
+      <p style="font-size:13px; color:#5C4A3D; line-height:1.6; margin:16px 0;">Running late or can&#39;t find us? Message us on WhatsApp and we&#39;ll help.</p>
+      <p style="text-align:center; margin:0;"><a href="${whatsapp}" style="display:inline-block; background:#25D366; color:#ffffff; text-decoration:none; padding:11px 24px; border-radius:22px; font-size:14px; font-weight:bold;">💬 Message us on WhatsApp</a></p>
+    </td></tr>
+  </table>
+</body></html>`.trim();
+
+  const customerText = `See you soon! Your workshop starts in about 1 hour.
+
+Dear ${b.customer_name},
+
+${icon} ${pkgName} · ${guests} · ${b.booking_ref}
+Today: ${start} – ${end} (please arrive about 10 minutes early)
+Where: ${SHOP_ADDRESS}
+Map: ${SHOP_MAPS_URL}
+Payment: ${payLine}
+
+Running late or can't find us? WhatsApp: ${whatsapp}
+
+— ${SHOP_NAME}`;
+
+  const ownerHtml = `
+<!DOCTYPE html>
+<html><body style="margin:0; padding:24px; background-color:#F5F2EC; font-family: Arial, sans-serif;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
+    <tr><td style="background-color:#A89068; padding:22px; text-align:center;">
+      <div style="font-family: Georgia, serif; font-size:20px; color:#ffffff;">${icon} ${escapeHtml(pkgName)}</div>
+      <div style="font-size:12px; color:#F7EFE2; margin-top:6px; letter-spacing:0.5px;">Starts in 1 hour · ${start} · ${b.booking_ref}</div>
+    </td></tr>
+    <tr><td style="padding:22px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden;">
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Guests</div>
+          <div style="font-size:14px; color:#2D4639;">${guests} · ${groupLabel(b.instructor_group, b.is_private)} · ${start} – ${end}</div>
+        </td></tr>
+        <tr><td style="padding:12px 16px; border-bottom:1px solid #E8E2D8;">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Customer</div>
+          <div style="font-size:14px; color:#2D4639;">${safeName}</div>
+          ${b.customer_phone ? `<div style="font-size:13px; color:#5C4A3D;">${escapeHtml(b.customer_phone)}</div>` : ''}
+          ${b.customer_notes ? `<div style="font-size:13px; color:#8A4B3C; margin-top:4px;"><strong>Notes:</strong> ${escapeHtml(b.customer_notes)}</div>` : ''}
+        </td></tr>
+        <tr><td style="padding:12px 16px; background-color:${method === 'later' ? '#FFF3D6' : '#FAF7F0'};">
+          <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
+          <div style="font-size:14px; color:#2D4639;${method === 'later' ? ' font-weight:bold;' : ''}">${method === 'later' ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival` : ownerPaymentLabel(method)}</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`.trim();
+
+  const ownerText = `Starts in 1 hour — ${pkgName} · ${start} · ${b.booking_ref}
+${guests} · ${groupLabel(b.instructor_group, b.is_private)} · ${start} – ${end}
+Customer: ${b.customer_name}${b.customer_phone ? ` · ${b.customer_phone}` : ''}${b.customer_notes ? `\nNotes: ${b.customer_notes}` : ''}
+Payment: ${method === 'later' ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival` : ownerPaymentLabel(method)}`;
+
+  const sends: Promise<unknown>[] = [];
+  if (b.customer_email) {
+    sends.push(
+      sendEmailViaResend(
+        { to: b.customer_email, replyTo: OWNER_EMAIL, subject: `See you in 1 hour — ${pkgName} at ${start} · ${SHOP_NAME}`, html: customerHtml, text: customerText },
+        apiKey
+      ).catch((err: any) => console.error(`sendReminderEmails: customer email failed for ${b.booking_ref}:`, err.message))
+    );
+  }
+  sends.push(
+    sendEmailViaResend(
+      { to: OWNER_EMAIL, subject: `Starts in 1 hour — ${pkgName} · ${start} · ${guests} · ${b.booking_ref}`, html: ownerHtml, text: ownerText },
+      apiKey
+    ).catch((err: any) => console.error(`sendReminderEmails: owner email failed for ${b.booking_ref}:`, err.message))
+  );
+  await Promise.all(sends);
+  return 'sent';
 }
 
 

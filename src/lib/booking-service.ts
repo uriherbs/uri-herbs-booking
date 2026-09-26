@@ -350,7 +350,9 @@ export async function createManualBooking(
   // (RESEND_API_KEY is server-only). Fire-and-forget — a booking
   // that's confirmed and paid must not fail because the email
   // couldn't be sent.
-  if (confirmation.payment_status === 'paid') {
+  // Every manual booking (paid OR unpaid/pay-on-arrival) is 'confirmed'
+  // since 2026-09-26, so both get the customer + shop emails.
+  if (confirmation.status === 'confirmed') {
     fetch('/api/bookings/notify-confirmed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
