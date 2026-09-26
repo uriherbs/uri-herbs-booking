@@ -26,6 +26,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getWorkshopPageData } from '@/lib/workshop-content-service';
 import { getPlaceholderWorkshopImage } from '@/lib/workshop-placeholder-images';
+import { parseVideoUrl, youTubeEmbedUrl } from '@/lib/video-url';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import { LeafFrame } from '@/components/LeafFrame';
@@ -52,6 +53,9 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
   if (!w) notFound();
 
   const heroImage = w.hero_image_url || getPlaceholderWorkshopImage(w.slug, 0);
+  // Top of the detail page: the workshop video if one is set (admin →
+  // Content → "Detail page video"), otherwise the photo as before.
+  const heroVideo = parseVideoUrl(w.hero_video_url);
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh' }}>
@@ -110,11 +114,41 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
               null. No code change needed here once every workshop has
               a real photo — the placeholder just stops being used. */}
           <LeafFrame>
-            <img
-              src={heroImage}
-              alt={w.name}
-              style={{ display: 'block', width: 640, maxWidth: '82vw', aspectRatio: '16 / 10', objectFit: 'cover' }}
-            />
+            {heroVideo?.kind === 'youtube' ? (
+              <iframe
+                src={youTubeEmbedUrl(heroVideo.id)}
+                title={`${w.name} video`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+                style={{
+                  display: 'block', border: 0, maxWidth: '82vw',
+                  ...(heroVideo.vertical
+                    ? { width: 360, aspectRatio: '9 / 16' }
+                    : { width: 640, aspectRatio: '16 / 9' }),
+                }}
+              />
+            ) : heroVideo?.kind === 'file' ? (
+              <video
+                src={heroVideo.url}
+                poster={w.hero_image_url || undefined}
+                controls
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                // width:auto + max sizes keeps the video's own shape (landscape or
+                // vertical phone video) instead of adding black bars.
+                style={{ display: 'block', width: 'auto', height: 'auto', maxWidth: 'min(640px, 82vw)', maxHeight: '75vh' }}
+              />
+            ) : (
+              <img
+                src={heroImage}
+                alt={w.name}
+                style={{ display: 'block', width: 640, maxWidth: '82vw', aspectRatio: '16 / 10', objectFit: 'cover' }}
+              />
+            )}
           </LeafFrame>
         </div>
 
