@@ -98,7 +98,20 @@ function StripeCardFormInner({ amountLabel, onSuccess }: { amountLabel: string; 
     });
 
     if (confirmError) {
-      setError(confirmError.message || 'Payment failed. Please try again.');
+      // Declines / failed bank verification are usually the card
+      // issuer's fraud check on a first payment to a foreign merchant
+      // (e.g. Isracard blocked a THB charge and sent the owner an
+      // "approve by SMS" text instead of a 3D Secure prompt). Tell the
+      // customer what to do instead of a bare "declined", and point at
+      // the other payment options — the booking stays reserved as
+      // pending_payment for ~30 min (expire_pending_bookings).
+      const otherOptions = process.env.NEXT_PUBLIC_PAYPAL_ENABLED === 'true' ? 'PayPal or Pay Later' : 'Pay Later (pay when you arrive)';
+      const bankBlocked = ['card_declined', 'payment_intent_authentication_failure', 'authentication_required'].includes(confirmError.code ?? '');
+      setError(
+        bankBlocked
+          ? `Your bank didn't approve this payment, and you have not been charged. Banks often block a first payment to a business abroad: check your phone for a message from your bank, approve it, then tap Pay again. Or choose ${otherOptions} above. Your spot is held for 30 minutes.`
+          : `${confirmError.message || 'Payment failed.'} You can try again, or choose ${otherOptions} above.`
+      );
       setSubmitting(false);
       return;
     }

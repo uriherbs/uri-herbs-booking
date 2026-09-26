@@ -1072,6 +1072,14 @@ const PAYMENT_METHODS = [
   },
 ];
 
+// PayPal is still wired to PayPal's sandbox (src/lib/paypal-server.ts),
+// so on the live site a real PayPal login can't work and a "card via
+// PayPal" payment would confirm a booking with no real money. Hidden
+// until live REST credentials are in place — set
+// NEXT_PUBLIC_PAYPAL_ENABLED=true in Vercel (and redeploy) to show it.
+const PAYPAL_ENABLED = process.env.NEXT_PUBLIC_PAYPAL_ENABLED === "true";
+const VISIBLE_PAYMENT_METHODS = PAYMENT_METHODS.filter(m => PAYPAL_ENABLED || m.key !== "paypal");
+
 // TODO(design): generic placeholder marks, not the real Stripe/PayPal
 // brand assets — swap for their official logo kits before launch
 // (stripe.com/newsroom/brand-assets, paypal.com/us/webapps/mpp/logo-center).
@@ -1110,7 +1118,7 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
   return (
     <div style={{ padding: "0 16px 100px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {PAYMENT_METHODS.map(opt => {
+        {VISIBLE_PAYMENT_METHODS.map(opt => {
           const selected = paymentMethod === opt.key;
           const Icon = PAYMENT_ICONS[opt.key];
           return (
