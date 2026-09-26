@@ -41,6 +41,7 @@ export interface AdminWorkshopDetail {
   slug: string;
   intro_paragraph: string | null;
   hero_image_url: string | null;
+  hero_video_url: string | null;
   blocks: AdminContentBlock[];   // always exactly BLOCK_COUNT, padded with empty placeholders
 }
 
@@ -93,7 +94,7 @@ export async function listWorkshopsForAdmin(): Promise<AdminWorkshopSummary[]> {
 export async function getWorkshopForAdmin(slug: string): Promise<AdminWorkshopDetail | null> {
   const { data: workshop, error } = await supabase
     .from('workshops')
-    .select('id, name, slug, intro_paragraph, hero_image_url')
+    .select('id, name, slug, intro_paragraph, hero_image_url, hero_video_url')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -138,7 +139,7 @@ export async function getWorkshopForAdmin(slug: string): Promise<AdminWorkshopDe
 
 export async function saveWorkshopContent(
   workshopId: string,
-  fields: { intro_paragraph: string; hero_image_url: string | null },
+  fields: { intro_paragraph: string; hero_image_url: string | null; hero_video_url: string | null },
   blocks: AdminContentBlock[]
 ): Promise<void> {
   const { error: workshopError } = await supabase
@@ -146,6 +147,7 @@ export async function saveWorkshopContent(
     .update({
       intro_paragraph: fields.intro_paragraph.trim() || null,
       hero_image_url: fields.hero_image_url,
+      hero_video_url: fields.hero_video_url,
     })
     .eq('id', workshopId);
 
@@ -199,6 +201,39 @@ export async function uploadWorkshopImage(file: File, workshopSlug: string): Pro
   const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
     cacheControl: '3600',
     upsert: false,
+  });
+
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 5. UPLOAD VIDEO  (detail-page top video → Storage → public URL)
+// ────────────────────────────────────────────────────────────
+// Same bucket/namespacing as images. 50MB is Supabase's per-file
+// upload limit on the current plan — longer videos should go on
+// YouTube and be pasted as a link instead.
+
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50MB
+
+export async function uploadWorkshopVideo(file: File, workshopSlug: string): Promise<string> {
+  if (!file.type.startsWith('video/')) {
+    throw new Error('Please choose a video file (MP4, MOV, WebM)');
+  }
+  if (file.size > MAX_VIDEO_BYTES) {
+    throw new Error('Video is too large (max 50MB). Please upload it to YouTube and paste the link instead.');
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+  const path = `${workshopSlug}/video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: file.type,
   });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
