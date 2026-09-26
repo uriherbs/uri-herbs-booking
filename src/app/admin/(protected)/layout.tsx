@@ -16,5 +16,11 @@ import { ProtectedRoute } from '@/lib/protected-route';
 export const dynamic = 'force-dynamic';
 
 export default function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
-  return <ProtectedRoute>{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute>
+      {/* Wider editing pages on laptop/desktop (phones keep the 600px column); hide the customer WhatsApp bubble so it never covers admin buttons. */}
+      <style>{`.floating-whatsapp-btn { display: none !important; } @media (min-width: 1024px) { .ua-page { max-width: 960px !important; } }`}</style>
+      {children}
+    </ProtectedRoute>
+  );
 }

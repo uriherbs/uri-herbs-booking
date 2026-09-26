@@ -195,7 +195,7 @@ export default function WorkshopContentEditPage() {
 
   if (loading && !workshop) {
     return (
-      <div style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="ua-page" style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: C.barkLight }}>Loading…</span>
       </div>
     );
@@ -203,7 +203,7 @@ export default function WorkshopContentEditPage() {
 
   if (error || !workshop) {
     return (
-      <div style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, padding: 24, fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="ua-page" style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, padding: 24, fontFamily: "'DM Sans', sans-serif" }}>
         <p style={{ color: C.coral, fontSize: 14 }}>{error || 'Workshop not found.'}</p>
         <button onClick={() => router.push('/admin/content')} style={{ color: C.sage, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, textDecoration: 'underline' }}>
           Back to workshop content
@@ -213,7 +213,7 @@ export default function WorkshopContentEditPage() {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="ua-page" style={{ maxWidth: 600, margin: '0 auto', minHeight: '100vh', background: C.parchment, fontFamily: "'DM Sans', sans-serif" }}>
       <style dangerouslySetInnerHTML={{ __html: `
         @import url(https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap);
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
