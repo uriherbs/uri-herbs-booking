@@ -25,7 +25,7 @@ const SHOP_MAPS_URL =
   'https://www.google.com/maps/search/?api=1&query=' +
   encodeURIComponent('Uri Herbs Workshop') +
   '&query_place_id=0x30da3bb4d505e7c5:0x41cac3c3a753cc10&hl=en';
-const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66812345678'; // set NEXT_PUBLIC_WHATSAPP_NUMBER in Vercel — this fallback is a placeholder only
+const SHOP_WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '66643349890'; // real shop number (matches FloatingWhatsApp.tsx)
 const SHOP_INSTAGRAM = 'https://instagram.com/uriherbsworkshop';
 const SHOP_WEBSITE = 'https://www.uriherbs.com';
 // Base URL for links that must reach the NEW booking site (e.g. the
