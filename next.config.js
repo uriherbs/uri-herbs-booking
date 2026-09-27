@@ -9,6 +9,10 @@ const nextConfig = {
       // can be changed later without browsers caching it.
       { source: '/health', destination: 'https://uherbhouse.systeme.io/health', permanent: false },
       { source: '/Health', destination: 'https://uherbhouse.systeme.io/health', permanent: false },
+      // The questionnaire's later steps — the page's buttons still link to
+      // the old domain, so catch those too.
+      { source: '/multiple', destination: 'https://uherbhouse.systeme.io/multiple', permanent: false },
+      { source: '/thank', destination: 'https://uherbhouse.systeme.io/thank', permanent: false },
     ];
   },
 };
