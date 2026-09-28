@@ -41,7 +41,7 @@ export function Intro() {
                 percentage width here would resolve against an
                 indefinite containing block and collapse to 0. */}
             <img
-              src="/intro-hands.png"
+              src="/intro-hands.jpg"
               alt="Hands working with fresh herbs at a rustic garden workbench"
               style={{ display: 'block', width: 380, maxWidth: '80vw', aspectRatio: '4 / 3', objectFit: 'cover' }}
             />

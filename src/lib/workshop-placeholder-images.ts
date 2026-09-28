@@ -24,10 +24,10 @@
 // filter on it: always prefer `hero_image_url` when the DB has one,
 // and only reach for a placeholder when the field is actually null.
 export const PLACEHOLDER_IMAGE_BY_SLUG: Record<string, string> = {
-  'tea-blending': '/workshop-tea-blending.png',
-  'ya-dom-inhaler': '/workshop-ya-dom.png',
-  'herbal-massage-ball': '/workshop-massage-ball.png',
-  'skincare-aromatherapy': '/workshop-skincare-aromatherapy.png',
+  'tea-blending': '/workshop-tea-blending.jpg',
+  'ya-dom-inhaler': '/workshop-ya-dom.jpg',
+  'herbal-massage-ball': '/workshop-massage-ball.jpg',
+  'skincare-aromatherapy': '/workshop-skincare-aromatherapy.jpg',
 };
 
 // Fallback cycle for a future/unlisted slug not in the map above.

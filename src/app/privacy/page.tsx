@@ -3,7 +3,7 @@ import LegalPageLayout from '@/components/legal/LegalPageLayout';
 import { privacyDoc } from '@/lib/legal-content';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Uri Herbs Workshop',
+  title: 'Privacy Policy',
   description: 'How Uri Herbs Workshop collects, uses, and protects your personal data, in line with Thailand’s PDPA.',
 };
 
