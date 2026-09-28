@@ -3,7 +3,7 @@ import LegalPageLayout from '@/components/legal/LegalPageLayout';
 import { termsDoc } from '@/lib/legal-content';
 
 export const metadata: Metadata = {
-  title: 'Terms & Conditions — Uri Herbs Workshop',
+  title: 'Terms & Conditions',
   description: 'Booking, payment, cancellation, and refund terms for Uri Herbs Workshop, Chiang Mai.',
 };
 

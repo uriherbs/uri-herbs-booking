@@ -42,9 +42,14 @@ const ArrowLeftSVG = () => (
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const w = await getWorkshopPageData(params.slug);
   if (!w) return {};
+  // The root layout's title template adds " · Uri Herbs Workshop", so the
+  // brand isn't repeated here. "Workshop in Chiang Mai" is what people
+  // actually search for.
+  const name = /workshop|class|mastery/i.test(w.name) ? w.name : `${w.name} Workshop`;
   return {
-    title: `${w.name} — Uri Herbs Workshop`,
+    title: `${name} in Chiang Mai`,
     description: w.intro_paragraph || w.description || undefined,
+    alternates: { canonical: `/workshops/${w.slug}` },
   };
 }
 

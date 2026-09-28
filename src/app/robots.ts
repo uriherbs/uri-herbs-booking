@@ -5,7 +5,7 @@
 
 import type { MetadataRoute } from 'next';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://uri-herbs-booking.vercel.app';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.uriherbs.com';
 
 export default function robots(): MetadataRoute.Robots {
   return {

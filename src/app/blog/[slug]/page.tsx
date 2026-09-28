@@ -35,9 +35,26 @@ const SITE_URL = 'https://www.uriherbs.com';
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await getBlogPostBySlug(params.slug);
   if (!post) return {};
+  // Brand suffix comes from the root layout's title template.
+  const image = post.hero_image_url || undefined;
   return {
-    title: `${post.title} — Uri Herbs Workshop`,
+    title: post.title,
     description: post.excerpt || undefined,
+    alternates: { canonical: `/blog/${post.slug}` },
+    openGraph: {
+      type: 'article',
+      title: post.title,
+      description: post.excerpt || undefined,
+      url: `/blog/${post.slug}`,
+      publishedTime: post.published_at,
+      ...(image ? { images: [{ url: image, alt: post.title }] } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt || undefined,
+      ...(image ? { images: [image] } : {}),
+    },
   };
 }
 

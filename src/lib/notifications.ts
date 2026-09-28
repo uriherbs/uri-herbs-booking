@@ -31,7 +31,7 @@ const SHOP_WEBSITE = 'https://www.uriherbs.com';
 // Base URL for links that must reach the NEW booking site (e.g. the
 // customer cancel page). Set NEXT_PUBLIC_SITE_URL=https://www.uriherbs.com
 // in Vercel once the domain is switched from SimplyBook to Vercel.
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://uri-herbs-booking.vercel.app').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.uriherbs.com').replace(/\/$/, '');
 
 // ────────────────────────────────────────────────────────────
 // 1. WHATSAPP CLICK-TO-CHAT LINKS

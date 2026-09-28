@@ -8,9 +8,9 @@ import FloatingWhatsApp from '@/components/FloatingWhatsApp';
 // without a code change once that day comes. Used as metadataBase so
 // every page's Open Graph/Twitter image resolves to an absolute URL
 // without every page having to repeat it.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://uri-herbs-booking.vercel.app';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.uriherbs.com';
 
-const TITLE = 'Uri Herbs Workshop — Chiang Mai';
+const TITLE = 'Uri Herbs Workshop — Thai Herbal Workshops in Chiang Mai Old City';
 const DESCRIPTION = 'Hands-on herbal & botanical workshops in Chiang Mai Old City — tea blending, herbal inhalers, massage balls, natural skincare & aromatherapy.';
 
 // Sitewide defaults — every page inherited nothing before this (no
@@ -36,7 +36,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
-    url: SITE_URL,
     siteName: 'Uri Herbs Workshop',
     images: [{ url: '/og-image.jpg', width: 1200, height: 630, alt: 'Uri Herbs Workshop — Chiang Mai' }],
     locale: 'en_US',

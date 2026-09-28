@@ -27,7 +27,8 @@ import { getActiveBlogPosts } from '@/lib/blog-content-service';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
 export const metadata: Metadata = {
-  title: 'Blog — Uri Herbs Workshop',
+  title: 'Blog — Thai Herbs & Natural Wellness',
+  alternates: { canonical: '/blog' },
   description:
     'Stories from the workshop and wellness tips from the garden — notes on Thai herbal tea, ya dom, natural skincare, aloe vera, castor oil, and more from Uri Herbs Workshop in Chiang Mai.',
 };
