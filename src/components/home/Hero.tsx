@@ -19,16 +19,21 @@ export function Hero() {
   return (
     <section style={{ padding: '12px 12px 0' }}>
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 32 }}>
-        {/* TODO(design): AI-generated placeholder mural, carried over
-            from the uri-herbs-v0-design mockup (public/hero-mural.png
-            there). Swap for a real photo of the workshop's entrance
-            mural once the studio shoots one — same filename works,
-            just replace public/hero-mural.png. */}
-        <img
-          src="/hero-mural.png"
-          alt="Hand-painted mural of terraced green herb fields and blue mountains, inspired by the workshop entrance wall"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+        {/* Mural artwork, reworked 2026-09-28 (owner-approved): the
+            white wall around the original square public/hero-mural.png
+            was replaced with painted-style sky, and it's cut into two
+            crops so each screen shape shows the mural edge to edge —
+            a wide one (sky, mountains, terraces) for desktop, a tall
+            one (sky down to the winding path) for phones. The original
+            square file is kept as the source for future edits. */}
+        <picture>
+          <source media="(max-width: 700px)" srcSet="/hero-tall.jpg" />
+          <img
+            src="/hero-wide.jpg"
+            alt="Hand-painted mural of terraced green herb fields and blue mountains, inspired by the workshop entrance wall"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </picture>
         <div
           aria-hidden="true"
           style={{
