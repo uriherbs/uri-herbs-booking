@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendCancellationEmail } from '@/lib/notifications';
+import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 export async function POST(request: NextRequest) {
   let body: any;
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
   await sendCancellationEmail(db, booking.id).catch((err) =>
     console.error(`sendCancellationEmail threw for ${bookingRef}:`, err?.message)
   );
+  await syncBookingToCalendar(db, booking.id);
 
   return NextResponse.json({ sent: true });
 }
