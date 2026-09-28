@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendCancellationEmail, sendOwnerCancellationEmail } from '@/lib/notifications';
 import { hoursUntilWorkshop, isPaidOnline, refundStatus } from '@/lib/cancel-policy';
+import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
     sendCancellationEmail(db, booking.id, { byCustomer: true }),
     sendOwnerCancellationEmail(db, booking.id, reason),
   ]);
+  await syncBookingToCalendar(db, booking.id);
 
   return NextResponse.json({ ...summary({ ...booking, status: 'cancelled' }), cancelled: true });
 }
