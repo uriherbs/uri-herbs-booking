@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendRescheduleEmails } from '@/lib/notifications';
 import { hoursUntilWorkshop } from '@/lib/cancel-policy';
+import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 const RESCHEDULE_MIN_HOURS = 2;
 
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
   await sendRescheduleEmails(db, booking.id, previous).catch((err) =>
     console.error(`sendRescheduleEmails threw for ${booking.booking_ref}:`, err?.message)
   );
+  await syncBookingToCalendar(db, booking.id);
 
   const { booking: updated } = await loadBooking(token);
   return NextResponse.json({ ...summary(updated || booking), rescheduled: true });
