@@ -1,8 +1,8 @@
 // ============================================================
 // src/lib/ota-email.ts — fixed-rule parsers for OTA booking emails
 // ============================================================
-// Reads the booking / cancellation emails that Klook, GetYourGuide and
-// KKday send to uherbhouse@gmail.com and turns them into a plain object.
+// Reads the booking / cancellation emails that Klook, GetYourGuide,
+// KKday, Trip.com (Vbooking) and Guidestination send to uherbhouse@gmail.com and turns them into a plain object.
 // Pure functions (no DB, no network) so they're easy to test.
 //
 // If an OTA changes its email layout, the parser returns an 'unreadable'
@@ -10,7 +10,7 @@
 // add the booking by hand.
 // ============================================================
 
-export type OtaPlatform = 'klook' | 'getyourguide' | 'kkday';
+export type OtaPlatform = 'klook' | 'getyourguide' | 'kkday' | 'tripcom' | 'guidestination';
 
 export interface OtaEmailInput {
   from: string;
@@ -22,6 +22,7 @@ export type OtaParsed =
   | { kind: 'ignore' }
   | { kind: 'unreadable'; platform: OtaPlatform; reason: string }
   | { kind: 'cancel'; platform: OtaPlatform; ref: string }
+  | { kind: 'alert'; platform: OtaPlatform; ref: string; message: string } // needs a human (e.g. cancellation request)
   | {
       kind: 'new';
       platform: OtaPlatform;
@@ -42,6 +43,8 @@ export const PLATFORM_LABEL: Record<OtaPlatform, string> = {
   klook: 'Klook',
   getyourguide: 'GetYourGuide',
   kkday: 'KKday',
+  tripcom: 'Trip.com',
+  guidestination: 'Guidestination',
 };
 
 // Collapse the email's table/markdown noise into single-spaced text.
@@ -108,6 +111,8 @@ function detectPlatform(from: string): OtaPlatform | null {
   if (f.includes('klook.com')) return 'klook';
   if (f.includes('getyourguide.com')) return 'getyourguide';
   if (f.includes('kkday.com')) return 'kkday';
+  if (f.includes('trip.com') || f.includes('ctrip.com')) return 'tripcom';
+  if (f.includes('guidestination.com')) return 'guidestination';
   return null;
 }
 
@@ -192,11 +197,110 @@ function parseKkday(subject: string, t: string): OtaParsed {
   };
 }
 
+function parseTripcom(subject: string, t: string): OtaParsed {
+  const s = subject.trim();
+  const neu = s.match(/New order notification\s*,?\s*Booking\s*No\.?\s*(\d{8,})/i);
+  if (neu) {
+    const ref = neu[1];
+    const product = t.match(/Booked product\s*\d*\s*-?\s*(.+?)\s*Booking time/i)?.[1]?.trim();
+    const resource = t.match(/Resource info\s*(.+?)\s*Date of use/i)?.[1] || '';
+    const tm = resource.match(/(\d{1,2}):(\d{2})\s*([AP]M)?/i);
+    const date = t.match(/Date of use\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
+    const guests = parseInt(t.match(/Booking Quantity\s*(\d+)/i)?.[1] || '0', 10);
+    const name = (t.match(/Name:\s*(.+?)\s*(?:Email:|Phone:|Preferred language)/i)?.[1]
+      || t.match(/Guest name\s*(.+?)\s*Guest contact/i)?.[1] || '').trim();
+    const lang = t.match(/Preferred language:\s*([A-Za-z ]+?)\s*(?:Select a button|$)/i)?.[1];
+    if (!product || !tm || !date || !guests || !name) {
+      return { kind: 'unreadable', platform: 'tripcom', reason: 'missing date/time/product/guests' };
+    }
+    return {
+      kind: 'new', platform: 'tripcom', ref, date, time: to24h(tm[1], tm[2], tm[3]), guests, name,
+      packageText: product, packageSlug: mapPackage(product),
+      extra: lang ? `Customer language: ${lang.trim()}` : undefined,
+    };
+  }
+  // Trip.com agent emails like "【Booking No. ：1578…】" — usually a guest
+  // asking to cancel/change; the shop has to answer in Vbooking.
+  const other = s.match(/Booking\s*No\.?\s*[：:]\s*(\d{8,})/i);
+  if (other) {
+    const cancel = /cancel/i.test(t);
+    return {
+      kind: 'alert', platform: 'tripcom', ref: other[1],
+      message: cancel
+        ? 'Trip.com says the guest asked to CANCEL — please answer in Vbooking, then cancel the booking in admin if approved'
+        : 'Trip.com sent a message about this booking — please check Vbooking',
+    };
+  }
+  return { kind: 'ignore' };
+}
+
+const THAI_MONTHS: Record<string, string> = {
+  'มกราคม': '01', 'กุมภาพันธ์': '02', 'มีนาคม': '03', 'เมษายน': '04', 'พฤษภาคม': '05', 'มิถุนายน': '06',
+  'กรกฎาคม': '07', 'สิงหาคม': '08', 'กันยายน': '09', 'ตุลาคม': '10', 'พฤศจิกายน': '11', 'ธันวาคม': '12',
+};
+
+/** Thai/English Guidestination title → slug; falls back to time + length for the all-in-one listing. */
+export function mapGuidestination(title: string, start: string, end: string): string | null {
+  const t = title.toLowerCase();
+  if (/สกินแคร์|ผิว|อโรมา|skin|aromatherap/.test(t)) return 'skincare-aromatherapy';
+  const tea = /ชา|\btea\b/.test(t);
+  const inhaler = /สูดดม|ยาดม|inhaler|ya\s*dom|yadom/.test(t);
+  const ball = /ลูกบอล|ลูกประคบ|\bball\b|compress/.test(t);
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const minutes = (eh * 60 + em) - (sh * 60 + sm);
+  const count = [tea, inhaler, ball].filter(Boolean).length;
+  if (count > 0 && count < 3) return mapPackage(title.replace(/ชา/g, ' tea ').replace(/สูดดม|ยาดม/g, ' inhaler ').replace(/ลูกบอล|ลูกประคบ/g, ' ball '));
+  // All-in-one listing: decide by length and start hour.
+  if (minutes >= 170) return 'journey-full';
+  if (minutes >= 110) return [11, 15].includes(sh) ? 'combo-inhaler-ball' : null; // 10/14 could be tea+inhaler or tea+ball
+  if (minutes >= 50) {
+    if ([10, 14].includes(sh)) return 'single-tea';
+    if ([11, 15].includes(sh)) return 'single-inhaler';
+    if ([12, 16].includes(sh)) return 'single-massage-ball';
+  }
+  return null;
+}
+
+function parseGuidestination(subject: string, t: string): OtaParsed {
+  const s = subject.trim();
+  const ref = t.match(/รหัสการจอง\s*([A-Za-z0-9-]+)/)?.[1] || '';
+  if (/ยกเลิก|cancel/i.test(s)) {
+    return {
+      kind: 'alert', platform: 'guidestination', ref,
+      message: 'Guidestination sent a cancellation — please cancel this booking in admin',
+    };
+  }
+  if (!/^ยืนยันการจอง|booking confirm/i.test(s)) return { kind: 'ignore' };
+  const title = s.replace(/^ยืนยันการจอง\s*[–-]\s*/, '').trim();
+  const when = t.match(/กำหนดการกิจกรรม\s*(\d{1,2})\s+(\S+)\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
+  const guests = parseInt(t.match(/จำนวนลูกค้า\s*(\d+)/)?.[1] || '0', 10);
+  const email = t.match(/มีการจองจาก\s*(\S+@\S+?)\s/)?.[1];
+  const month = when ? THAI_MONTHS[when[2]] : undefined;
+  if (!ref || !when || !month || !guests) {
+    return { kind: 'unreadable', platform: 'guidestination', reason: 'missing booking code/date/time/guests' };
+  }
+  let year = parseInt(when[3], 10);
+  if (year > 2400) year -= 543; // Thai Buddhist year
+  const start = `${pad(when[4])}:${when[5]}`;
+  const end = `${pad(when[6])}:${when[7]}`;
+  const special = t.match(/คำขอพิเศษ\s*(.+?)\s*ยอดสุทธิ/)?.[1]?.trim();
+  return {
+    kind: 'new', platform: 'guidestination', ref, date: `${year}-${month}-${pad(when[1])}`, time: start,
+    guests, name: email ? email.split('@')[0] : 'Guidestination guest', email,
+    packageText: `${title} (${start}–${end})`, packageSlug: mapGuidestination(title, start, end),
+    price: t.match(/ยอดสุทธิที่จะโอน\s*(฿\s*[\d,.]+)/)?.[1] && `net ${t.match(/ยอดสุทธิที่จะโอน\s*(฿\s*[\d,.]+)/)?.[1]}`,
+    extra: special && !/ไม่มีคำขอพิเศษ/.test(special) ? `Special request: ${special}` : undefined,
+  };
+}
+
 export function parseOtaEmail(input: OtaEmailInput): OtaParsed {
   const platform = detectPlatform(input.from || '');
   if (!platform) return { kind: 'ignore' };
   const t = normalize(input.body);
   if (platform === 'klook') return parseKlook(input.subject || '', t);
   if (platform === 'getyourguide') return parseGyg(input.subject || '', t);
+  if (platform === 'tripcom') return parseTripcom(input.subject || '', t);
+  if (platform === 'guidestination') return parseGuidestination(input.subject || '', t);
   return parseKkday(input.subject || '', t);
 }

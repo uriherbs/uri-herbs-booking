@@ -3,7 +3,7 @@
 // ============================================================
 // Called every minute by a small Google Apps Script in the shop's Gmail
 // (see docs in the project: ota-email-import) with each new Klook /
-// GetYourGuide / KKday email: { from, subject, body, messageId }.
+// GetYourGuide / KKday / Trip.com / Guidestination email: { from, subject, body, messageId }.
 // Auth: header "x-import-secret" must equal OTA_IMPORT_SECRET.
 //
 // New booking  → ota_create_booking() (paid, source 'ota', no customer
@@ -95,6 +95,11 @@ export async function POST(request: NextRequest) {
   if (parsed.kind === 'unreadable') {
     await notifyManual(parsed.platform, email.subject, `the email layout was not recognised (${parsed.reason})`, {});
     return NextResponse.json({ result: 'manual', reason: parsed.reason });
+  }
+
+  if (parsed.kind === 'alert') {
+    await notifyManual(parsed.platform, email.subject, parsed.message, { 'Booking ref': parsed.ref });
+    return NextResponse.json({ result: 'alert', ref: parsed.ref });
   }
 
   // ── Cancellation ──
