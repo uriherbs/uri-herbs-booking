@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 
 // SITE_URL: update this the day the real domain (uriherbs.com) actually
 // points at this app instead of the old SimplyBook-based site (council
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ margin: 0 }}>
         {children}
         <FloatingWhatsApp />
+        <GoogleAnalytics />
       </body>
     </html>
   );

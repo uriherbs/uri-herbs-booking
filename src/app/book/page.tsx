@@ -1453,8 +1453,26 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
 // STEP 5: CONFIRMATION
 // ════════════════════════════════════════════════════════════
 
+// Google Analytics: one "purchase" per confirmed booking (the ref is the
+// transaction id, so GA also ignores accidental repeats). Lets Analytics
+// show which pages, searches and countries lead to real bookings.
+const trackedBookingRefs = new Set<string>();
+
 function ConfirmationStep({ pkg, result, form, onReset, paymentMethod }) {
   const paidOnline = paymentMethod === "stripe" || paymentMethod === "paypal";
+  useEffect(() => {
+    const ref = result?.booking_ref;
+    const gtag = (window as any).gtag;
+    if (!ref || trackedBookingRefs.has(ref) || typeof gtag !== "function") return;
+    trackedBookingRefs.add(ref);
+    gtag("event", "purchase", {
+      transaction_id: ref,
+      value: Number(result.total_price_thb) || 0,
+      currency: "THB",
+      payment_type: paymentMethod || "pay_later",
+      items: [{ item_id: pkg?.slug, item_name: pkg?.name, quantity: 1, price: Number(result.total_price_thb) || 0 }],
+    });
+  }, [result, pkg, paymentMethod]);
   const dateObj = new Date(result.slot_date + "T00:00:00");
   const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];
   const monthName = MONTHS[dateObj.getMonth()];
