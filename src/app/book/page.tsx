@@ -10,7 +10,6 @@ import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButto
 import { PaymentLoadingBox } from "@/components/payments/PaymentStatusBoxes";
 import LegalModal from "@/components/legal/LegalModal";
 import { legalDocs } from "@/lib/legal-content";
-import { ReviewsStripClient } from "@/components/ReviewsStripClient";
 
 // ════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -398,44 +397,186 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
   );
 }
 
-function ModeToggle({ isPrivate, onChange }) {
-  const options = [
-    { value: false, label: "Join a Group", sub: "Share a table · best value" },
-    { value: true, label: "Private Session", sub: "Just your group" },
-  ];
+// ════════════════════════════════════════════════════════════
+// PRIVATE SESSION — entry card, explainer sheet, Group/Private cards
+// ════════════════════════════════════════════════════════════
+// Owner-approved design (2026-09-28): Private is explained up front
+// (entry card at the top of step 1 → bottom-sheet explainer) AND
+// chosen next to the guest count as two priced cards, so customers
+// who skipped the top card still see it. Both paths set the same
+// isPrivate state. What private includes (owner's list): own table &
+// instructor (no strangers), welcome herbal tea & chia pudding,
+// unlimited photos. Pricing copy must match chargedParticipants() /
+// create_booking(): priced from 4 guests; 5–8 pay per person; 9–16
+// take the whole studio (both instructors), priced from 10;
+// Skincare & Aromatherapy private = whole class, priced as 4 chairs.
+
+const PRIVATE_PERKS = [
+  { icon: "🫶", title: "No strangers.", text: "Regular sessions are shared with whoever books the same time. A private session is only your group." },
+  { icon: "🧑‍🏫", title: "Your own instructor", text: "for the whole session, at your own pace." },
+  { icon: "🍵", title: "Welcome herbal tea & chia pudding", text: "when you arrive." },
+  { icon: "📸", title: "Unlimited photos", text: "— your instructor captures the moments on your phone." },
+];
+
+function PrivateEntryCard({ onOpen }) {
+  return (
+    <button
+      onClick={onOpen}
+      style={{
+        width: "100%", textAlign: "left", cursor: "pointer", border: "none",
+        background: `linear-gradient(135deg, ${C.forest}, ${C.sageDark})`,
+        color: C.white, borderRadius: 16, padding: "14px 14px",
+        display: "flex", alignItems: "center", gap: 12, marginBottom: 20,
+        boxShadow: "0 4px 14px rgba(45,70,57,0.2)",
+      }}
+    >
+      <span aria-hidden="true" style={{
+        width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,0.15)",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+      }}>🌿</span>
+      <span style={{ flex: 1 }}>
+        <span style={{ display: "block", fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700 }}>Private Session</span>
+        <span style={{ display: "block", fontFamily: "'DM Sans'", fontSize: 12, opacity: 0.9, lineHeight: 1.4 }}>
+          Your own table &amp; instructor. No strangers.
+        </span>
+      </span>
+      <span style={{ fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 700, color: "#E8D9B8", whiteSpace: "nowrap" }}>
+        See what's included ›
+      </span>
+    </button>
+  );
+}
+
+function PrivateSelectedBar({ onChange, onInfo }) {
   return (
     <div style={{
-      display: "flex", gap: 4, background: C.mist, borderRadius: 12, padding: 4,
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+      background: C.sageLight, border: "1px solid rgba(107,143,113,0.3)", borderRadius: 12,
+      padding: "10px 14px", marginBottom: 20, fontFamily: "'DM Sans'", fontSize: 13, color: C.forest,
     }}>
-      {options.map(opt => {
-        const selected = isPrivate === opt.value;
-        return (
-          <button
-            key={String(opt.value)}
-            onClick={() => onChange(opt.value)}
-            style={{
-              flex: 1, cursor: "pointer", border: "none", borderRadius: 9,
-              padding: "10px 8px", textAlign: "center",
-              background: selected ? C.white : "transparent",
-              boxShadow: selected ? "0 1px 5px rgba(0,0,0,0.08)" : "none",
-              transition: "all 0.15s",
-            }}
-          >
-            <div style={{
-              fontFamily: "'Crimson Pro'", fontSize: 15, fontWeight: 700,
-              color: selected ? C.forest : C.barkLight,
-            }}>{opt.label}</div>
-            <div style={{
-              fontFamily: "'DM Sans'", fontSize: 11, color: C.barkLight, marginTop: 1,
-            }}>{opt.sub}</div>
-          </button>
-        );
-      })}
+      <span style={{ fontWeight: 700 }}>✓ Private Session selected</span>
+      <span style={{ display: "flex", gap: 14 }}>
+        <button onClick={onInfo} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.sageDark, textDecoration: "underline", fontSize: 13, fontFamily: "'DM Sans'" }}>Details</button>
+        <button onClick={onChange} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.sageDark, textDecoration: "underline", fontSize: 13, fontFamily: "'DM Sans'", fontWeight: 700 }}>Change</button>
+      </span>
+    </div>
+  );
+}
+
+function PrivateInfoSheet({ open, onClose, onBook, isPrivate }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Private Session details" style={{ position: "fixed", inset: 0, zIndex: 10000 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(30,40,34,0.45)" }}/>
+      <div style={{
+        position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)",
+        width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto",
+        background: C.white, borderRadius: "22px 22px 0 0", padding: "12px 20px 24px",
+        boxShadow: "0 -8px 30px rgba(0,0,0,0.15)",
+      }}>
+        <div style={{ width: 40, height: 4, borderRadius: 4, background: C.sand, margin: "0 auto 14px" }}/>
+        <h3 style={{ fontFamily: "'Crimson Pro'", fontSize: 24, fontWeight: 700, color: C.forest, margin: 0 }}>Private Session</h3>
+        <p style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.barkLight, margin: "4px 0 16px" }}>
+          Just your group — perfect for couples, families &amp; celebrations
+        </p>
+        {PRIVATE_PERKS.map(p => (
+          <div key={p.title} style={{ display: "flex", gap: 12, marginBottom: 12, fontFamily: "'DM Sans'", fontSize: 14, color: C.bark, lineHeight: 1.45 }}>
+            <span aria-hidden="true" style={{
+              width: 32, height: 32, borderRadius: 10, background: C.sageLight, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+            }}>{p.icon}</span>
+            <span><strong style={{ color: C.forest }}>{p.title}</strong> {p.text}</span>
+          </div>
+        ))}
+        <div style={{
+          background: C.goldLight, border: "1px solid rgba(168,144,104,0.3)", borderRadius: 12,
+          padding: "12px 14px", margin: "6px 0 18px", fontFamily: "'DM Sans'", fontSize: 13,
+          color: C.bark, lineHeight: 1.55,
+        }}>
+          <strong style={{ color: C.forest }}>Pricing:</strong> the same price per person, with a minimum of 4 guests.
+          <br/>Example: 2 guests on a single workshop = ฿3,680 (priced as 4).
+          <br/>5–8 guests? You pay only for your group.
+          <br/>9–16 guests get the whole studio with both instructors (priced from 10).
+          <br/>Skincare &amp; Aromatherapy: the whole class for your group, priced as 4 seats.
+        </div>
+        {!isPrivate && (
+          <button onClick={onBook} style={{
+            width: "100%", padding: "15px", borderRadius: 14, border: "none", cursor: "pointer",
+            background: C.sage, color: C.white, fontFamily: "'DM Sans'", fontSize: 15, fontWeight: 700,
+          }}>Book a Private Session</button>
+        )}
+        <button onClick={onClose} style={{
+          width: "100%", padding: "12px", marginTop: 6, border: "none", background: "none", cursor: "pointer",
+          color: C.barkLight, fontFamily: "'DM Sans'", fontSize: 14,
+        }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+function ModeCards({ pkg, participants, isPrivate, onChange, onInfo }) {
+  const groupTotal = pkg.price * participants;
+  const privCharged = chargedParticipants(participants, true);
+  const privTotal = pkg.price * privCharged;
+  const groupDisabled = participants > 6; // group bookings cap at 6 per booking
+  const card = (selected, disabled): React.CSSProperties => ({
+    flex: 1, textAlign: "left", position: "relative", cursor: disabled ? "default" : "pointer",
+    background: selected ? "#F4F8F5" : C.white, opacity: disabled ? 0.55 : 1,
+    border: selected ? `2px solid ${C.sage}` : `1.5px solid ${C.sand}`,
+    borderRadius: 14, padding: "12px 11px", fontFamily: "'DM Sans'",
+  });
+  const tick = (
+    <span aria-hidden="true" style={{
+      position: "absolute", top: 8, right: 9, width: 18, height: 18, borderRadius: "50%",
+      background: C.sage, color: C.white, fontSize: 11, textAlign: "center", lineHeight: "18px",
+    }}>✓</span>
+  );
+  return (
+    <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+      <button aria-pressed={!isPrivate} disabled={groupDisabled} onClick={() => onChange(false)} style={card(!isPrivate, groupDisabled)}>
+        {!isPrivate && tick}
+        <div style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 700, color: C.forest, paddingRight: 20 }}>Join a Group</div>
+        <div style={{ fontSize: 11.5, color: C.barkLight, marginTop: 3, lineHeight: 1.4 }}>
+          {groupDisabled ? "Up to 6 guests per booking" : "Share the session with other travellers"}
+        </div>
+        <div style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.sageDark, marginTop: 8 }}>
+          ฿{groupTotal.toLocaleString()}
+        </div>
+        <div style={{ fontSize: 10.5, color: C.gold, fontWeight: 700 }}>฿{pkg.price.toLocaleString()} × {participants}</div>
+      </button>
+      <button aria-pressed={isPrivate} onClick={() => onChange(true)} style={card(isPrivate, false)}>
+        {isPrivate && tick}
+        <div style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 700, color: C.forest, paddingRight: 20 }}>Private Session</div>
+        <div style={{ fontSize: 11.5, color: C.barkLight, marginTop: 3, lineHeight: 1.4 }}>
+          Your own table &amp; instructor, tea, chia pudding, photos
+        </div>
+        <div style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.sageDark, marginTop: 8 }}>
+          ฿{privTotal.toLocaleString()}
+        </div>
+        <div style={{ fontSize: 10.5, color: C.gold, fontWeight: 700 }}>
+          {privCharged > participants ? `priced as ${privCharged} guests` : `฿${pkg.price.toLocaleString()} × ${participants}`}
+        </div>
+        <span
+          role="link" tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onInfo(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onInfo(); } }}
+          style={{ display: "inline-block", marginTop: 6, fontSize: 11.5, color: C.sageDark, textDecoration: "underline" }}
+        >ⓘ What's included</span>
+      </button>
     </div>
   );
 }
 
 function PackageStep({ packages, selected, onSelect, participants, onParticipantsChange, isPrivate, onIsPrivateChange }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
   // Most expensive/longest first, per business request — highest-value
   // option gets first look before the customer scrolls past it.
   const categories = [
@@ -470,6 +611,14 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
 
   return (
     <div style={{ padding: "0 16px 100px" }}>
+      {isPrivate
+        ? <PrivateSelectedBar onChange={() => onIsPrivateChange(false)} onInfo={() => setSheetOpen(true)} />
+        : <PrivateEntryCard onOpen={() => setSheetOpen(true)} />}
+      <PrivateInfoSheet
+        open={sheetOpen} isPrivate={isPrivate}
+        onClose={() => setSheetOpen(false)}
+        onBook={() => { onIsPrivateChange(true); setSheetOpen(false); }}
+      />
       {categories.map(cat => {
         const catPackages = packages.filter(p => p.category === cat.key);
         if (catPackages.length === 0) return null;
@@ -512,15 +661,10 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             </p>
           </div>
 
-          {/* Private vs. Group toggle */}
-          <div style={{ marginBottom: 14 }}>
-            <ModeToggle isPrivate={isPrivate} onChange={onIsPrivateChange} />
-          </div>
-
           {/* Participant counter */}
           <div style={{
             background: C.white, borderRadius: 14, padding: "16px 18px",
-            border: `1.5px solid ${C.sand}`, marginBottom: isPrivate ? 10 : 20,
+            border: `1.5px solid ${C.sand}`, marginBottom: 12,
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <div>
@@ -529,10 +673,10 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
               </div>
               <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, marginTop: 2 }}>
                 {isAroma
-                  ? (isPrivate ? "Up to 4 — the whole session, flat rate" : "Up to 4, sharing the session with other guests")
+                  ? "Up to 4 — this class has 4 seats"
                   : isPrivate
-                    ? "Up to 16 — 8 per table, or the whole space for 9+"
-                    : "Up to 6, sharing a table with other guests"}
+                    ? "Up to 16 in a private session"
+                    : "Up to 6 · 7 or more? Choose Private"}
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -564,17 +708,30 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             </div>
           </div>
 
-          {/* Private-mode dynamic messaging, per spec §4 (herbal) /
-              aromatherapy-capacity-fix doc (aromatherapy) */}
-          {isPrivate && (
-            <div style={{
-              background: C.goldLight, border: `1px solid rgba(168,144,104,0.25)`,
-              borderRadius: 12, padding: "12px 14px", marginBottom: 20,
-              fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.5,
-            }}>
-              {privateModeMessageFor(selectedPkg.calendar, participants)}
-            </div>
-          )}
+          {/* Group / Private as two priced cards (replaces the old
+              toggle) — each shows its own live total so the price
+              difference is visible before choosing. */}
+          <ModeCards
+            pkg={selectedPkg} participants={participants} isPrivate={isPrivate}
+            onChange={onIsPrivateChange} onInfo={() => setSheetOpen(true)}
+          />
+
+          {isPrivate && (() => {
+            const charged = chargedParticipants(participants, true);
+            const extra = charged - participants;
+            const msg = extra > 0
+              ? `You have ${participants} guest${participants > 1 ? "s" : ""} — ${extra} more can join at no extra cost.`
+              : !isAroma && participants >= 9
+                ? "The whole studio is yours, with both instructors."
+                : "Just your group, with your own instructor.";
+            return (
+              <div style={{
+                background: C.goldLight, border: `1px solid rgba(168,144,104,0.25)`,
+                borderRadius: 12, padding: "10px 14px", marginBottom: 14,
+                fontFamily: "'DM Sans'", fontSize: 13, color: C.bark, lineHeight: 1.5,
+              }}>{msg}</div>
+            );
+          })()}
 
           {/* Live running total — the price also already updates live
               on the selected PackageCard above, but it's off-screen by
@@ -931,7 +1088,7 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
 // STEP 3: CUSTOMER DETAILS
 // ════════════════════════════════════════════════════════════
 
-function CustomerStep({ form, onChange, errors }) {
+function CustomerStep({ form, onChange, errors, isPrivate = false }) {
   const inputStyle = (hasError: boolean): React.CSSProperties => ({
     width: "100%", boxSizing: "border-box",
     fontFamily: "'DM Sans'", fontSize: 16, // 16px prevents iOS zoom
@@ -1005,9 +1162,9 @@ function CustomerStep({ form, onChange, errors }) {
         </div>
 
         <div>
-          <label style={labelStyle}>Special Requests</label>
+          <label style={labelStyle}>{isPrivate ? "Allergies & Special Requests" : "Special Requests"}</label>
           <textarea
-            placeholder="Allergies, dietary needs, special occasions..."
+            placeholder={isPrivate ? "Any food allergies? (we serve welcome tea & chia pudding) · special occasions..." : "Allergies, dietary needs, special occasions..."}
             value={form.notes} onChange={e => onChange("notes", e.target.value)}
             rows={3}
             style={{ ...inputStyle(false), resize: "vertical", lineHeight: 1.5 }}
@@ -1847,9 +2004,6 @@ export default function BookingFlow() {
           />
         )
       )}
-      {step === 0 && !packagesLoading && !packagesError && (
-        <ReviewsStripClient gold={C.gold} forest={C.forest} bark={C.bark} />
-      )}
       {step === 1 && pkg && (
         <DateTimeStep
           selectedDate={selectedDate} onSelectDate={(d) => { setSelectedDate(d); setSelectedTime(null); }}
@@ -1858,7 +2012,7 @@ export default function BookingFlow() {
         />
       )}
       {step === 2 && (
-        <CustomerStep form={form} onChange={updateForm} errors={errors}/>
+        <CustomerStep form={form} onChange={updateForm} errors={errors} isPrivate={isPrivate}/>
       )}
       {step === 3 && (
         <PaymentStep
