@@ -41,7 +41,7 @@ export type OtaParsed =
 
 export const PLATFORM_LABEL: Record<OtaPlatform, string> = {
   klook: 'Klook',
-  getyourguide: 'GetYourGuide',
+  getyourguide: 'Get Your Guide',
   kkday: 'KKday',
   tripcom: 'Trip.com',
   guidestination: 'Guidestination',

@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
     p_date: p.date,
     p_start_time: p.time,
     p_num_participants: p.guests,
-    p_customer_name: `${p.name} (${PLATFORM_LABEL[p.platform]})`,
+    p_customer_name: `${PLATFORM_LABEL[p.platform]} (${p.name})`,
     p_customer_notes: notes,
     p_ota_platform: p.platform,
     p_ota_ref: p.ref,
