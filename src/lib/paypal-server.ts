@@ -8,13 +8,16 @@
 // route imports getPayPalAccessToken() instead of re-implementing
 // OAuth.
 
-// The keys currently configured in Vercel are SANDBOX keys (per the
-// task brief). Sandbox and live PayPal use different API hosts —
-// there's no way to detect which kind of key is configured from the
-// key string itself, so this is a deliberate single constant to flip
-// by hand when moving to real production keys (see the setup guide).
-export const PAYPAL_API_BASE = 'https://api-m.sandbox.paypal.com';
-// export const PAYPAL_API_BASE = 'https://api-m.paypal.com'; // ← live
+// Sandbox and live PayPal use different API hosts, and there's no way
+// to tell from the key string itself which kind is configured — so the
+// host is chosen by PAYPAL_ENV, set in Vercel next to the keys:
+//   PAYPAL_ENV=live     → https://api-m.paypal.com (real money)
+//   anything else/unset → https://api-m.sandbox.paypal.com
+// Keep PAYPAL_ENV in step with PAYPAL_CLIENT_ID / PAYPAL_SECRET /
+// PAYPAL_WEBHOOK_ID: live keys against the sandbox host (or the
+// reverse) fail with an auth error.
+export const PAYPAL_API_BASE =
+  process.env.PAYPAL_ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
 export async function getPayPalAccessToken(): Promise<string> {
   const clientId = process.env.PAYPAL_CLIENT_ID;
