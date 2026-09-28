@@ -31,8 +31,23 @@ const nextConfig = {
       { source: '/yadom-tea', destination: '/book', permanent: true },
       { source: '/yadom-ball', destination: '/book', permanent: true },
       { source: '/refreshandrelax', destination: '/book', permanent: true },
-      // Old blog post not carried over to the new blog.
+      // More old addresses found in Search Console (2026-09-28 export).
+      { source: '/herbaljourney', destination: '/book', permanent: true },
+      { source: '/naturalskincare-aromatherapy', destination: '/workshops/skincare-aromatherapy', permanent: true },
+      { source: '/naturalskincare-tea', destination: '/book', permanent: true },
+      { source: '/creativecare', destination: '/', permanent: true },
+      { source: '/thankyou', destination: '/', permanent: true },
+      // Old blog posts that exist on the new blog under a new address.
+      { source: '/blog/aloe-vera', destination: '/blog/aloe-vera-southeast-asias-botanical-gold', permanent: true },
+      { source: '/blog/natural-deodorant', destination: '/blog/deodorant-potential-harm-natural-solutions', permanent: true },
+      // Old blog posts not carried over to the new blog.
       { source: '/blog/utis', destination: '/blog', permanent: true },
+      { source: '/blog/water_lily', destination: '/blog', permanent: true },
+      // The old site's most-seen page (8,000+ Google impressions in 3 months).
+      // TEMPORARY (307) until the post is re-published on the new blog with
+      // the slug "avocado-pit" — then DELETE this line so /blog/avocado-pit
+      // serves the post itself and keeps its Google ranking.
+      { source: '/blog/avocado-pit', destination: '/blog', permanent: false },
     ];
   },
 };
