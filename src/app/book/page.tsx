@@ -821,9 +821,14 @@ function MiniCalendar({ selectedDate, onSelectDate, selectedPkg, participants, i
     return cells;
   }, [viewMonth, viewYear, statusByDate, calLoading]);
 
-  const canGoPrev = viewMonth > today.getMonth() || viewYear > today.getFullYear();
-  const maxMonth = today.getMonth() + 2;
-  const canGoNext = viewMonth < maxMonth || viewYear > today.getFullYear();
+  // Booking window: this month + the next 11 (12 months total). Counted
+  // as months-from-today so it works across the year boundary (the old
+  // `viewMonth < today.getMonth() + 2` check stopped at November when
+  // opened in September). The database keeps slots generated 12 months
+  // ahead via the daily `extend-daily-slots` cron job.
+  const monthsAhead = (viewYear - today.getFullYear()) * 12 + (viewMonth - today.getMonth());
+  const canGoPrev = monthsAhead > 0;
+  const canGoNext = monthsAhead < 11;
 
   return (
     <div style={{
