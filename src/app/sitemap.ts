@@ -19,6 +19,11 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.uriherbs.com';
 
 const WORKSHOP_SLUGS = ['tea-blending', 'ya-dom-inhaler', 'herbal-massage-ball', 'skincare-aromatherapy'];
 
+// Blog posts are edited in admin → Content → Blog. Without this the page
+// was built once at deploy time, so new or edited posts only appeared after
+// the next deploy. Re-check the database at most every 5 minutes.
+export const revalidate = 300;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, changeFrequency: 'weekly', priority: 1 },

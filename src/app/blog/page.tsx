@@ -26,6 +26,11 @@ import { PostCard } from '@/components/blog/PostCard';
 import { getActiveBlogPosts } from '@/lib/blog-content-service';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
+// Blog posts are edited in admin → Content → Blog. Without this the page
+// was built once at deploy time, so new or edited posts only appeared after
+// the next deploy. Re-check the database at most every 5 minutes.
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: 'Blog — Thai Herbs & Natural Wellness',
   alternates: { canonical: '/blog' },
