@@ -32,6 +32,11 @@ import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 // since it's only needed to build the absolute share URL below.
 const SITE_URL = 'https://www.uriherbs.com';
 
+// Blog posts are edited in admin → Content → Blog. Without this the page
+// was built once at deploy time, so new or edited posts only appeared after
+// the next deploy. Re-check the database at most every 5 minutes.
+export const revalidate = 300;
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await getBlogPostBySlug(params.slug);
   if (!post) return {};
