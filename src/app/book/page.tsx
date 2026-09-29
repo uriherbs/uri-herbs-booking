@@ -166,7 +166,9 @@ function mergePackage(dbPkg) {
 // actually charged.
 function chargedParticipants(participants, isPrivate) {
   if (!isPrivate) return participants;
-  const minimum = participants <= 8 ? 4 : 10;
+  // Owner decision 2026-09-28: minimum 4 only — 5+ (incl. 9–16
+  // whole-studio groups) pay for their actual headcount.
+  const minimum = 4;
   return Math.max(participants, minimum);
 }
 
@@ -407,8 +409,8 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
 // isPrivate state. What private includes (owner's list): own table &
 // instructor (no strangers), welcome herbal tea & chia pudding,
 // unlimited photos. Pricing copy must match chargedParticipants() /
-// create_booking(): priced from 4 guests; 5–8 pay per person; 9–16
-// take the whole studio (both instructors), priced from 10;
+// create_booking(): priced from 4 guests; 5+ pay per person; 9–16
+// take the whole studio (both instructors), per person;
 // Skincare & Aromatherapy private = whole class, priced as 4 chairs.
 
 const PRIVATE_PERKS = [
@@ -503,8 +505,8 @@ function PrivateInfoSheet({ open, onClose, onBook, isPrivate }) {
         }}>
           <strong style={{ color: C.forest }}>Pricing:</strong> the same price per person, with a minimum of 4 guests.
           <br/>Example: 2 guests on a single workshop = ฿3,680 (priced as 4).
-          <br/>5–8 guests? You pay only for your group.
-          <br/>9–16 guests get the whole studio with both instructors (priced from 10).
+          <br/>5 or more? You pay only for your group.
+          <br/>9–16 guests get the whole studio with both instructors.
           <br/>Skincare &amp; Aromatherapy: the whole class for your group, priced as 4 seats.
         </div>
         {!isPrivate && (
