@@ -37,6 +37,8 @@ const nextConfig = {
       { source: '/naturalskincare-tea', destination: '/book', permanent: true },
       { source: '/creativecare', destination: '/', permanent: true },
       { source: '/thankyou', destination: '/', permanent: true },
+      { source: '/group', destination: '/trade', permanent: true },
+      { source: '/privacypolicy', destination: '/privacy', permanent: true },
       // Old blog posts that exist on the new blog under a new address.
       { source: '/blog/aloe-vera', destination: '/blog/aloe-vera-southeast-asias-botanical-gold', permanent: true },
       { source: '/blog/natural-deodorant', destination: '/blog/deodorant-potential-harm-natural-solutions', permanent: true },
