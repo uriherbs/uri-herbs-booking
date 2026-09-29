@@ -45,11 +45,8 @@ const nextConfig = {
       // Old blog posts not carried over to the new blog.
       { source: '/blog/utis', destination: '/blog', permanent: true },
       { source: '/blog/water_lily', destination: '/blog', permanent: true },
-      // The old site's most-seen page (8,000+ Google impressions in 3 months).
-      // TEMPORARY (307) until the post is re-published on the new blog with
-      // the slug "avocado-pit" — then DELETE this line so /blog/avocado-pit
-      // serves the post itself and keeps its Google ranking.
-      { source: '/blog/avocado-pit', destination: '/blog', permanent: false },
+      // /blog/avocado-pit is served by the new blog again (re-published 2026-09-29).
+      { source: '/blob/avocado-pit', destination: '/blog/avocado-pit', permanent: true },
     ];
   },
 };
