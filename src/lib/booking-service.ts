@@ -57,14 +57,13 @@ export async function getPackages(calendarType?: 'herbal' | 'aromatherapy'): Pro
 // ────────────────────────────────────────────────────────────
 // Returns which start times are bookable, with capacity info.
 //
-// A "group" request shares a table with other bookings (soft cap 6);
-// a "private" request claims a whole table to itself (1-8, hard cap
-// 8) or — at 9+ guests — the whole space (both tables, cap 16). See
-// migration "add_private_vs_group_capacity_model" for the full model.
+// Seats are counted per hour (migration 20260930_seat_based_capacity):
+// group bookings share 12 seats; a private session takes one area
+// (1-8, a table + instructor) or both (9-16).
 //
 // Usage:
 //   const slots = await getAvailableSlots('2026-07-28', 'combo-tea-inhaler', 2);
-//   → [{ start_time: '10:00', remaining: 8, group: 'A', available: true }, ...]
+//   → [{ start_time: '10:00', remaining: 8, group: null, available: true }, ...]
 
 export async function getAvailableSlots(
   date: string,

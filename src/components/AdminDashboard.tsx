@@ -51,7 +51,7 @@ function mapBooking(row) {
     endTime: row.end_time.slice(0, 5),
     blocks: computeBlocks(row.start_time, pkg?.duration_minutes || 60),
     guests: row.num_participants,
-    group: row.instructor_group, // 'A' | 'B' | null (null = whole-space private)
+    group: row.instructor_group, // legacy table letter on old bookings; not used for capacity since 2026-09-30
     isPrivate: !!row.is_private,
     name: row.customer_name,
     email: row.customer_email || "",
@@ -139,10 +139,22 @@ function formatTime12(t) {
   return `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? "PM" : "AM"}`;
 }
 
-// Two-tone capacity gauge: sage = Group A, gold = Group B — two independent
-// tables, each soft-capped at 6 (up to 8 for a private booking), not one
-// sequential pool.
-function CapacityGauge({ groupA, groupB, max = 16, blocked }) {
+// Seat gauge (owner decision 2026-09-30: count people, not tables).
+// Herbal hour = two areas (a table of up to 8 + instructor each).
+// Groups share 12 seats. A private session takes a whole area (1–8
+// people) or both (9–16); with one area private, the other takes up to
+// 8 group people or one more private. Aromatherapy: 4 chairs, private
+// closes the session. Group seats left — mirrors seats_left() in the DB.
+function privateAreas(bookings) {
+  return bookings.reduce((s, b) => s + (b.isPrivate ? (b.guests <= 8 ? 1 : 2) : 0), 0);
+}
+function seatsLeft(calendar, group, priv, areas) {
+  if (calendar === "aromatherapy") return priv > 0 ? 0 : Math.max(0, 4 - group);
+  if (areas >= 2) return 0;
+  return Math.max(0, (areas === 1 ? 8 : 12) - group);
+}
+
+function CapacityGauge({ group, priv, areas = 0, calendar = "herbal", blocked }) {
   if (blocked) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -154,24 +166,27 @@ function CapacityGauge({ groupA, groupB, max = 16, blocked }) {
       </div>
     );
   }
-  const pctA = (groupA / max) * 100;
-  const pctB = (groupB / max) * 100;
-  const total = groupA + groupB;
+  const isAroma = calendar === "aromatherapy";
+  const groupMax = isAroma ? 4 : areas >= 2 ? 0 : areas === 1 ? 8 : 12;
+  const spaceMax = isAroma ? 4 : 16;
+  const left = seatsLeft(calendar, group, priv, areas);
+  const pctG = Math.min(100, (group / spaceMax) * 100);
+  const pctP = Math.min(100 - pctG, (priv / spaceMax) * 100);
   return (
     <div>
       <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: C.mist }}>
-        {pctA > 0 && <div style={{ width: `${pctA}%`, background: C.sage, transition: "width 0.3s" }}/>}
-        {pctB > 0 && <div style={{ width: `${pctB}%`, background: C.gold, transition: "width 0.3s" }}/>}
+        {pctG > 0 && <div style={{ width: `${pctG}%`, background: C.sage, transition: "width 0.3s" }}/>}
+        {pctP > 0 && <div style={{ width: `${pctP}%`, background: C.coral, transition: "width 0.3s" }}/>}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, gap: 8 }}>
         <div style={{ display: "flex", gap: 10, fontSize: 11, fontFamily: "'DM Sans'", color: C.barkLight }}>
-          {groupA > 0 && <span><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: C.sage, marginRight: 3, verticalAlign: "middle" }}/>A: {groupA}</span>}
-          {groupB > 0 && <span><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: C.gold, marginRight: 3, verticalAlign: "middle" }}/>B: {groupB}</span>}
+          <span><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: C.sage, marginRight: 3, verticalAlign: "middle" }}/>Group {group}/{groupMax}</span>
+          {priv > 0 && <span><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: C.coral, marginRight: 3, verticalAlign: "middle" }}/>Private {priv}</span>}
         </div>
         <span style={{
-          fontSize: 11, fontFamily: "'DM Sans'", fontWeight: 600,
-          color: total >= max ? C.coral : total >= 9 ? C.gold : C.sage,
-        }}>{total}/{max}</span>
+          fontSize: 11, fontFamily: "'DM Sans'", fontWeight: 600, whiteSpace: "nowrap",
+          color: left === 0 ? C.coral : left <= 3 ? C.gold : C.sage,
+        }}>{left === 0 ? "Full" : `${left} left`}</span>
       </div>
     </div>
   );
@@ -241,7 +256,7 @@ function BookingRow({ booking, onUpdate, onCancel }) {
         {/* Group indicator */}
         <div style={{
           width: 6, height: 36, borderRadius: 3, flexShrink: 0,
-          background: booking.group === "A" ? C.sage : booking.group === "B" ? C.gold : C.coral,
+          background: booking.isPrivate ? C.coral : C.sage,
         }}/>
 
         {/* Name & package */}
@@ -303,10 +318,9 @@ function BookingRow({ booking, onUpdate, onCancel }) {
             <div>
               <div style={{ fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Group</div>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: booking.group === "A" ? C.sage : booking.group === "B" ? C.gold : C.coral }}/>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: booking.isPrivate ? C.coral : C.sage }}/>
                 <span style={{ fontFamily: "'DM Sans'", fontSize: 13, color: C.forest }}>
-                  {booking.group === "A" ? "Group A (Mali)" : booking.group === "B" ? "Group B" : "Whole Space"}
-                  {booking.isPrivate && " · Private"}
+                  {booking.isPrivate ? "Private session" : "Group"}
                 </span>
               </div>
             </div>
@@ -406,30 +420,20 @@ function BookingRow({ booking, onUpdate, onCancel }) {
 // SLOT CARD — one hourly block with all its bookings
 // ══════════════════════════════════════════════════════════════════
 
-function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking, onCancelBooking }) {
+function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBooking, onCancelBooking, calendar = "herbal" }) {
   const [open, setOpen] = useState(bookings.length > 0);
   const isBlocked = blockedSlots.has(block.time);
 
-  // A whole-space private booking has group === null (occupies both
-  // tables at once) — split its headcount evenly across both bars so
-  // the gauge still reflects real occupancy instead of hiding it.
-  const groupA = bookings.reduce((s, b) => s + (b.group === "A" ? b.guests : b.group === null ? Math.ceil(b.guests / 2) : 0), 0);
-  const groupB = bookings.reduce((s, b) => s + (b.group === "B" ? b.guests : b.group === null ? Math.floor(b.guests / 2) : 0), 0);
-  const total = groupA + groupB;
+  const groupPeople = bookings.reduce((s, b) => s + (b.isPrivate ? 0 : b.guests), 0);
+  const privatePeople = bookings.reduce((s, b) => s + (b.isPrivate ? b.guests : 0), 0);
 
   const allArrived = bookings.length > 0 && bookings.every(b => b.attendance === "arrived");
   const allPaid = bookings.length > 0 && bookings.every(b => b.payment === "paid");
 
-  // Private-booking label (§6 of the spec) — visible on the collapsed
-  // header, next to the time, without needing to expand any booking.
-  const privateWhole = bookings.some(b => b.isPrivate && b.group === null);
-  const privateA = bookings.some(b => b.isPrivate && b.group === "A");
-  const privateB = bookings.some(b => b.isPrivate && b.group === "B");
-  const privateLabel = privateWhole || (privateA && privateB)
-    ? "Private — Full Space"
-    : privateA ? "Private — Group A"
-    : privateB ? "Private — Group B"
-    : null;
+  // Private-booking label — visible on the collapsed header.
+  const privateCount = bookings.filter(b => b.isPrivate).length;
+  const privateLabel = privateCount === 0 ? null
+    : privateCount === 1 ? "Private session" : `${privateCount} private sessions`;
 
   return (
     <div style={{
@@ -469,7 +473,7 @@ function SlotCard({ block, bookings, blockedSlots, onToggleBlock, onUpdateBookin
 
         {/* Capacity gauge */}
         <div style={{ flex: 1 }}>
-          <CapacityGauge groupA={groupA} groupB={groupB} blocked={isBlocked}/>
+          <CapacityGauge group={groupPeople} priv={privatePeople} areas={privateAreas(bookings)} calendar={calendar} blocked={isBlocked}/>
         </div>
 
         {/* Quick indicators */}
@@ -1035,7 +1039,7 @@ export default function AdminDashboard({ adminName, onSignOut }) {
                   {aromaBlocksToday.map(block => (
                     <SlotCard
                       key={`aroma-${block.time}`} block={block}
-                      bookings={aromaByBlock[block.time] || []}
+                      bookings={aromaByBlock[block.time] || []} calendar="aromatherapy"
                       blockedSlots={blockedTimesByCalendar.aromatherapy}
                       onToggleBlock={handleToggleBlock}
                       onUpdateBooking={handleUpdateBooking}
@@ -1060,22 +1064,18 @@ export default function AdminDashboard({ adminName, onSignOut }) {
         <div style={{
           fontFamily: "'DM Sans'", fontSize: 11, fontWeight: 600, color: C.barkLight,
           textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8,
-        }}>Instructor Groups</div>
+        }}>Seats per hour</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 12, height: 12, borderRadius: 3, background: C.sage }}/>
-            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group A · Mali (up to 6, 8 if private)</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 12, height: 12, borderRadius: 3, background: C.gold }}/>
-            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group B (up to 6, 8 if private)</span>
+            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Group bookings — up to 12 people per hour</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{
               width: 12, height: 12, borderRadius: 3, background: C.coralPale,
               border: `1px solid rgba(192,122,110,0.4)`,
             }}/>
-            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Private booking (table or full space closed)</span>
+            <span style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.bark }}>Private session — takes a table (1–8) or the whole space (9–16)</span>
           </div>
         </div>
       </div>

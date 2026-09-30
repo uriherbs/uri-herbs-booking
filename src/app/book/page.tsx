@@ -150,62 +150,46 @@ function mergePackage(dbPkg) {
 // there's now exactly one place the schedule matrix is enforced.
 
 // ════════════════════════════════════════════════════════════
-// PRIVATE VS. GROUP CAPACITY MODEL (spec /book §2.1)
+// CAPACITY MODEL (owner decision 2026-09-30) — seats, not tables
 // ════════════════════════════════════════════════════════════
-// Two instructors, two tables. A group ("join a group") booking shares
-// a table — soft-capped at 6 — with other parties, billed by actual
-// headcount. A private booking claims a whole table to itself:
-//   1–6 guests  → one table, one instructor
-//   7–8 guests  → same one table, just a cozier fit (messaging-only
-//                 difference — the locking logic is identical to 1–6)
-//   9–16 guests → both tables, both instructors (the whole space)
-// Pricing never adds a "private surcharge" — it's the same per-person
-// rate as group, just with a minimum headcount charged regardless of
-// actual attendance. Mirrors create_booking()'s GREATEST(...) logic
-// exactly, so what the customer sees pre-submit matches what they're
-// actually charged.
+// Herbal calendar, counted per hour:
+//   • Group ("join a group") bookings share 12 seats per hour. One
+//     booking may be 1–12 people; staff seat everyone on the day.
+//   • Two areas (a table of up to 8 + instructor each). A private
+//     session takes a whole area (1–8 people) or both (9–16). With one
+//     area private, the other takes up to 8 group people OR one more
+//     private of up to 8.
+//   • Multi-hour packages need room in every hour they cover.
+// Aromatherapy: 4 chairs; private closes the whole session.
+// The database (seats_left / reserve_seats) enforces all of this; the
+// page only mirrors it for display.
+//
+// Pricing never adds a "private surcharge" — same per-person rate, with
+// a minimum of 4 charged for private. Mirrors charge_participants().
 function chargedParticipants(participants, isPrivate) {
   if (!isPrivate) return participants;
-  // Owner decision 2026-09-28: minimum 4 only — 5+ (incl. 9–16
-  // whole-studio groups) pay for their actual headcount.
+  // Owner decision 2026-09-28: minimum 4 only — 5+ pay actual headcount.
   const minimum = 4;
   return Math.max(participants, minimum);
 }
 
-// Dynamic "Experience" step messaging, per spec §4. Herbal calendar
-// only (two tables/instructors) — see privateModeMessageFor() below,
-// which branches to aromatherapy's own wording instead of calling
-// this for that calendar.
-function privateModeMessage(participants) {
-  if (participants <= 6) return "Private session — just your group, with one instructor";
-  if (participants <= 8) return "Private session — just your group (cozy fit for up to 8, one instructor)";
-  return "Private session — the whole space, with both instructors";
+const GROUP_SEATS_PER_HOUR = 12;
+const SPACE_SEATS_PER_HOUR = 16;
+
+function privateModeMessage() {
+  return "Private session — your own instructor and table, just your group";
 }
 
-// Aromatherapy is NOT the herbal two-table model — one instructor,
-// 4 chairs, period (see aromatherapy-capacity-fix doc). Both modes
-// cap at 4 guests; the only difference private makes here is that it
-// closes the whole session to other guests and charges a flat
-// ฿10,800 (4 × price) regardless of actual headcount (1–4).
 function maxGuestsFor(calendarType, isPrivate) {
   if (calendarType === "aromatherapy") return 4;
-  return isPrivate ? 16 : 6;
+  return isPrivate ? SPACE_SEATS_PER_HOUR : GROUP_SEATS_PER_HOUR;
 }
 
 function privateModeMessageFor(calendarType, participants) {
   if (calendarType === "aromatherapy") {
     return "Private session — the whole session reserved just for your group (flat rate for all 4 chairs, however many of you come)";
   }
-  return privateModeMessage(participants);
-}
-
-// Table label shown on a Date & Time slot, mode-aware (group vs.
-// private) and null-safe (null = a whole-space private booking spans
-// both tables, so there's no single "group" to name).
-function slotGroupLabel(group, isPrivate) {
-  if (group === null) return isPrivate ? "Whole space — both instructors" : null;
-  const instructor = group === "A" ? "with Mali" : "Instructor B";
-  return isPrivate ? `Private table — Group ${group} (${instructor})` : `Group ${group} (${instructor})`;
+  return privateModeMessage();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -409,8 +393,7 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
 // isPrivate state. What private includes (owner's list): own table &
 // instructor (no strangers), welcome herbal tea & chia pudding,
 // unlimited photos. Pricing copy must match chargedParticipants() /
-// create_booking(): priced from 4 guests; 5+ pay per person; 9–16
-// take the whole studio (both instructors), per person;
+// create_booking(): priced from 4 guests; 5+ pay per person (up to 16);
 // Skincare & Aromatherapy private = whole class, priced as 4 chairs.
 
 const PRIVATE_PERKS = [
@@ -506,7 +489,7 @@ function PrivateInfoSheet({ open, onClose, onBook, isPrivate }) {
           <strong style={{ color: C.forest }}>Pricing:</strong> the same price per person, with a minimum of 4 guests.
           <br/>Example: 2 guests on a single workshop = ฿3,680 (priced as 4).
           <br/>5 or more? You pay only for your group.
-          <br/>9–16 guests get the whole studio with both instructors.
+          <br/>Groups of up to 16 guests.
           <br/>Skincare &amp; Aromatherapy: the whole class for your group, priced as 4 seats.
         </div>
         {!isPrivate && (
@@ -528,7 +511,7 @@ function ModeCards({ pkg, participants, isPrivate, onChange, onInfo }) {
   const groupTotal = pkg.price * participants;
   const privCharged = chargedParticipants(participants, true);
   const privTotal = pkg.price * privCharged;
-  const groupDisabled = participants > 6; // group bookings cap at 6 per booking
+  const groupDisabled = participants > maxGuestsFor(pkg.calendar, false); // group: up to 12 per booking (4 for aromatherapy)
   const card = (selected, disabled): React.CSSProperties => ({
     flex: 1, textAlign: "left", position: "relative", cursor: disabled ? "default" : "pointer",
     background: selected ? "#F4F8F5" : C.white, opacity: disabled ? 0.55 : 1,
@@ -547,7 +530,7 @@ function ModeCards({ pkg, participants, isPrivate, onChange, onInfo }) {
         {!isPrivate && tick}
         <div style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 700, color: C.forest, paddingRight: 20 }}>Join a Group</div>
         <div style={{ fontSize: 11.5, color: C.barkLight, marginTop: 3, lineHeight: 1.4 }}>
-          {groupDisabled ? "Up to 6 guests per booking" : "Share the session with other travellers"}
+          {groupDisabled ? `Up to ${maxGuestsFor(pkg.calendar, false)} guests per booking` : "Share the session with other travellers"}
         </div>
         <div style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.sageDark, marginTop: 8 }}>
           ฿{groupTotal.toLocaleString()}
@@ -678,7 +661,7 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
                   ? "Up to 4 — this class has 4 seats"
                   : isPrivate
                     ? "Up to 16 in a private session"
-                    : "Up to 6 · 7 or more? Choose Private"}
+                    : "Up to 12 · 13 or more? Choose Private"}
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -723,9 +706,7 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
             const extra = charged - participants;
             const msg = extra > 0
               ? `You have ${participants} guest${participants > 1 ? "s" : ""} — ${extra} more can join at no extra cost.`
-              : !isAroma && participants >= 9
-                ? "The whole studio is yours, with both instructors."
-                : "Just your group, with your own instructor.";
+              : "Just your group, with your own instructor.";
             return (
               <div style={{
                 background: C.goldLight, border: `1px solid rgba(168,144,104,0.25)`,
@@ -931,10 +912,9 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
 
   if (!selectedDate) return null;
 
-  // Same mode-dependent ceiling the RPC uses for remaining_capacity:
-  // 6 for a shared group table, 8 for a private one-table booking,
-  // 16 for a private whole-space booking. See spec /book §2.1 §1.
-  const maxCap = !isPrivate ? 6 : participants <= 8 ? 8 : 16;
+  // Seats per hour for this kind of booking (see CAPACITY MODEL above):
+  // 12 group seats / 16 for the whole space (private) / 4 aromatherapy.
+  const maxCap = maxGuestsFor(pkg?.calendar, isPrivate);
 
   const formatTime = (t) => {
     const [h] = t.split(":");
@@ -970,9 +950,7 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
             const isSelected = selectedTime === slot.start_time;
             const remaining = slot.remaining_capacity;
             const available = slot.is_available;
-            const group = slot.instructor_group;
-            const groupLabel = slotGroupLabel(group, isPrivate);
-            const pct = ((maxCap - remaining) / maxCap) * 100;
+            const pct = Math.min(100, Math.max(0, ((maxCap - remaining) / maxCap) * 100));
             return (
               <button key={slot.start_time}
                 onClick={() => available && onSelectTime(slot.start_time)}
@@ -993,27 +971,19 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
                       {formatTime(slot.start_time)}
                       <span style={{ fontSize: 13, fontWeight: 400, color: C.barkLight }}> – {formatTime(slot.end_time)}</span>
                     </div>
-                    {available && groupLabel && (
-                      <div style={{
-                        fontFamily: "'DM Sans'", fontSize: 11, color: C.sage, marginTop: 3,
-                        display: "flex", alignItems: "center", gap: 4,
-                      }}>
-                        <UsersSVG size={12} color={C.sage}/>
-                        {groupLabel}
-                      </div>
-                    )}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{
                       fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600,
                       color: remaining <= 3 ? C.coral : C.sage,
                     }}>
-                      {available ? `${remaining} left` : "Full"}
+                      {!available ? "Full" : isPrivate ? "Available" : `${remaining} left`}
                     </div>
                   </div>
                 </div>
 
-                {/* Capacity bar */}
+                {/* Capacity bar (group seats only — a private session books a whole table) */}
+                {!isPrivate && (
                 <div style={{
                   height: 4, background: C.mist, borderRadius: 2, marginTop: 10, overflow: "hidden",
                 }}>
@@ -1023,13 +993,7 @@ function TimeSlotPicker({ selectedDate, selectedTime, onSelectTime, pkg, partici
                     background: pct > 75 ? C.coral : pct > 50 ? C.gold : C.sage,
                   }}/>
                 </div>
-                <div style={{
-                  display: "flex", justifyContent: "space-between", marginTop: 4,
-                  fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight,
-                }}>
-                  <span>{maxCap - remaining} booked</span>
-                  <span>{maxCap} max</span>
-                </div>
+                )}
               </button>
             );
           })}
@@ -1533,8 +1497,7 @@ function ConfirmationStep({ pkg, result, form, onReset, paymentMethod }) {
               </div>
               <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight }}>
                 {pkg.duration} minutes • {result.num_participants} guest{result.num_participants > 1 ? "s" : ""} •{" "}
-                {result.instructor_group === null ? "Whole space" : `Group ${result.instructor_group}`}
-                {result.is_private && " · Private"}
+                {result.is_private ? "Private session" : "Group session"}
               </div>
             </div>
           </div>
@@ -1724,7 +1687,7 @@ export default function BookingFlow() {
   // switching between a herbal package and Aromatherapy (or between
   // herbal categories) can leave `participants` above the newly
   // selected package's max (Aromatherapy caps at 4 either way; herbal
-  // caps at 6 group / 16 private — see maxGuestsFor). Clamp down
+  // caps at 12 group / 16 private — see maxGuestsFor). Clamp down
   // rather than leaving an invalid count silently in state; never
   // needs to clamp UP, so a lower previous count is left untouched.
   const handleSelectPackage = useCallback((slug: string) => {
@@ -1740,7 +1703,7 @@ export default function BookingFlow() {
   // the package choice — e.g. switching Aromatherapy from Group (max
   // 4) is a no-op since Private is also capped at 4 there, but a
   // herbal Private → Group switch can still leave participants above
-  // the group soft cap (6).
+  // the group cap (12).
   const handleIsPrivateChange = useCallback((next: boolean) => {
     setIsPrivate(next);
     const max = maxGuestsFor(pkg?.calendar, next);

@@ -157,7 +157,9 @@ export default function ManualBookingModal({ open, initialDate, onClose, onCreat
 
   const update = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
-  const maxGuests = form.isPrivate ? 16 : 6;
+  // Seat model (2026-09-30): group bookings up to 12, private up to 16,
+  // aromatherapy 4 either way. The database enforces the per-hour limits.
+  const maxGuests = selectedPackage?.calendar_type === 'aromatherapy' ? 4 : form.isPrivate ? 16 : 12;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

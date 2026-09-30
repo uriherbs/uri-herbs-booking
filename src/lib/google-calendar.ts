@@ -87,12 +87,12 @@ function buildEvent(b: any) {
   const money = unpaid
     ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival`
     : `Paid ฿${Number(b.total_price_thb).toLocaleString()}${b.payment_method === 'stripe' ? ' (card)' : b.payment_method === 'paypal' ? ' (PayPal)' : ''}`;
-  const group = b.instructor_group ? `Group ${b.instructor_group}` : (b.is_private ? 'Whole space' : '');
+  const group = b.is_private ? 'Private session' : 'Group';
   const lines = [
     `Booking: ${b.booking_ref}`,
     `Workshop: ${pkgName}${b.is_private ? ' (private)' : ''}`,
     `Guests: ${b.num_participants}${b.has_minors ? ' (includes under-18s)' : ''}`,
-    group && `Table: ${group}`,
+    group && `Type: ${group}`,
     money,
     b.customer_phone && `Phone: ${b.customer_phone}`,
     b.customer_email && `Email: ${b.customer_email}`,

@@ -97,10 +97,11 @@ export interface BookingEmailData {
 // Mirrors the group-label logic in src/app/book/page.tsx's
 // slotGroupLabel() so the email matches what the customer already
 // saw on the confirmation page.
-function groupLabel(instructorGroup: 'A' | 'B' | null, isPrivate: boolean): string {
-  if (instructorGroup === null) return isPrivate ? 'Whole space — both instructors' : 'Whole space';
-  const instructor = instructorGroup === 'A' ? 'with Mali' : 'Instructor B';
-  return isPrivate ? `Private table — Group ${instructorGroup} (${instructor})` : `Group ${instructorGroup} (${instructor})`;
+// Since 2026-09-30 seats are counted per hour and staff seat guests on
+// the day, so no table letter is shown (instructorGroup kept for old rows).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function groupLabel(_instructorGroup: 'A' | 'B' | null, isPrivate: boolean): string {
+  return isPrivate ? 'Private session' : 'Group session';
 }
 
 function formatDateLong(dateStr: string): string {

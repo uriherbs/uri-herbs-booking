@@ -128,7 +128,7 @@ export interface CreateBookingRequest {
   customer_phone?: string;
   customer_notes?: string;
   has_minors?: boolean;
-  // Private session (own table, up to 8 — or the whole space, 9-16)
+  // Private session (1–8 = one table/area, 9–16 = the whole space)
   // vs. a public group join (shares a table, capped at 6). Defaults
   // to false (group) server-side if omitted.
   is_private?: boolean;
@@ -193,7 +193,7 @@ export function parseBookingError(pgMessage: string): BookingError {
 // User-friendly error messages (Thai tourists + international visitors)
 export const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   INVALID_PACKAGE:      'This workshop is not currently available.',
-  INVALID_PARTICIPANTS: 'Please check your guest count — up to 6 for a shared group session, or up to 16 for a private booking.',
+  INVALID_PARTICIPANTS: 'Please check your guest count — up to 12 for a group booking, or up to 16 for a private session.',
   INVALID_DATE:         'This date is not available for booking.',
   INVALID_TIME:         'This time slot is not available for the selected workshop.',
   INVALID_CUSTOMER:     'Please enter your name to complete the booking.',
@@ -242,7 +242,7 @@ export interface ManualBookingConfirmation {
 
 export const MANUAL_BOOKING_ERROR_MESSAGES_HE: Record<BookingErrorCode, string> = {
   INVALID_PACKAGE:      'This package is not currently available.',
-  INVALID_PARTICIPANTS: 'Guest count is invalid — up to 6 for a group booking, or up to 16 for a private booking (depending on the package).',
+  INVALID_PARTICIPANTS: 'Guest count is invalid — up to 12 for a group booking, or up to 16 for a private session (4 for Skincare & Aromatherapy).',
   INVALID_DATE:         'This date can\'t be booked (e.g. it may already be in the past).',
   INVALID_TIME:         'This time is not available for this package.',
   INVALID_CUSTOMER:     'Please enter a customer name.',
