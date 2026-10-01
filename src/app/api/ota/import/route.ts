@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ result: 'manual', reason: error.message });
     }
-    await sendOwnerCancellationEmail(db, b.id, `Cancelled on ${PLATFORM_LABEL[parsed.platform]} (${parsed.ref})`).catch(() => {});
+    await sendOwnerCancellationEmail(db, b.id, `Cancelled on ${PLATFORM_LABEL[parsed.platform]} (${parsed.ref})`, 'platform').catch(() => {});
     await syncBookingToCalendar(db, b.id);
     return NextResponse.json({ result: 'cancelled', booking_ref: b.booking_ref });
   }

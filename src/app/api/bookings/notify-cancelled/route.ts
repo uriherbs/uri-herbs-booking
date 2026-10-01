@@ -1,7 +1,9 @@
 // ============================================================
 // POST /api/bookings/notify-cancelled
 // ============================================================
-// Sends the customer cancellation email for a booking. Mirrors
+// Sends the customer cancellation email for a booking, plus a shop copy
+// ("Booking cancelled by staff (admin)") so admin cancellations leave a
+// record in the shop inbox like customer/platform ones do. Mirrors
 // /api/bookings/notify-confirmed exactly, just for the cancellation
 // side: cancelBookingAsAdmin() (src/lib/booking-service.ts) calls the
 // admin_cancel_booking RPC directly with the anon key (it can't send
@@ -20,7 +22,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
-import { sendCancellationEmail } from '@/lib/notifications';
+import { sendCancellationEmail, sendOwnerCancellationEmail } from '@/lib/notifications';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 export async function POST(request: NextRequest) {
@@ -54,9 +56,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sent: false });
   }
 
-  await sendCancellationEmail(db, booking.id).catch((err) =>
-    console.error(`sendCancellationEmail threw for ${bookingRef}:`, err?.message)
-  );
+  // Only the call that wins the claim sends the shop copy too, so a
+  // retried/duplicate request never emails the shop twice.
+  const firstSend = await sendCancellationEmail(db, booking.id).catch((err) => {
+    console.error(`sendCancellationEmail threw for ${bookingRef}:`, err?.message);
+    return false;
+  });
+  if (firstSend) {
+    await sendOwnerCancellationEmail(db, booking.id, 'Cancelled in the admin area', 'staff').catch((err) =>
+      console.error(`sendOwnerCancellationEmail threw for ${bookingRef}:`, err?.message)
+    );
+  }
   await syncBookingToCalendar(db, booking.id);
 
   return NextResponse.json({ sent: true });

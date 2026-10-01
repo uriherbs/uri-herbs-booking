@@ -924,20 +924,21 @@ Payment: ${method === 'later' ? `Collect ฿${Number(b.total_price_thb).toLocale
 // that only one caller can ever win, so a redundant/retried call is
 // safe. Never throws — a booking that's genuinely cancelled must not
 // fail because an email couldn't be sent; failures are logged loudly
-// instead. Customer-only (no owner copy): cancellation is always
-// admin-initiated here, so Mali already knows it happened — she's the
-// one who clicked Cancel.
+// instead. Customer email only — the shop copy is sent separately by
+// the caller (sendOwnerCancellationEmail). Returns true only for the
+// ONE call that claimed the send, so callers can send the shop copy
+// exactly once too (a retried/redundant call returns false).
 export async function sendCancellationEmail(
   db: any,
   bookingId: string,
   opts: { byCustomer?: boolean } = {}
-): Promise<void> {
+): Promise<boolean> {
   // Key check BEFORE the claim, so a misconfiguration never marks an
   // unsent email as sent.
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.error(`sendCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId} cancelled but no email sent`);
-    return;
+    return false;
   }
 
   const { data: claimed, error: claimError } = await db
@@ -950,11 +951,11 @@ export async function sendCancellationEmail(
 
   if (claimError) {
     console.error(`sendCancellationEmail: claim failed for booking ${bookingId}:`, claimError.message);
-    return;
+    return false;
   }
   if (!claimed) {
     // Already sent — expected, not an error.
-    return;
+    return false;
   }
 
   const { data: booking, error: fetchError } = await db
@@ -965,11 +966,11 @@ export async function sendCancellationEmail(
 
   if (fetchError || !booking) {
     console.error(`sendCancellationEmail: could not fetch booking ${bookingId}:`, fetchError?.message);
-    return;
+    return true; // claimed, but nothing more we can send
   }
 
   // Best-effort, only if they gave an email (it's optional at booking time).
-  if (!booking.customer_email) return;
+  if (!booking.customer_email) return true;
 
   // Refund wording only for customer self-cancellations of online
   // payments (Terms §4). Shop-initiated cancellations are handled
@@ -997,6 +998,7 @@ export async function sendCancellationEmail(
   } catch (err: any) {
     console.error(`sendCancellationEmail: email failed for ${booking.booking_ref}:`, err.message);
   }
+  return true;
 }
 
 function isPaidOnlineMethod(m: string | null | undefined): boolean {
@@ -1008,11 +1010,22 @@ function hoursBeforeStart(slotDate: string, startTime: string, at: Date): number
   return (start.getTime() - at.getTime()) / 36e5;
 }
 
-// Shop alert for a CUSTOMER self-cancellation (from /cancel/<token>).
-// Only called by /api/bookings/cancel right after customer_cancel_booking()
-// succeeds — that function only succeeds once per booking, so no claim
-// flag is needed. Admin cancellations don't send this (Mali clicked it).
-export async function sendOwnerCancellationEmail(db: any, bookingId: string, reason: string): Promise<void> {
+// Shop copy of every cancellation, so each one leaves a record in the
+// shop inbox. Who cancelled decides the wording:
+//   'customer' – /api/bookings/cancel (customer used their email link)
+//   'staff'    – /api/bookings/notify-cancelled (Cancel Booking in admin)
+//   'platform' – /api/ota/import (Klook / Get Your Guide / KKday cancelled)
+// Callers make sure it runs once per booking (customer_cancel_booking
+// only succeeds once; notify-cancelled only sends when it won the
+// cancellation_email_sent claim; OTA cancel only after a successful cancel).
+export type CancelledBy = 'customer' | 'staff' | 'platform';
+
+export async function sendOwnerCancellationEmail(
+  db: any,
+  bookingId: string,
+  reason: string,
+  by: CancelledBy = 'customer'
+): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.error(`sendOwnerCancellationEmail: RESEND_API_KEY not configured — booking ${bookingId}`);
@@ -1034,12 +1047,18 @@ export async function sendOwnerCancellationEmail(db: any, bookingId: string, rea
   const pkgName = pkg?.name || 'Uri Herbs Workshop';
   const paidOnline = isPaidOnlineMethod(b.payment_method);
   const hours = hoursBeforeStart(b.slot_date, b.start_time, b.cancelled_at ? new Date(b.cancelled_at) : new Date());
-  const refundLine = !paidOnline
+  const refundLine = by === 'platform'
+    ? 'Paid through the booking platform: any refund is handled by the platform.'
+    : !paidOnline
     ? 'Pay on arrival: nothing to refund.'
+    : by === 'staff'
+      ? `Paid online ฿${Number(b.total_price_thb).toLocaleString()} via ${b.payment_method === 'paypal' ? 'PayPal' : 'Stripe'}. Cancelled by the shop, so the customer is owed a full refund or a new date (Terms §4). Refund in the ${b.payment_method === 'paypal' ? 'PayPal' : 'Stripe'} dashboard if not done yet.`
     : hours >= 48
       ? `REFUND DUE: ฿${Number(b.total_price_thb).toLocaleString()} via ${b.payment_method === 'paypal' ? 'PayPal' : 'Stripe'} (cancelled ${Math.floor(hours)}h before, 48h+ = full refund). Please refund in the ${b.payment_method === 'paypal' ? 'PayPal' : 'Stripe'} dashboard.`
       : `No refund: cancelled ${Math.max(0, Math.floor(hours))}h before the workshop (inside 48h).`;
   const when = `${formatDateLong(b.slot_date)}, ${formatTime12(String(b.start_time).slice(0, 5))} – ${formatTime12(String(b.end_time).slice(0, 5))}`;
+  const byLabel = by === 'staff' ? 'staff (admin)' : by === 'platform' ? 'the booking platform' : 'customer';
+  const refundDue = by !== 'platform' && paidOnline && (by === 'staff' || hours >= 48);
   const safeReason = reason ? escapeHtml(reason) : '';
   const safeName = escapeHtml(String(b.customer_name || ''));
 
@@ -1049,7 +1068,7 @@ export async function sendOwnerCancellationEmail(db: any, bookingId: string, rea
   <table role="presentation" width="480" cellpadding="0" cellspacing="0" align="center" style="background:#ffffff; border-radius:16px; overflow:hidden; max-width:480px;">
     <tr><td style="background-color:#8A4B3C; padding:24px; text-align:center;">
       <div style="font-family: Georgia, serif; font-size:20px; color:#ffffff;">${icon} ${escapeHtml(pkgName)}</div>
-      <div style="font-size:12px; color:#F1D9D2; margin-top:6px; letter-spacing:0.5px;">Booking cancelled by customer · ${b.booking_ref}</div>
+      <div style="font-size:12px; color:#F1D9D2; margin-top:6px; letter-spacing:0.5px;">Booking cancelled by ${byLabel} · ${b.booking_ref}</div>
     </td></tr>
     <tr><td style="padding:24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #E8E2D8; border-radius:12px; overflow:hidden;">
@@ -1067,9 +1086,9 @@ export async function sendOwnerCancellationEmail(db: any, bookingId: string, rea
           <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Reason</div>
           <div style="font-size:14px; color:#2D4639;">${safeReason || '<span style="color:#8A7668;">(no reason given)</span>'}</div>
         </td></tr>
-        <tr><td style="padding:12px 16px; background-color:${paidOnline && hours >= 48 ? '#FFF3D6' : '#FAF7F0'};">
+        <tr><td style="padding:12px 16px; background-color:${refundDue ? '#FFF3D6' : '#FAF7F0'};">
           <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
-          <div style="font-size:14px; color:#2D4639;${paidOnline && hours >= 48 ? ' font-weight:bold;' : ''}">${escapeHtml(refundLine)}</div>
+          <div style="font-size:14px; color:#2D4639;${refundDue ? ' font-weight:bold;' : ''}">${escapeHtml(refundLine)}</div>
         </td></tr>
       </table>
       <p style="font-size:12px; color:#8A7668; text-align:center; margin:16px 0 0;">The spot has been released automatically. Uri Herbs Booking Admin</p>
@@ -1077,7 +1096,7 @@ export async function sendOwnerCancellationEmail(db: any, bookingId: string, rea
   </table>
 </body></html>`.trim();
 
-  const text = `Booking cancelled by customer — ${b.booking_ref}
+  const text = `Booking cancelled by ${byLabel} — ${b.booking_ref}
 
 ${icon} ${pkgName}
 ${when} · ${b.num_participants} guest${b.num_participants > 1 ? 's' : ''}
@@ -1091,7 +1110,7 @@ The spot has been released automatically.`;
     await sendEmailViaResend(
       {
         to: OWNER_EMAIL,
-        subject: `Booking cancelled — ${pkgName} · ${b.booking_ref}${paidOnline && hours >= 48 ? ' · REFUND DUE' : ''}`,
+        subject: `Booking cancelled — ${pkgName} · ${b.booking_ref}${refundDue ? ' · REFUND DUE' : ''}`,
         html,
         text,
       },
