@@ -589,7 +589,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
   const { data: booking, error: fetchError } = await db
     .from('bookings')
     .select(
-      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, coupon_code, discount_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, coupon_id, coupon_code, discount_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
     )
     .eq('id', bookingId)
     .single();
@@ -674,7 +674,136 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     } catch (err: any) {
       console.error(`sendBookingConfirmationEmails: owner email failed for ${booking.booking_ref}:`, err.message);
     }
+    // Same one-time claim: tell the partner (influencer) whose code was
+    // used, if they asked for an email on every booking.
+    if (booking.coupon_id) {
+      await sendPartnerBookingEmail(db, booking, pkg?.name || 'Uri Herbs Workshop', apiKey).catch((err: any) =>
+        console.error(`sendBookingConfirmationEmails: partner email failed for ${booking.booking_ref}:`, err?.message));
+    }
   }
+}
+
+
+// ────────────────────────────────────────────────────────────
+// PARTNERS (influencers) — per-booking + monthly summary emails
+// ────────────────────────────────────────────────────────────
+// Partners never see customer names or contact details — only date,
+// workshop, number of guests and their commission (privacy / PDPA).
+
+const PARTNER_PAGE = (token: string) => `${SITE_URL}/partner/${token}`;
+const thb = (n: number) => `฿${Math.round(Number(n) || 0).toLocaleString()}`;
+
+function partnerEmailShell(title: string, bodyHtml: string, token: string): string {
+  return `<!DOCTYPE html><html><body style="margin:0; background:#F8F5EF; font-family: Arial, sans-serif; color:#2D4639;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F5EF;"><tr><td align="center" style="padding:24px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid #E8E2D8;">
+    <tr><td style="background:#2D4639; color:#ffffff; padding:18px 20px; font-family: Georgia, serif; font-size:20px; font-weight:bold;">${title}</td></tr>
+    <tr><td style="padding:18px 20px; font-size:14px; line-height:1.6;">${bodyHtml}
+      <p style="margin:18px 0 0;"><a href="${PARTNER_PAGE(token)}" style="display:inline-block; background:#6B8F71; color:#ffffff; text-decoration:none; padding:10px 18px; border-radius:20px; font-weight:bold; font-size:13px;">Open your partner page</a></p>
+    </td></tr>
+    <tr><td style="padding:12px 20px; background:#FAF7F0; font-size:12px; color:#8A7668;">${SHOP_NAME} · Chiang Mai Old City · reply to this email with any question</td></tr>
+  </table></td></tr></table></body></html>`;
+}
+
+async function sendPartnerBookingEmail(db: any, booking: any, packageName: string, apiKey: string): Promise<void> {
+  const { data: c } = await db
+    .from('coupons')
+    .select('code, partners ( id, name, email, is_active, notify_each_booking, commission_pct, dashboard_token )')
+    .eq('id', booking.coupon_id)
+    .maybeSingle();
+  const p = c && (Array.isArray(c.partners) ? c.partners[0] : c.partners);
+  if (!p || !p.is_active || !p.notify_each_booking || !p.email) return;
+
+  const guests = `${booking.num_participants} guest${booking.num_participants > 1 ? 's' : ''}`;
+  const when = `${formatDateLong(booking.slot_date)}, ${formatTime12(String(booking.start_time).slice(0, 5))}`;
+  const commission = Math.round(Number(booking.total_price_thb) * Number(p.commission_pct) / 100);
+  const firstName = escapeHtml(String(p.name).split(' ')[0]);
+  const html = partnerEmailShell('🎉 New booking with your code', `
+      <p style="margin:0 0 10px;">Hi ${firstName}, someone just booked with your code <strong>${escapeHtml(String(c.code).toUpperCase())}</strong>:</p>
+      <p style="margin:0 0 10px; padding:12px 14px; background:#F2F7F3; border-radius:10px;">
+        <strong>${escapeHtml(packageName)}</strong><br>${guests} · ${when}
+      </p>
+      <p style="margin:0;">Your commission once they attend: <strong>${thb(commission)}</strong> (${Number(p.commission_pct)}%).</p>`, p.dashboard_token);
+  const text = `Hi ${p.name.split(' ')[0]}, someone just booked with your code ${String(c.code).toUpperCase()}:
+${packageName} · ${guests} · ${when}
+Your commission once they attend: ${thb(commission)} (${Number(p.commission_pct)}%).
+Your partner page: ${PARTNER_PAGE(p.dashboard_token)}`;
+
+  await sendEmailViaResend(
+    { to: p.email, replyTo: OWNER_EMAIL, subject: `New booking with your code ${String(c.code).toUpperCase()} — ${SHOP_NAME}`, html, text },
+    apiKey
+  );
+}
+
+// Called from /api/cron/reminders (every 5 min). From the 2nd of each
+// month, 09:00 Chiang Mai time, sends each active partner (monthly
+// email on, has an email address) last month's summary, once — the
+// partner_payouts row (partner, month) is the "already sent" claim.
+// The shop gets a copy of each.
+export async function sendPartnerMonthlySummaries(db: any): Promise<number> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return 0;
+
+  const now = new Date(Date.now() + 7 * 3600 * 1000); // Bangkok wall clock (as UTC fields)
+  if (now.getUTCDate() < 2 || (now.getUTCDate() === 2 && now.getUTCHours() < 9)) return 0;
+  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const month = prev.toISOString().slice(0, 10);
+  const monthName = prev.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+  const { data: partners } = await db
+    .from('partners')
+    .select('id, name, email, dashboard_token, commission_pct')
+    .eq('is_active', true).eq('monthly_email', true).not('email', 'is', null);
+
+  let sent = 0;
+  for (const p of partners || []) {
+    // Claim (partner, month) — only one cron run ever sends it.
+    const { data: existing } = await db.from('partner_payouts').select('id, emailed_at')
+      .eq('partner_id', p.id).eq('month', month).maybeSingle();
+    if (existing?.emailed_at) continue;
+
+    const { data: dash, error } = await db.rpc('partner_dashboard', { p_token: p.dashboard_token });
+    if (error || !dash) continue;
+    const m = (dash.months || []).find((x: any) => String(x.month).slice(0, 10) === month);
+
+    let claimed = false;
+    if (existing) {
+      const { data } = await db.from('partner_payouts').update({ emailed_at: new Date().toISOString() })
+        .eq('id', existing.id).is('emailed_at', null).select('id').maybeSingle();
+      claimed = !!data;
+    } else {
+      const { error: insErr } = await db.from('partner_payouts')
+        .insert({ partner_id: p.id, month, amount_thb: m?.earned || 0, emailed_at: new Date().toISOString() });
+      claimed = !insErr;
+    }
+    if (!claimed || !m || !m.bookings) continue; // nothing to report → no email
+
+    const firstName = escapeHtml(String(p.name).split(' ')[0]);
+    const body = `
+      <p style="margin:0 0 12px;">Hi ${firstName}, here is your ${escapeHtml(monthName)} summary:</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+        <tr><td style="padding:4px 0;">Bookings with your code</td><td align="right"><strong>${m.bookings}</strong></td></tr>
+        <tr><td style="padding:4px 0;">Guests who came</td><td align="right"><strong>${m.came_guests}</strong></td></tr>
+        <tr><td style="padding:8px 0; border-top:1px solid #E8E2D8;">Your commission (${Number(p.commission_pct)}%)</td>
+            <td align="right" style="border-top:1px solid #E8E2D8; font-family: Georgia, serif; font-size:20px; color:#A89068;"><strong>${thb(m.earned)}</strong></td></tr>
+      </table>
+      <p style="margin:12px 0 0; font-size:13px; color:#5C4A3D;">We'll transfer it this month — thank you for sharing Uri Herbs! 🌿</p>`;
+    const text = `Hi ${p.name.split(' ')[0]}, your ${monthName} summary:
+Bookings with your code: ${m.bookings}
+Guests who came: ${m.came_guests}
+Your commission (${Number(p.commission_pct)}%): ${thb(m.earned)}
+Partner page: ${PARTNER_PAGE(p.dashboard_token)}`;
+    try {
+      await sendEmailViaResend({ to: p.email, replyTo: OWNER_EMAIL, subject: `Your ${monthName} summary — ${SHOP_NAME}`,
+        html: partnerEmailShell(`${monthName} summary`, body, p.dashboard_token), text }, apiKey);
+      await sendEmailViaResend({ to: OWNER_EMAIL, subject: `Partner payout due — ${p.name}: ${thb(m.earned)} (${monthName})`,
+        html: partnerEmailShell(`Payout due: ${escapeHtml(p.name)}`, body, p.dashboard_token), text }, apiKey);
+      sent++;
+    } catch (err: any) {
+      console.error(`sendPartnerMonthlySummaries: email failed for partner ${p.id}:`, err?.message);
+    }
+  }
+  return sent;
 }
 
 

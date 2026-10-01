@@ -24,6 +24,7 @@ export interface Coupon {
   min_participants: number | null;
   prepay_only: boolean;
   is_active: boolean;
+  partner_id: string | null; // influencer / affiliate who owns this code
   created_at: string;
 }
 
@@ -47,7 +48,7 @@ export interface CouponBookingUse {
 export type CouponInput = Omit<Coupon, 'id' | 'created_at'>;
 
 const COLS =
-  'id, code, note, discount_type, discount_value, valid_from, valid_until, max_uses, package_slugs, allow_private, min_participants, prepay_only, is_active, created_at';
+  'id, code, note, discount_type, discount_value, valid_from, valid_until, max_uses, package_slugs, allow_private, min_participants, prepay_only, is_active, partner_id, created_at';
 
 function friendly(msg: string): string {
   if (/coupons_code_upper_key|duplicate key/i.test(msg)) return 'A coupon with this code already exists.';
@@ -77,6 +78,7 @@ export async function saveCoupon(input: CouponInput, id?: string): Promise<void>
     ...input,
     code: input.code.trim().toUpperCase(),
     note: input.note?.trim() || null,
+    partner_id: input.partner_id || null,
     package_slugs: input.package_slugs && input.package_slugs.length > 0 ? input.package_slugs : null,
     updated_at: new Date().toISOString(),
   };

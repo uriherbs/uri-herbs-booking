@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getPackages, confirmPayLaterBooking, cancelBooking, applyCoupon } from "@/lib/booking-service";
@@ -1301,11 +1301,12 @@ const PAYMENT_ICONS: Record<string, (props: { color?: string }) => JSX.Element> 
 // (pending_payment), so applying a code calls apply_coupon() on the
 // server, which rewrites the booking's total — every payment path then
 // charges the discounted amount. Shows the price breakdown once applied.
-function CouponBox({ booking, onApply }) {
-  const [open, setOpen] = useState(false);
-  const [code, setCode] = useState("");
+function CouponBox({ booking, onApply, autoCode = null }) {
+  const [open, setOpen] = useState(!!autoCode);
+  const [code, setCode] = useState(autoCode || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const autoTried = useRef(false);
   const applied = booking?.coupon_code;
   const discount = booking?.discount_thb || 0;
   const gross = (booking?.total_price_thb || 0) + discount;
@@ -1316,6 +1317,15 @@ function CouponBox({ booking, onApply }) {
     catch (e: any) { setErr(e?.message || "Couldn't apply this coupon."); }
     finally { setBusy(false); }
   };
+
+  // Partner links (/book?code=NOA10) apply their code automatically
+  // when the Payment step opens — once; the customer can still remove it.
+  useEffect(() => {
+    if (!autoCode || autoTried.current || booking?.coupon_code) return;
+    autoTried.current = true;
+    run(autoCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCode, booking?.coupon_code]);
 
   if (applied) {
     return (
@@ -1385,7 +1395,7 @@ function CouponBox({ booking, onApply }) {
   );
 }
 
-function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors, booking, onOnlinePaymentSuccess, onApplyCoupon }) {
+function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors, booking, onOnlinePaymentSuccess, onApplyCoupon, autoCoupon = null }) {
   const amountLabel = booking ? `฿${booking.total_price_thb.toLocaleString()}` : "";
   // Coupons: a free booking (100% off) has nothing to charge online; a
   // prepay-only coupon can't be used with pay on arrival.
@@ -1402,7 +1412,7 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
   const [legalModalDoc, setLegalModalDoc] = useState(null);
   return (
     <div style={{ padding: "0 16px 100px" }}>
-      {booking && <CouponBox booking={booking} onApply={onApplyCoupon} />}
+      {booking && <CouponBox booking={booking} onApply={onApplyCoupon} autoCode={autoCoupon} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {methods.map(opt => {
           const selected = paymentMethod === opt.key;
@@ -1884,6 +1894,16 @@ export default function BookingFlow() {
     }));
   }, []);
 
+  // Coupon from a partner link (/book?code=NOA10) — applied automatically
+  // on the Payment step (see CouponBox). Read once on load.
+  const [linkCoupon, setLinkCoupon] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const c = new URLSearchParams(window.location.search).get("code");
+      if (c && /^[A-Za-z0-9_-]{3,30}$/.test(c)) setLinkCoupon(c.toUpperCase());
+    } catch { /* ignore */ }
+  }, []);
+
   // Apply / remove a coupon on the pending booking (Payment step).
   const handleApplyCoupon = useCallback(async (code: string) => {
     if (!result?.booking_ref) return;
@@ -2192,7 +2212,7 @@ export default function BookingFlow() {
           paymentMethod={paymentMethod} onSelectMethod={handleSelectPaymentMethod}
           agreedToTerms={agreedToTerms} onToggleTerms={() => setAgreedToTerms(a => !a)}
           errors={errors} booking={result} onOnlinePaymentSuccess={handleOnlinePaymentSuccess}
-          onApplyCoupon={handleApplyCoupon}
+          onApplyCoupon={handleApplyCoupon} autoCoupon={linkCoupon}
         />
       )}
       {(step === 2 || step === 3) && errors.submit && (

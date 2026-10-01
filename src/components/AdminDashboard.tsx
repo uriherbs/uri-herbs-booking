@@ -826,6 +826,20 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             </svg>
             Coupons
           </Link>
+          <Link
+            href="/admin/partners"
+            title="Partners (influencers)"
+            style={{
+              background: "rgba(255,255,255,0.12)", borderRadius: 20,
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
+            }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            Partners
+          </Link>
           <button
             onClick={handleSignOut}
             title="Sign out"

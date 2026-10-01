@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
-import { sendReminderEmails } from '@/lib/notifications';
+import { sendReminderEmails, sendPartnerMonthlySummaries } from '@/lib/notifications';
 
 const WINDOW_MINUTES = 60;
 const SKIP_IF_CREATED_WITHIN_MINUTES = 15;
@@ -75,7 +75,14 @@ async function run(request: NextRequest) {
     if (r === 'sent') sent++; else skipped++;
   }
 
-  return NextResponse.json({ checked: (due || []).length, sent, skipped, window: `${from.date} ${from.time}–${toTime}` });
+  // Partner (influencer) monthly summaries ride on this same 5-minute
+  // job — they only actually send once per partner per month.
+  const partnerSummaries = await sendPartnerMonthlySummaries(db).catch((err) => {
+    console.error('cron/reminders: partner summaries failed:', err?.message);
+    return 0;
+  });
+
+  return NextResponse.json({ checked: (due || []).length, sent, skipped, partnerSummaries, window: `${from.date} ${from.time}–${toTime}` });
 }
 
 export async function POST(request: NextRequest) {

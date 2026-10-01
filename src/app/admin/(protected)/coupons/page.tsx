@@ -18,6 +18,7 @@ import {
   Coupon, CouponInput, CouponUsage, CouponBookingUse,
   listCoupons, listCouponUsage, saveCoupon, setCouponActive, listCouponBookings,
 } from '@/lib/admin-coupons-service';
+import { listPartners } from '@/lib/partners';
 
 const C = {
   sage: '#6B8F71', sageDark: '#4A7050', sageLight: '#E7EFEA', sagePale: '#F2F7F3',
@@ -29,7 +30,7 @@ const C = {
 const EMPTY: CouponInput = {
   code: '', note: '', discount_type: 'percent', discount_value: 10,
   valid_from: null, valid_until: null, max_uses: null, package_slugs: null,
-  allow_private: true, min_participants: null, prepay_only: false, is_active: true,
+  allow_private: true, min_participants: null, prepay_only: false, is_active: true, partner_id: null,
 };
 
 const todayStr = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); // Bangkok date
@@ -81,8 +82,9 @@ function Toggle({ on, onChange, text, sub }: { on: boolean; onChange: (v: boolea
   );
 }
 
-function CouponForm({ initial, editingId, packages, onCancel, onSaved }: {
+function CouponForm({ initial, editingId, packages, partners, onCancel, onSaved }: {
   initial: CouponInput; editingId?: string; packages: { slug: string; name: string }[];
+  partners: { id: string; name: string; commission_pct: number }[];
   onCancel: () => void; onSaved: () => void;
 }) {
   const [f, setF] = useState<CouponInput>(initial);
@@ -204,6 +206,15 @@ function CouponForm({ initial, editingId, packages, onCancel, onSaved }: {
         </div>
 
         <div>
+          <span style={label}>Partner (influencer)</span>
+          <select style={input} value={f.partner_id || ''} onChange={e => set({ partner_id: e.target.value || null })}>
+            <option value="">— None (a regular coupon) —</option>
+            {partners.map(p => <option key={p.id} value={p.id}>{p.name} · {Number(p.commission_pct)}% commission</option>)}
+          </select>
+          <div style={hint}>Bookings with this code count toward the partner’s commission. Manage partners in Admin → Partners.</div>
+        </div>
+
+        <div>
           <span style={label}>Internal note (optional)</span>
           <input style={input} value={f.note || ''} placeholder="e.g. Instagram campaign, October"
             onChange={e => set({ note: e.target.value })} />
@@ -229,8 +240,8 @@ function CouponForm({ initial, editingId, packages, onCancel, onSaved }: {
   );
 }
 
-function CouponCard({ c, usage, packagesBySlug, onEdit, onToggle }: {
-  c: Coupon; usage?: CouponUsage; packagesBySlug: Record<string, string>;
+function CouponCard({ c, usage, packagesBySlug, partnersById, onEdit, onToggle }: {
+  c: Coupon; usage?: CouponUsage; packagesBySlug: Record<string, string>; partnersById: Record<string, string>;
   onEdit: () => void; onToggle: () => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
@@ -245,6 +256,7 @@ function CouponCard({ c, usage, packagesBySlug, onEdit, onToggle }: {
   }, [showHistory, history, c.id]);
 
   const rules: string[] = [];
+  if (c.partner_id) rules.push(`Partner: ${partnersById[c.partner_id] || '—'}`);
   if (c.valid_from || c.valid_until) rules.push(`${c.valid_from ? fmtDate(c.valid_from) : '…'} – ${c.valid_until ? fmtDate(c.valid_until) : '…'}`);
   if (c.package_slugs && c.package_slugs.length > 0) rules.push(c.package_slugs.map(s => packagesBySlug[s] || s).join(', '));
   if (!c.allow_private) rules.push('not for private');
@@ -312,6 +324,19 @@ export default function CouponsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id?: string; data: CouponInput } | null>(null);
+  const [partners, setPartners] = useState<{ id: string; name: string; commission_pct: number }[]>([]);
+
+  useEffect(() => {
+    listPartners()
+      .then(ps => {
+        setPartners(ps.filter(p => p.is_active).map(p => ({ id: p.id, name: p.name, commission_pct: Number(p.commission_pct) })));
+        // Arrived from Partners → "+ Coupon": open a new coupon for that partner.
+        const pid = new URLSearchParams(window.location.search).get('partner');
+        if (pid && ps.some(p => p.id === pid)) setEditing({ data: { ...EMPTY, partner_id: pid } });
+      })
+      .catch(() => {});
+  }, []);
+  const partnersById = useMemo(() => Object.fromEntries(partners.map(p => [p.id, p.name])), [partners]);
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(null);
@@ -379,7 +404,7 @@ export default function CouponsAdminPage() {
         {editing && (
           <CouponForm
             key={editing.id || 'new'}
-            initial={editing.data} editingId={editing.id} packages={packages}
+            initial={editing.data} editingId={editing.id} packages={packages} partners={partners}
             onCancel={() => setEditing(null)}
             onSaved={() => { setEditing(null); refresh(); }}
           />
@@ -393,7 +418,7 @@ export default function CouponsAdminPage() {
 
         {coupons.map(c => (
           <CouponCard
-            key={c.id} c={c} usage={usage[c.id]} packagesBySlug={packagesBySlug}
+            key={c.id} c={c} usage={usage[c.id]} packagesBySlug={packagesBySlug} partnersById={partnersById}
             onEdit={() => {
               const { id, created_at, ...data } = c;
               setEditing({ id, data });
