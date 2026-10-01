@@ -232,7 +232,12 @@ export function useCreateBooking() {
     setResult(null);
   }, []);
 
-  return { submit, submitting, error, result, reset };
+  // Merge new totals into the booking result (e.g. after a coupon).
+  const patchResult = useCallback((patch: Partial<BookingConfirmation>) => {
+    setResult(r => (r ? { ...r, ...patch } : r));
+  }, []);
+
+  return { submit, submitting, error, result, reset, patchResult };
 }
 
 
@@ -376,7 +381,7 @@ export function useAdminDayData(date: string | null) {
           .select(`
             id, booking_ref, slot_date, start_time, end_time, num_participants,
             instructor_group, is_private, customer_name, customer_email, customer_phone,
-            customer_notes, has_minors, total_price_thb, status,
+            customer_notes, has_minors, total_price_thb, coupon_code, discount_thb, status,
             attendance_status, payment_status,
             packages ( name, slug, duration_minutes, calendar_type )
           `)

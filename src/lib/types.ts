@@ -49,6 +49,20 @@ export interface BookingConfirmation {
   is_private: boolean;
   total_price_thb: number;
   status: string; // 'pending_payment' — always, straight out of create_booking now
+  // Set by apply_coupon() on the Payment step (absent until then).
+  discount_thb?: number;
+  coupon_code?: string | null;
+  coupon_prepay_only?: boolean;
+}
+
+// Result of apply_coupon() — new totals for a pending booking.
+export interface CouponResult {
+  booking_ref: string;
+  gross_price_thb: number;
+  discount_thb: number;
+  total_price_thb: number;
+  coupon_code: string | null;
+  prepay_only: boolean;
 }
 
 // Returned by confirm_pay_later_booking / (indirectly) by the payment
@@ -173,6 +187,12 @@ export type BookingErrorCode =
   // Raised only by admin_create_manual_booking when p_payment_status isn't
   // 'paid' or 'unpaid'.
   | 'INVALID_PAYMENT_STATUS'
+  // Coupons (apply_coupon / confirm_pay_later_booking)
+  | 'COUPON_INVALID'
+  | 'COUPON_EXPIRED'
+  | 'COUPON_USED_UP'
+  | 'COUPON_NOT_APPLICABLE'
+  | 'COUPON_PREPAY_ONLY'
   | 'UNKNOWN_ERROR';
 
 export interface BookingError {
@@ -208,6 +228,11 @@ export const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   BOOKING_NOT_PAYABLE:  'This booking is no longer awaiting payment — it may have expired. Please start a new booking.',
   FORBIDDEN:            'You do not have admin access to do this.',
   INVALID_PAYMENT_STATUS: 'Payment status must be either paid or unpaid.',
+  COUPON_INVALID:       'This coupon code was not found. Please check the spelling.',
+  COUPON_EXPIRED:       'This coupon is not valid on this date.',
+  COUPON_USED_UP:       'This coupon has already been used.',
+  COUPON_NOT_APPLICABLE:'This coupon does not apply to this workshop or group size.',
+  COUPON_PREPAY_ONLY:   'This coupon is valid with online payment only — please pay by card or PayPal, or remove the coupon.',
   UNKNOWN_ERROR:        'Something went wrong. Please try again or contact us directly.',
 };
 
@@ -257,5 +282,10 @@ export const MANUAL_BOOKING_ERROR_MESSAGES_HE: Record<BookingErrorCode, string> 
   BOOKING_NOT_PAYABLE:  'This booking is no longer awaiting payment.',
   FORBIDDEN:            'You don\'t have admin permission to do this.',
   INVALID_PAYMENT_STATUS: 'Invalid payment status — please choose "Paid" or "Unpaid".',
+  COUPON_INVALID:       'Coupon not found.',
+  COUPON_EXPIRED:       'Coupon is not valid on this date.',
+  COUPON_USED_UP:       'Coupon has already been used up.',
+  COUPON_NOT_APPLICABLE:'Coupon does not apply to this booking.',
+  COUPON_PREPAY_ONLY:   'Coupon is valid with online payment only.',
   UNKNOWN_ERROR:        'Something went wrong. Please try again or contact technical support.',
 };

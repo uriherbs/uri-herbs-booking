@@ -87,6 +87,8 @@ export interface BookingEmailData {
   instructorGroup: 'A' | 'B' | null;
   isPrivate: boolean;
   totalPriceThb: number;
+  couponCode?: string | null; // discount coupon applied (total already reduced)
+  discountThb?: number;
   takeawayDescription: string;
   paymentMethod: string; // 'stripe' | 'paypal' | 'later' | ...
   cancelUrl?: string; // customer self-cancel page (/cancel/<cancel_token>)
@@ -102,6 +104,10 @@ export interface BookingEmailData {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function groupLabel(_instructorGroup: 'A' | 'B' | null, isPrivate: boolean): string {
   return isPrivate ? 'Private session' : 'Group session';
+}
+
+function couponNote(code?: string | null, discount?: number): string {
+  return code && (discount || 0) > 0 ? `Coupon ${code}: −฿${Number(discount).toLocaleString()}` : '';
 }
 
 function formatDateLong(dateStr: string): string {
@@ -212,6 +218,7 @@ export function buildConfirmationEmailHtml(data: BookingEmailData): string {
                         <td style="font-family: Arial, sans-serif; font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Total</td>
                         <td align="right" style="font-family: Georgia, serif; font-size:22px; font-weight:bold; color:#A89068;">฿${data.totalPriceThb.toLocaleString()}</td>
                       </tr></table>
+                      ${couponNote(data.couponCode, data.discountThb) ? `<div style="font-family: Arial, sans-serif; font-size:12px; color:#4A7050; text-align:right; margin-top:2px;">Includes ${couponNote(data.couponCode, data.discountThb)}</div>` : ''}
                     </div>
                   </td>
                 </tr>
@@ -322,7 +329,7 @@ Experience: ${data.packageName}
 Date: ${formatDateLong(data.date)}
 Time: ${formatTime12(data.startTime)} – ${formatTime12(data.endTime)}
 Guests: ${data.numParticipants}
-Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later' ? ' (pay on arrival — Cash, PromptPay, or WeChat Pay)' : ' — already paid, nothing more to pay'}
+Total: ฿${data.totalPriceThb.toLocaleString()}${data.paymentMethod === 'later' ? ' (pay on arrival — Cash, PromptPay, or WeChat Pay)' : ' — already paid, nothing more to pay'}${couponNote(data.couponCode, data.discountThb) ? `\nIncludes ${couponNote(data.couponCode, data.discountThb)}` : ''}
 
 Location: ${SHOP_ADDRESS}
 Map: ${SHOP_MAPS_URL}
@@ -454,6 +461,7 @@ export function buildOwnerNotificationEmailHtml(data: OwnerNotificationData): st
         <tr><td style="padding:12px 16px; background-color:#FAF7F0;">
           <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
           <div style="font-size:14px; color:#2D4639;">฿${data.totalPriceThb.toLocaleString()} — ${ownerPaymentLabel(data.paymentMethod)}</div>
+          ${couponNote(data.couponCode, data.discountThb) ? `<div style="font-size:12px; color:#4A7050;">${couponNote(data.couponCode, data.discountThb)}</div>` : ''}
         </tr></td>
       </table>
       ${whatsappLink ? `<p style="text-align:center; margin:0 0 12px;"><a href="${whatsappLink}" style="display:inline-block; background:#6B8F71; color:#ffffff; text-decoration:none; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:bold;">Message ${data.customerName.split(' ')[0]} on WhatsApp</a></p>` : ''}
@@ -474,7 +482,7 @@ ${formatDateLong(data.date)}, ${formatTime12(data.startTime)} – ${formatTime12
 
 Customer: ${data.customerName}
 ${data.customerPhone ? `Phone: ${data.customerPhone}\n` : ''}${data.customerEmail ? `Email: ${data.customerEmail}\n` : ''}
-Total: ฿${data.totalPriceThb.toLocaleString()} — ${ownerPaymentLabel(data.paymentMethod)}
+Total: ฿${data.totalPriceThb.toLocaleString()} — ${ownerPaymentLabel(data.paymentMethod)}${couponNote(data.couponCode, data.discountThb) ? ` (${couponNote(data.couponCode, data.discountThb)})` : ''}
 `.trim();
 }
 
@@ -581,7 +589,7 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
   const { data: booking, error: fetchError } = await db
     .from('bookings')
     .select(
-      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, coupon_code, discount_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
     )
     .eq('id', bookingId)
     .single();
@@ -605,6 +613,8 @@ export async function sendBookingConfirmationEmails(db: any, bookingId: string):
     instructorGroup: booking.instructor_group,
     isPrivate: booking.is_private,
     totalPriceThb: booking.total_price_thb,
+    couponCode: booking.coupon_code,
+    discountThb: booking.discount_thb,
     takeawayDescription: meta.takeaway,
     customerEmail: booking.customer_email || undefined,
     customerPhone: booking.customer_phone || undefined,
@@ -691,7 +701,7 @@ export async function sendRescheduleEmails(
   const { data: booking, error } = await db
     .from('bookings')
     .select(
-      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
+      'booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, coupon_code, discount_thb, payment_method, payment_status, cancel_token, packages ( name, slug )'
     )
     .eq('id', bookingId)
     .single();
@@ -715,6 +725,8 @@ export async function sendRescheduleEmails(
     instructorGroup: booking.instructor_group,
     isPrivate: booking.is_private,
     totalPriceThb: booking.total_price_thb,
+    couponCode: booking.coupon_code,
+    discountThb: booking.discount_thb,
     takeawayDescription: meta.takeaway,
     customerEmail: booking.customer_email || undefined,
     customerPhone: booking.customer_phone || undefined,
@@ -786,7 +798,7 @@ export async function sendReminderEmails(db: any, bookingId: string): Promise<'s
 
   const { data: b, error } = await db
     .from('bookings')
-    .select('booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, payment_method, payment_status, customer_notes, packages ( name, slug )')
+    .select('booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, instructor_group, is_private, total_price_thb, coupon_code, discount_thb, payment_method, payment_status, customer_notes, packages ( name, slug )')
     .eq('id', bookingId)
     .single();
   if (error || !b) {
@@ -881,6 +893,7 @@ Running late or can't find us? WhatsApp: ${whatsapp}
         <tr><td style="padding:12px 16px; background-color:${method === 'later' ? '#FFF3D6' : '#FAF7F0'};">
           <div style="font-size:10px; color:#8A7668; text-transform:uppercase; letter-spacing:1px;">Payment</div>
           <div style="font-size:14px; color:#2D4639;${method === 'later' ? ' font-weight:bold;' : ''}">${method === 'later' ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival` : ownerPaymentLabel(method)}</div>
+          ${couponNote(b.coupon_code, b.discount_thb) ? `<div style="font-size:12px; color:#4A7050;">${couponNote(b.coupon_code, b.discount_thb)}</div>` : ''}
         </td></tr>
       </table>
     </td></tr>
@@ -890,7 +903,7 @@ Running late or can't find us? WhatsApp: ${whatsapp}
   const ownerText = `Starts in 1 hour — ${pkgName} · ${start} · ${b.booking_ref}
 ${guests} · ${groupLabel(b.instructor_group, b.is_private)} · ${start} – ${end}
 Customer: ${b.customer_name}${b.customer_phone ? ` · ${b.customer_phone}` : ''}${b.customer_notes ? `\nNotes: ${b.customer_notes}` : ''}
-Payment: ${method === 'later' ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival` : ownerPaymentLabel(method)}`;
+Payment: ${method === 'later' ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival` : ownerPaymentLabel(method)}${couponNote(b.coupon_code, b.discount_thb) ? ` (${couponNote(b.coupon_code, b.discount_thb)})` : ''}`;
 
   const sends: Promise<unknown>[] = [];
   if (b.customer_email) {

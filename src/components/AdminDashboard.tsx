@@ -59,6 +59,8 @@ function mapBooking(row) {
     notes: row.customer_notes || "",
     hasMinors: row.has_minors,
     price: row.total_price_thb,
+    couponCode: row.coupon_code || null,
+    discount: row.discount_thb || 0,
     attendance: row.attendance_status,
     payment: row.payment_status,
     calendar: pkg?.calendar_type || "herbal",
@@ -329,6 +331,11 @@ function BookingRow({ booking, onUpdate, onCancel }) {
               <div style={{ fontFamily: "'Crimson Pro'", fontSize: 16, fontWeight: 700, color: C.gold }}>
                 ฿{booking.price.toLocaleString()}
               </div>
+              {booking.couponCode && booking.discount > 0 && (
+                <div style={{ fontFamily: "'DM Sans'", fontSize: 11, color: C.sageDark }}>
+                  {booking.couponCode} −฿{booking.discount.toLocaleString()}
+                </div>
+              )}
             </div>
           </div>
 
@@ -804,6 +811,20 @@ export default function AdminDashboard({ adminName, onSignOut }) {
               <path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
             </svg>
             Blog
+          </Link>
+          <Link
+            href="/admin/coupons"
+            title="Coupons"
+            style={{
+              background: "rgba(255,255,255,0.12)", borderRadius: 20,
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
+            }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z" /><circle cx="7.5" cy="7.5" r="1.5" />
+            </svg>
+            Coupons
           </Link>
           <button
             onClick={handleSignOut}

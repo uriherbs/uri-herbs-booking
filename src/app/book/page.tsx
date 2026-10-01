@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getPackages, confirmPayLaterBooking, cancelBooking } from "@/lib/booking-service";
+import { getPackages, confirmPayLaterBooking, cancelBooking, applyCoupon } from "@/lib/booking-service";
 import { useAvailableSlots, useCalendarAvailability, useCreateBooking } from "@/lib/hooks";
 import { StripeCardForm } from "@/components/payments/StripeCardForm";
 import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButtons";
@@ -1296,8 +1296,105 @@ const PAYMENT_ICONS: Record<string, (props: { color?: string }) => JSX.Element> 
   stripe: CardSVG, paypal: WalletSVG, later: CashSVG,
 };
 
-function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors, booking, onOnlinePaymentSuccess }) {
+// ── Coupon box (owner request 2026-10-01) ─────────────────────
+// Sits at the top of the Payment step. The booking already exists
+// (pending_payment), so applying a code calls apply_coupon() on the
+// server, which rewrites the booking's total — every payment path then
+// charges the discounted amount. Shows the price breakdown once applied.
+function CouponBox({ booking, onApply }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const applied = booking?.coupon_code;
+  const discount = booking?.discount_thb || 0;
+  const gross = (booking?.total_price_thb || 0) + discount;
+
+  const run = async (value) => {
+    setBusy(true); setErr(null);
+    try { await onApply(value); setCode(""); if (!value) setOpen(true); }
+    catch (e: any) { setErr(e?.message || "Couldn't apply this coupon."); }
+    finally { setBusy(false); }
+  };
+
+  if (applied) {
+    return (
+      <div style={{
+        background: C.white, border: `1.5px solid ${C.sage}`, borderRadius: 14,
+        padding: "12px 14px", marginBottom: 14, fontFamily: "'DM Sans'",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.barkLight }}>
+          <span>Workshop price</span><span>฿{gross.toLocaleString()}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: C.sageDark, marginTop: 4 }}>
+          <span>
+            Coupon <strong>{applied}</strong>{" "}
+            <button type="button" disabled={busy} onClick={() => run("")} style={{
+              background: "none", border: "none", padding: 0, marginLeft: 4, cursor: "pointer",
+              fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, textDecoration: "underline",
+            }}>remove</button>
+          </span>
+          <span style={{ fontWeight: 700 }}>−฿{discount.toLocaleString()}</span>
+        </div>
+        <div style={{
+          display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8,
+          borderTop: `1px solid ${C.sand}`, fontFamily: "'Crimson Pro'", fontSize: 18, fontWeight: 700, color: C.forest,
+        }}>
+          <span>Total</span><span>฿{booking.total_price_thb.toLocaleString()}</span>
+        </div>
+        {booking.coupon_prepay_only && booking.total_price_thb > 0 && (
+          <div style={{ marginTop: 6, fontSize: 12, color: C.gold }}>
+            This coupon is valid with online payment (card / PayPal) only.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {!open ? (
+        <button type="button" onClick={() => setOpen(true)} style={{
+          background: "none", border: "none", padding: "4px 0", cursor: "pointer",
+          fontFamily: "'DM Sans'", fontSize: 13.5, fontWeight: 600, color: C.sageDark, textDecoration: "underline",
+        }}>Have a coupon code?</button>
+      ) : (
+        <div style={{ background: C.white, border: `1.5px solid ${C.sand}`, borderRadius: 14, padding: 12 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setErr(null); }}
+              onKeyDown={e => { if (e.key === "Enter" && code.trim()) { e.preventDefault(); run(code); } }}
+              placeholder="Coupon code" autoCapitalize="characters" autoComplete="off" spellCheck={false}
+              aria-label="Coupon code"
+              style={{
+                flex: 1, minWidth: 0, padding: "11px 12px", borderRadius: 10,
+                border: `1.5px solid ${err ? C.coral : C.sand}`, fontFamily: "'DM Sans'", fontSize: 15,
+                letterSpacing: "0.05em", color: C.forest, background: C.parchment, outline: "none",
+              }}
+            />
+            <button type="button" disabled={busy || !code.trim()} onClick={() => run(code)} style={{
+              padding: "0 18px", borderRadius: 10, border: "none", cursor: busy || !code.trim() ? "default" : "pointer",
+              background: busy || !code.trim() ? C.sand : C.sage, color: C.white,
+              fontFamily: "'DM Sans'", fontSize: 14, fontWeight: 700,
+            }}>{busy ? "…" : "Apply"}</button>
+          </div>
+          {err && <div style={{ marginTop: 6, fontFamily: "'DM Sans'", fontSize: 12.5, color: C.coral }}>{err}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTerms, errors, booking, onOnlinePaymentSuccess, onApplyCoupon }) {
   const amountLabel = booking ? `฿${booking.total_price_thb.toLocaleString()}` : "";
+  // Coupons: a free booking (100% off) has nothing to charge online; a
+  // prepay-only coupon can't be used with pay on arrival.
+  const isFree = !!booking && booking.total_price_thb === 0;
+  const methods = isFree
+    ? VISIBLE_PAYMENT_METHODS.filter(m => m.key === "later").map(m => ({ ...m, label: "Confirm booking", description: "Nothing to pay — your coupon covers the full price." }))
+    : booking?.coupon_prepay_only
+      ? VISIBLE_PAYMENT_METHODS.filter(m => m.key !== "later")
+      : VISIBLE_PAYMENT_METHODS;
   // Which legal doc's modal is open, if any — fully local to this
   // component. Opening/closing it only ever touches this one piece of
   // state; it has no way to reach the booking form or the agreement
@@ -1305,8 +1402,9 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
   const [legalModalDoc, setLegalModalDoc] = useState(null);
   return (
     <div style={{ padding: "0 16px 100px" }}>
+      {booking && <CouponBox booking={booking} onApply={onApplyCoupon} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {VISIBLE_PAYMENT_METHODS.map(opt => {
+        {methods.map(opt => {
           const selected = paymentMethod === opt.key;
           const Icon = PAYMENT_ICONS[opt.key];
           return (
@@ -1449,12 +1547,14 @@ function PaymentStep({ paymentMethod, onSelectMethod, agreedToTerms, onToggleTer
           booking ? (
             paymentMethod === "stripe" ? (
               <StripeCardForm
+                key={`stripe-${booking.total_price_thb}`}
                 bookingId={booking.booking_id}
                 amountLabel={amountLabel}
                 onSuccess={onOnlinePaymentSuccess}
               />
             ) : (
               <PayPalCheckoutButtons
+                key={`paypal-${booking.total_price_thb}`}
                 bookingId={booking.booking_id}
                 onSuccess={onOnlinePaymentSuccess}
               />
@@ -1622,6 +1722,11 @@ function ConfirmationStep({ pkg, result, form, onReset, paymentMethod }) {
               </div>
             );
           })()}
+          {result.coupon_code && (result.discount_thb || 0) > 0 && (
+            <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.sageDark, textAlign: "right", marginTop: 2 }}>
+              Coupon {result.coupon_code}: −฿{(result.discount_thb || 0).toLocaleString()} included
+            </div>
+          )}
         </div>
       </div>
 
@@ -1716,7 +1821,7 @@ export default function BookingFlow() {
   // stays valid all the way through to ConfirmationStep; only `status`
   // changes, so step 4 just overrides that one field once payment
   // actually succeeds rather than re-fetching anything.
-  const { submit, submitting, error: submitError, result, reset: resetBooking } = useCreateBooking();
+  const { submit, submitting, error: submitError, result, reset: resetBooking, patchResult } = useCreateBooking();
 
   // Fetch the live product catalog once on mount. Presentation metadata
   // (icon/tagline/accent) is merged in client-side via mergePackage();
@@ -1778,6 +1883,23 @@ export default function BookingFlow() {
       submit: null,
     }));
   }, []);
+
+  // Apply / remove a coupon on the pending booking (Payment step).
+  const handleApplyCoupon = useCallback(async (code: string) => {
+    if (!result?.booking_ref) return;
+    const c = await applyCoupon(result.booking_ref, code);
+    patchResult({
+      total_price_thb: c.total_price_thb,
+      discount_thb: c.discount_thb,
+      coupon_code: c.coupon_code,
+      coupon_prepay_only: c.prepay_only,
+    });
+    // Drop a payment choice the coupon no longer allows.
+    setPaymentMethod(m =>
+      (c.total_price_thb === 0 && m !== "later") || (c.prepay_only && c.total_price_thb > 0 && m === "later") ? null : m
+    );
+    setErrors(e => ({ ...e, submit: null }));
+  }, [result?.booking_ref, patchResult]);
 
   const handleSelectPaymentMethod = useCallback((method: "stripe" | "paypal" | "later") => {
     setPaymentMethod(method);
@@ -2070,6 +2192,7 @@ export default function BookingFlow() {
           paymentMethod={paymentMethod} onSelectMethod={handleSelectPaymentMethod}
           agreedToTerms={agreedToTerms} onToggleTerms={() => setAgreedToTerms(a => !a)}
           errors={errors} booking={result} onOnlinePaymentSuccess={handleOnlinePaymentSuccess}
+          onApplyCoupon={handleApplyCoupon}
         />
       )}
       {(step === 2 || step === 3) && errors.submit && (

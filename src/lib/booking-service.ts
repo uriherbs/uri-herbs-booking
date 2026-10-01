@@ -23,6 +23,7 @@ import type {
   CreateManualBookingRequest,
   ManualBookingConfirmation,
   BookingError,
+  CouponResult,
 } from './types';
 import { parseBookingError, ERROR_MESSAGES, MANUAL_BOOKING_ERROR_MESSAGES_HE } from './types';
 
@@ -197,6 +198,29 @@ throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as any;  }
   }
 
   return data[0] as BookingConfirmation;
+}
+
+
+// ────────────────────────────────────────────────────────────
+// 4a. APPLY / REMOVE A COUPON  (Payment step)
+// ────────────────────────────────────────────────────────────
+// The booking already exists as pending_payment; apply_coupon()
+// recalculates bookings.total_price_thb on the server, so PayPal,
+// card and pay-on-arrival all use the discounted amount. An empty
+// code removes the coupon again.
+export async function applyCoupon(bookingRef: string, code: string): Promise<CouponResult> {
+  const { data, error } = await supabase.rpc('apply_coupon', {
+    p_booking_ref: bookingRef.trim().toUpperCase(),
+    p_code: code.trim(),
+  });
+  if (error) {
+    const bookingError = parseBookingError(error.message);
+    throw { ...bookingError, message: ERROR_MESSAGES[bookingError.code] || bookingError.message };
+  }
+  if (!data || data.length === 0) {
+    throw { code: 'UNKNOWN_ERROR', message: ERROR_MESSAGES.UNKNOWN_ERROR };
+  }
+  return data[0] as CouponResult;
 }
 
 
