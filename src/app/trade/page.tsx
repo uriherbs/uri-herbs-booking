@@ -66,15 +66,8 @@ const WHATSAPP_PREFILL = encodeURIComponent(
 );
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_PREFILL}`;
 const LINE_LINK = 'https://line.me/R/ti/p/@458fguvz';
+const TRADE_VIDEO_URL = process.env.NEXT_PUBLIC_TRADE_VIDEO_URL || '';
 
-const WORKSHOP_OPTIONS = [
-  'Tea Blending',
-  'Herbal Inhaler',
-  'Massage Ball',
-  'Full Journey (all 3)',
-  'Aromatherapy & Skincare',
-  'Not sure yet',
-];
 
 // ────────────────────────────────────────────────────────────
 // Small shared bits
@@ -143,45 +136,37 @@ function TermBullet({ children }: { children: React.ReactNode }) {
 // ────────────────────────────────────────────────────────────
 
 export default function TradePage() {
-  const [agencyName, setAgencyName] = useState('');
-  const [contactPerson, setContactPerson] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneOrLine, setPhoneOrLine] = useState('');
-  const [groupSize, setGroupSize] = useState('');
-  const [dates, setDates] = useState('');
-  const [workshops, setWorkshops] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
-  const [company, setCompany] = useState(''); // honeypot
+  // Partner application (owner flow 2026-10-01): saved for admin approval,
+  // then the agency signs the agreement online and gets its partner page.
+  const [f, setF] = useState({
+    company_name: '', contact_name: '', email: '', phone: '', country: '', website: '',
+    license_no: '', business_type: '', monthly_groups: '', message: '', website_hp: '',
+  });
+  const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginSent, setLoginSent] = useState(false);
 
-  const canSubmit = agencyName.trim() && EMAIL_RE.test(email.trim());
-
-  const toggleWorkshop = (w: string) => {
-    setWorkshops((prev) => (prev.includes(w) ? prev.filter((x) => x !== w) : [...prev, w]));
-  };
+  const canSubmit = f.company_name.trim() && EMAIL_RE.test(f.email.trim());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit || status === 'submitting') return;
-
     setStatus('submitting');
     setErrorMsg('');
-
     try {
-      const res = await fetch('/api/trade', {
+      const res = await fetch('/api/agency/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agencyName, contactPerson, email, phoneOrLine, groupSize, dates, workshops, notes, company }),
+        body: JSON.stringify(f),
       });
       const data = await res.json();
-
       if (!res.ok) {
         setErrorMsg(data.error || 'Something went wrong. Please try again.');
         setStatus('error');
         return;
       }
-
       setStatus('success');
     } catch {
       setErrorMsg("Couldn't reach the server. Please check your connection and try again.");
@@ -189,17 +174,16 @@ export default function TradePage() {
     }
   };
 
-  const handleSendAnother = () => {
-    setAgencyName('');
-    setContactPerson('');
-    setEmail('');
-    setPhoneOrLine('');
-    setGroupSize('');
-    setDates('');
-    setWorkshops([]);
-    setNotes('');
-    setStatus('idle');
+  const sendLoginLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!EMAIL_RE.test(loginEmail.trim())) return;
+    await fetch('/api/agency/login-link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: loginEmail }),
+    }).catch(() => {});
+    setLoginSent(true);
   };
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest };
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
@@ -247,10 +231,24 @@ export default function TradePage() {
         <p style={{ position: 'relative', fontFamily: "'DM Sans'", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,0.82)', maxWidth: 420, margin: '0 auto 30px' }}>
           Hands-on Thai herbal experiences in Chiang Mai&rsquo;s Old City — built for groups, priced for partners.
         </p>
-        <PillButton href="#quote" variant="primary" size="lg" style={{ position: 'relative', background: C.gold, color: C.forest }}>
-          Get a Group Quote &rarr;
+        <PillButton href="#apply" variant="primary" size="lg" style={{ position: 'relative', background: C.gold, color: C.forest }}>
+          Become a Partner &rarr;
         </PillButton>
       </div>
+
+      {/* ══════════ VIDEO (optional) ══════════
+          Short explainer for agencies. Set NEXT_PUBLIC_TRADE_VIDEO_URL in
+          Vercel to a YouTube/Vimeo *embed* URL (e.g.
+          https://www.youtube.com/embed/VIDEO_ID) and redeploy — the
+          section stays hidden until then. */}
+      {TRADE_VIDEO_URL && (
+        <div className="trade-section">
+          <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 18, overflow: 'hidden', background: C.forest, boxShadow: '0 10px 30px rgba(45,70,57,0.12)' }}>
+            <iframe src={TRADE_VIDEO_URL} title="Uri Herbs Workshop for travel partners" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+          </div>
+        </div>
+      )}
 
       {/* ══════════ WHAT YOU GET ══════════ */}
       <div className="trade-section">
@@ -286,7 +284,7 @@ export default function TradePage() {
 
       {/* ══════════ PARTNER RATE CARD ══════════ */}
       <div className="trade-section">
-        <Eyebrow>2026 Rates</Eyebrow>
+        <Eyebrow>2026 &amp; 2027 Rates</Eyebrow>
         <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 12 }}>Partner Rate Card</h2>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: C.sageLight, borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
@@ -302,13 +300,21 @@ export default function TradePage() {
             <div style={{ flex: 1, fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: C.sageDark, textAlign: 'right' }}>Retail</div>
             <div style={{ flex: 1, fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: C.sageDark, textAlign: 'right' }}>You Pay</div>
           </div>
+          <div style={{ padding: '8px 16px', background: C.goldLight, fontSize: 11.5, fontWeight: 700, color: C.bark, letterSpacing: '0.04em' }}>WORKSHOPS UNTIL DEC 31, 2026</div>
           <RateRow label="1 Hour" retail="฿920" partner="฿736" />
           <RateRow label="2 Hours" retail="฿1,670" partner="฿1,336" />
           <RateRow label="3 Hours" retail="฿2,320" partner="฿1,856" />
           <RateRow label="Aromatherapy & Skincare (2h)" retail="฿2,700" partner="฿2,160" />
+          {/* 2027 price list — owner decision 2026-10-01 (+25%), same as
+              package_prices in the database. Partner = retail − 20%. */}
+          <div style={{ padding: '8px 16px', background: C.goldLight, fontSize: 11.5, fontWeight: 700, color: C.bark, letterSpacing: '0.04em' }}>WORKSHOPS FROM JAN 1, 2027</div>
+          <RateRow label="1 Hour" retail="฿1,150" partner="฿920" />
+          <RateRow label="2 Hours" retail="฿2,090" partner="฿1,672" />
+          <RateRow label="3 Hours" retail="฿2,900" partner="฿2,320" />
+          <RateRow label="Aromatherapy & Skincare (2h)" retail="฿3,380" partner="฿2,704" />
         </div>
         <p style={{ fontSize: 12, color: C.barkLight, lineHeight: 1.6, margin: '10px 2px 0' }}>
-          Per participant, inclusive of materials, instruction, welcome drink &amp; the final handcrafted product. Rates valid through Dec 31, 2026.
+          Per participant, inclusive of materials, instruction, welcome drink &amp; the final handcrafted product. The rate is set by the date of the workshop.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20, background: C.goldLight, borderRadius: 14, padding: 18 }}>
@@ -324,17 +330,17 @@ export default function TradePage() {
         <Eyebrow>The Process</Eyebrow>
         <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 22 }}>How It Works</h2>
         <div>
-          <Step n={1} title="Tell us about your group">
-            Message us or fill in the quick form below — group size, workshop interest, rough dates.
+          <Step n={1} title="Apply in two minutes">
+            Fill in the partner application below — company details, the kind of groups you bring.
           </Step>
-          <Step n={2} title="Get a quote, fast">
-            We&rsquo;ll confirm partner pricing and availability directly — no back-and-forth over a full itinerary just to get a number.
+          <Step n={2} title="Sign your agreement online">
+            Once we approve, you get your partner agreement by email — read it, tick, type your name. Done.
           </Step>
-          <Step n={3} title="We send your agreement">
-            Once terms are agreed, you get a written group agreement — clear pricing, headcount and policies, not just a chat thread.
+          <Step n={3} title="Book on your partner page">
+            Your own page with live availability: pick the workshop, date and guests and see your partner price instantly.
           </Step>
-          <Step n={4} title="Confirm your date" last>
-            We lock in the exact date &amp; time together directly — <em>live self-serve group scheduling is coming soon.</em>
+          <Step n={4} title="Pay 14 days before" last>
+            Pay online or by bank transfer (upload the slip). We remind you 18 days before and on the due date.
           </Step>
         </div>
       </div>
@@ -389,136 +395,95 @@ export default function TradePage() {
         </div>
       </div>
 
-      {/* ══════════ LEAD FORM ══════════ */}
-      <div className="trade-section">
-        <Eyebrow>Or, Skip the Chat</Eyebrow>
-        <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 8 }}>Send Us Your Details</h2>
+      {/* ══════════ PARTNER APPLICATION ══════════ */}
+      <div className="trade-section" id="apply">
+        <Eyebrow>Become a Partner</Eyebrow>
+        <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 8 }}>Partner Application</h2>
         <p style={{ fontSize: 14, color: C.barkLight, lineHeight: 1.6, marginBottom: 22 }}>
-          Prefer to just fill in the basics? We&rsquo;ll follow up directly by email.
+          For travel agencies, tour guides, hotels and group leaders. We reply within 1–2 working days.
         </p>
 
         {status === 'success' ? (
           <div style={{ textAlign: 'center', padding: '32px 8px', background: C.white, border: `1px solid ${C.sand}`, borderRadius: 20 }}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>🌿</div>
-            <h3 style={{ fontFamily: "'Crimson Pro'", fontSize: 21, fontWeight: 700, color: C.forest, margin: '0 0 8px' }}>Details Sent!</h3>
-            <p style={{ fontSize: 14, color: C.bark, lineHeight: 1.6, margin: '0 0 18px' }}>
-              Thanks — we&rsquo;ll follow up by email soon. For anything urgent, message us on WhatsApp or LINE above.
+            <h3 style={{ fontFamily: "'Crimson Pro'", fontSize: 21, fontWeight: 700, color: C.forest, margin: '0 0 8px' }}>Application received!</h3>
+            <p style={{ fontSize: 14, color: C.bark, lineHeight: 1.6, margin: 0 }}>
+              Thank you — we sent a confirmation to your email. Once approved, you&rsquo;ll receive your partner agreement to sign online.
             </p>
-            <button
-              onClick={handleSendAnother}
-              style={{ background: 'transparent', border: `1.5px solid ${C.sage}`, color: C.sageDark, borderRadius: 10, padding: '10px 22px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}
-            >
-              Send Another Inquiry
-            </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="trade-form-grid">
             {status === 'error' && (
-              <div style={{ background: C.coralLight, color: C.coral, borderRadius: 10, padding: '12px 14px', fontSize: 13, lineHeight: 1.5 }}>
-                {errorMsg}
-              </div>
+              <div style={{ background: C.coralLight, color: C.coral, borderRadius: 10, padding: '12px 14px', fontSize: 13, lineHeight: 1.5 }}>{errorMsg}</div>
             )}
+            {/* Honeypot — visually hidden */}
+            <input type="text" value={f.website_hp} onChange={(e) => set('website_hp', e.target.value)} autoComplete="off" tabIndex={-1} aria-hidden="true"
+              style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
 
-            {/* Honeypot — visually hidden, off-screen */}
-            <input
-              type="text"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              autoComplete="off"
-              tabIndex={-1}
-              aria-hidden="true"
-              style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
-            />
-
-            <input
-              type="text"
-              value={agencyName}
-              onChange={(e) => setAgencyName(e.target.value)}
-              required
-              placeholder="Agency / Tour Guide Name"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest }}
-            />
-            <input
-              type="text"
-              value={contactPerson}
-              onChange={(e) => setContactPerson(e.target.value)}
-              placeholder="Contact Person"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest }}
-            />
+            <input type="text" value={f.company_name} onChange={(e) => set('company_name', e.target.value)} required placeholder="Company / business name *" style={inputStyle} />
             <div className="trade-form-row">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="Email"
-                style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest }}
-              />
-              <input
-                type="text"
-                value={phoneOrLine}
-                onChange={(e) => setPhoneOrLine(e.target.value)}
-                placeholder="Phone / LINE ID"
-                style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest }}
-              />
+              <input type="text" value={f.contact_name} onChange={(e) => set('contact_name', e.target.value)} placeholder="Contact person" style={inputStyle} />
+              <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} required placeholder="Email *" style={inputStyle} />
             </div>
             <div className="trade-form-row">
-              <input
-                type="number"
-                min={1}
-                value={groupSize}
-                onChange={(e) => setGroupSize(e.target.value)}
-                placeholder="Estimated Group Size"
-                style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest }}
-              />
-              <input
-                type="text"
-                value={dates}
-                onChange={(e) => setDates(e.target.value)}
-                placeholder="Tentative Date(s)"
-                style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest }}
-              />
+              <input type="text" value={f.phone} onChange={(e) => set('phone', e.target.value)} placeholder="WhatsApp / LINE / phone" style={inputStyle} />
+              <input type="text" value={f.country} onChange={(e) => set('country', e.target.value)} placeholder="Country" style={inputStyle} />
+            </div>
+            <div className="trade-form-row">
+              <input type="text" value={f.website} onChange={(e) => set('website', e.target.value)} placeholder="Website or Instagram" style={inputStyle} />
+              <input type="text" value={f.license_no} onChange={(e) => set('license_no', e.target.value)} placeholder="TAT / business licence no. (optional)" style={inputStyle} />
             </div>
 
             <div>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.forest, marginBottom: 9 }}>Workshop(s) of Interest</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.forest, marginBottom: 9 }}>You are a…</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {WORKSHOP_OPTIONS.map((w) => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => toggleWorkshop(w)}
-                    className={`trade-chip${workshops.includes(w) ? ' active' : ''}`}
-                  >
-                    {w}
-                  </button>
+                {['Travel agency', 'Tour guide', 'Hotel / hostel', 'School / group leader', 'Other'].map((w) => (
+                  <button key={w} type="button" onClick={() => set('business_type', f.business_type === w ? '' : w)}
+                    className={`trade-chip${f.business_type === w ? ' active' : ''}`}>{w}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.forest, marginBottom: 9 }}>Groups per month (roughly)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {['1–2', '3–5', '6–10', '10+', 'Seasonal'].map((w) => (
+                  <button key={w} type="button" onClick={() => set('monthly_groups', f.monthly_groups === w ? '' : w)}
+                    className={`trade-chip${f.monthly_groups === w ? ' active' : ''}`}>{w}</button>
                 ))}
               </div>
             </div>
 
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              placeholder="Anything else we should know? (dietary notes, language, itinerary constraints…)"
-              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.sand}`, background: C.white, fontSize: 14, color: C.forest, resize: 'vertical', lineHeight: 1.5 }}
-            />
+            <textarea value={f.message} onChange={(e) => set('message', e.target.value)} rows={4}
+              placeholder="Anything else? (typical group size, languages, workshops of interest…)"
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
 
-            <button
-              type="submit"
-              disabled={!canSubmit || status === 'submitting'}
-              style={{
-                width: '100%', padding: '15px', borderRadius: 12, border: 'none',
-                background: canSubmit && status !== 'submitting' ? C.forest : C.sand,
-                color: canSubmit && status !== 'submitting' ? C.parchment : C.barkLight,
-                fontFamily: "'DM Sans'", fontSize: 14.5, fontWeight: 700,
-                cursor: canSubmit && status !== 'submitting' ? 'pointer' : 'default',
-              }}
-            >
-              {status === 'submitting' ? 'Sending…' : 'Send Details'}
+            <button type="submit" disabled={!canSubmit || status === 'submitting'} style={{
+              width: '100%', padding: '15px', borderRadius: 12, border: 'none',
+              background: canSubmit && status !== 'submitting' ? C.forest : C.sand,
+              color: canSubmit && status !== 'submitting' ? C.parchment : C.barkLight,
+              fontFamily: "'DM Sans'", fontSize: 14.5, fontWeight: 700,
+              cursor: canSubmit && status !== 'submitting' ? 'pointer' : 'default',
+            }}>
+              {status === 'submitting' ? 'Sending…' : 'Send application'}
             </button>
           </form>
         )}
+
+        {/* Existing partners: re-send the partner-page link */}
+        <div style={{ marginTop: 22, background: C.white, border: `1px solid ${C.sand}`, borderRadius: 16, padding: '16px 18px' }}>
+          <div style={{ fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest }}>Already a partner?</div>
+          {loginSent ? (
+            <p style={{ fontSize: 13.5, color: C.bark, margin: '6px 0 0' }}>If that email belongs to an active partner, your partner-page link is on its way.</p>
+          ) : (
+            <form onSubmit={sendLoginLink} style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Your partner email"
+                style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
+              <button type="submit" style={{ padding: '12px 18px', borderRadius: 12, border: 'none', background: C.sage, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
+                Get my partner link
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
       {/* ══════════ TRUST STRIP ══════════ */}

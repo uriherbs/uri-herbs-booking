@@ -62,7 +62,7 @@ async function handleCreateIntent(request: NextRequest): Promise<NextResponse> {
   const db = getServiceClient();
   const { data: booking, error: fetchError } = await db
     .from('bookings')
-    .select('id, booking_ref, status, total_price_thb, payment_provider_ref')
+    .select('id, booking_ref, status, total_price_thb, payment_provider_ref, agency_id, payment_status')
     .eq('id', bookingId)
     .single();
 
@@ -70,7 +70,8 @@ async function handleCreateIntent(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
   }
 
-  if (booking.status !== 'pending_payment') {
+  const agencyUnpaid = (booking.status === 'confirmed' && booking.agency_id && booking.payment_status === 'unpaid');
+  if (booking.status !== 'pending_payment' && !agencyUnpaid) {
     return NextResponse.json(
       { error: 'This booking is no longer awaiting payment. Please start a new booking.' },
       { status: 409 }
@@ -110,7 +111,7 @@ async function handleCreateIntent(request: NextRequest): Promise<NextResponse> {
       .from('bookings')
       .update({ payment_method: 'stripe', payment_provider_ref: intent.id })
       .eq('id', booking.id)
-      .eq('status', 'pending_payment');
+      .eq('status', booking.status);
 
     return NextResponse.json({
       client_secret: intent.client_secret,

@@ -38,7 +38,8 @@ export async function getPackages(calendarType?: 'herbal' | 'aromatherapy'): Pro
     .select(`
       id, name, slug, calendar_type, price_thb,
       duration_minutes, description, highlights, sort_order,
-      package_time_rules ( start_time, day_of_week )
+      package_time_rules ( start_time, day_of_week ),
+      package_prices ( valid_from, price_thb )
     `)
     .eq('is_active', true)
     .order('sort_order');

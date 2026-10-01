@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendReminderEmails, sendPartnerMonthlySummaries } from '@/lib/notifications';
+import { processAgencyPayments } from '@/lib/agency-emails';
 
 const WINDOW_MINUTES = 60;
 const SKIP_IF_CREATED_WITHIN_MINUTES = 15;
@@ -82,7 +83,14 @@ async function run(request: NextRequest) {
     return 0;
   });
 
-  return NextResponse.json({ checked: (due || []).length, sent, skipped, partnerSummaries, window: `${from.date} ${from.time}–${toTime}` });
+  // Agency bookings: payment reminders (18 days / due date) and
+  // automatic cancellation of bookings still unpaid after the due date.
+  const agencyPayments = await processAgencyPayments(db).catch((err) => {
+    console.error('cron/reminders: agency payments failed:', err?.message);
+    return { reminded: 0, cancelled: 0 };
+  });
+
+  return NextResponse.json({ checked: (due || []).length, sent, skipped, partnerSummaries, agencyPayments, window: `${from.date} ${from.time}–${toTime}` });
 }
 
 export async function POST(request: NextRequest) {

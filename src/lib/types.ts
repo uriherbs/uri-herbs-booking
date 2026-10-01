@@ -121,6 +121,8 @@ export interface Package {
   sort_order: number;
   // Start times the package can be booked at (null day = every open day).
   package_time_rules?: { start_time: string; day_of_week: number | null }[];
+  // Future price lists (e.g. 2027) — the one in force on the workshop date applies.
+  package_prices?: { valid_from: string; price_thb: number }[];
 }
 
 export interface Workshop {

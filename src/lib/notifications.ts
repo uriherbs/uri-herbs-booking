@@ -14,7 +14,7 @@
 // who default to WhatsApp.
 // ============================================================
 
-const SHOP_NAME = 'Uri Herbs Workshop';
+export const SHOP_NAME = 'Uri Herbs Workshop';
 const SHOP_ADDRESS = '44, 3 Si Phum Soi 9, Tambon Si Phum, Chiang Mai Old City, Thailand';
 // Coordinate + Place ID pattern (matches src/app/contact/page.tsx and
 // src/app/book/page.tsx) — a free-text query like the old
@@ -31,7 +31,7 @@ const SHOP_WEBSITE = 'https://www.uriherbs.com';
 // Base URL for links that must reach the NEW booking site (e.g. the
 // customer cancel page). Set NEXT_PUBLIC_SITE_URL=https://www.uriherbs.com
 // in Vercel once the domain is switched from SimplyBook to Vercel.
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.uriherbs.com').replace(/\/$/, '');
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.uriherbs.com').replace(/\/$/, '');
 
 // ────────────────────────────────────────────────────────────
 // 1. WHATSAPP CLICK-TO-CHAT LINKS
@@ -110,12 +110,12 @@ function couponNote(code?: string | null, discount?: number): string {
   return code && (discount || 0) > 0 ? `Coupon ${code}: −฿${Number(discount).toLocaleString()}` : '';
 }
 
-function formatDateLong(dateStr: string): string {
+export function formatDateLong(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function formatTime12(t: string): string {
+export function formatTime12(t: string): string {
   const h = parseInt(t.split(':')[0]);
   const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
   return `${hour12}:00 ${h >= 12 ? 'PM' : 'AM'}`;
@@ -1277,7 +1277,7 @@ export interface ContactMessageData {
 // Minimal HTML-escaping — this data comes straight from an
 // anonymous public form, so it must not be interpolated raw into
 // the email's HTML body.
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

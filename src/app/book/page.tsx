@@ -171,6 +171,20 @@ function scheduleFromRules(rules) {
   return { chips: times.map(t => `${fmtDays(byTime.get(t))} ${fmtStart(t)}`), days: null };
 }
 
+// Per-person price on a given workshop date ('YYYY-MM-DD'). Mirrors
+// price_for() in the database, which is what actually gets charged.
+function priceOn(pkg, date) {
+  let price = pkg.price;
+  for (const r of pkg.prices || []) if (date && r.from <= date) price = r.price;
+  return price;
+}
+
+// Next price change still in the future (shown as a note on the cards).
+function upcomingPrice(pkg) {
+  const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  return (pkg.prices || []).find(r => r.from > today) || null;
+}
+
 // Merges a live DB package row with its presentation metadata
 function mergePackage(dbPkg) {
   const meta = PACKAGE_META[dbPkg.slug] || CATEGORY_FALLBACK;
@@ -181,6 +195,10 @@ function mergePackage(dbPkg) {
     duration: dbPkg.duration_minutes,
     calendar: dbPkg.calendar_type,
     schedule: scheduleFromRules(dbPkg.package_time_rules),
+    // Date-based price lists (2027 = +25%), oldest first.
+    prices: (dbPkg.package_prices || [])
+      .map(r => ({ from: String(r.valid_from).slice(0, 10), price: r.price_thb }))
+      .sort((a, b) => a.from.localeCompare(b.from)),
     ...meta,
   };
 }
@@ -396,6 +414,11 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
                 ฿{pkg.price.toLocaleString()} × {participants}
               </div>
             ) : null}
+            {upcomingPrice(pkg) && (
+              <div style={{ fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight, marginTop: 2 }}>
+                ฿{upcomingPrice(pkg).price.toLocaleString()}/person from {new Date(upcomingPrice(pkg).from + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1079,7 +1102,7 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
             {pkg.name}{isPrivate && " · Private"}
           </div>
           <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight }}>
-            {pkg.duration} min • {participants} guest{participants > 1 ? "s" : ""} • ฿{(pkg.price * charged).toLocaleString()}
+            {pkg.duration} min • {participants} guest{participants > 1 ? "s" : ""} • ฿{(priceOn(pkg, selectedDate) * charged).toLocaleString()}
             {charged !== participants && ` (min. ${charged})`}
           </div>
         </div>
@@ -1727,7 +1750,7 @@ function ConfirmationStep({ pkg, result, form, onReset, paymentMethod }) {
             if (charged <= 1) return null;
             return (
               <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight, textAlign: "right", marginTop: 2 }}>
-                ฿{pkg.price.toLocaleString()} × {charged} guest{charged > 1 ? "s" : ""}
+                ฿{priceOn(pkg, result.slot_date).toLocaleString()} × {charged} guest{charged > 1 ? "s" : ""}
                 {charged !== result.num_participants && ` (${result.num_participants} attending, ${charged}-guest minimum)`}
               </div>
             );

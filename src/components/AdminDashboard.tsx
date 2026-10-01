@@ -840,6 +840,20 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             </svg>
             Partners
           </Link>
+          <Link
+            href="/admin/agencies"
+            title="Travel agencies"
+            style={{
+              background: "rgba(255,255,255,0.12)", borderRadius: 20,
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
+            }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+            </svg>
+            Agencies
+          </Link>
           <button
             onClick={handleSignOut}
             title="Sign out"

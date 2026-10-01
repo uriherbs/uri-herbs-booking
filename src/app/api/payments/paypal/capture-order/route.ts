@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const db = getServiceClient();
   const { data: booking, error: fetchError } = await db
     .from('bookings')
-    .select('id, booking_ref, status, total_price_thb, payment_provider_ref')
+    .select('id, booking_ref, status, total_price_thb, payment_provider_ref, agency_id, payment_status')
     .eq('id', bookingId)
     .single();
 
@@ -48,13 +48,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Order does not match this booking.' }, { status: 400 });
   }
 
-  if (booking.status === 'confirmed') {
+  const agencyUnpaid = (booking.status === 'confirmed' && booking.agency_id && booking.payment_status === 'unpaid');
+  if (booking.status === 'confirmed' && !agencyUnpaid) {
     // Already confirmed (e.g. the webhook beat this request there) —
     // idempotent success, not an error.
     return NextResponse.json({ booking_ref: booking.booking_ref, status: 'confirmed' });
   }
 
-  if (booking.status !== 'pending_payment') {
+  if (booking.status !== 'pending_payment' && !agencyUnpaid) {
     return NextResponse.json(
       { error: 'This booking is no longer awaiting payment. Please start a new booking.' },
       { status: 409 }

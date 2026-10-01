@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const db = getServiceClient();
   const { data: booking, error: fetchError } = await db
     .from('bookings')
-    .select('id, booking_ref, status, total_price_thb')
+    .select('id, booking_ref, status, total_price_thb, agency_id, payment_status')
     .eq('id', bookingId)
     .single();
 
@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
   }
 
-  if (booking.status !== 'pending_payment') {
+  // Agency bookings made 14+ days ahead are 'confirmed' + unpaid until
+  // paid (see agency_create_booking) — those are payable too.
+  const agencyUnpaid = (booking.status === 'confirmed' && booking.agency_id && booking.payment_status === 'unpaid');
+  if (booking.status !== 'pending_payment' && !agencyUnpaid) {
     return NextResponse.json(
       { error: 'This booking is no longer awaiting payment. Please start a new booking.' },
       { status: 409 }
@@ -106,7 +109,7 @@ export async function POST(request: NextRequest) {
       .from('bookings')
       .update({ payment_method: 'paypal', payment_provider_ref: order.id })
       .eq('id', booking.id)
-      .eq('status', 'pending_payment');
+      .eq('status', booking.status);
 
     return NextResponse.json({ order_id: order.id });
   } catch (err: any) {
