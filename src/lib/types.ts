@@ -105,6 +105,8 @@ export interface Package {
   description: string | null;
   highlights: string[] | null;
   sort_order: number;
+  // Start times the package can be booked at (null day = every open day).
+  package_time_rules?: { start_time: string; day_of_week: number | null }[];
 }
 
 export interface Workshop {

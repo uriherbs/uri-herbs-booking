@@ -129,6 +129,48 @@ const COUNTRY_CODES = [
   { code: "+7", flag: "🇷🇺", name: "Russia" },
 ];
 
+// ── Start-times info line on the workshop cards (customer survey,
+// 2026-10-01: "we couldn't see the workshop times"). Built from the
+// live package_time_rules, so it always matches what can be booked.
+// Info only — the actual time is still picked in the Date & Time step.
+const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function fmtStart(t) {
+  const [h, m] = t.split(":").map(Number);
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+function fmtDays(days) {
+  const d = [...days].sort((a, b) => a - b);
+  if (d.length === 7) return "Daily";
+  const key = d.join(",");
+  if (key === "1,2,3,4,5,6") return "Mon–Sat";
+  if (key === "1,2,3,4,5") return "Mon–Fri";
+  return d.map(x => DAY_SHORT[x]).join(" & ");
+}
+
+// → { chips: ["10:00 AM", "2:00 PM"], days: "Mon–Sat" } when every start
+//   time runs on the same days, otherwise chips carry their own days
+//   (e.g. "Mon & Wed 2:00 PM", "Tue & Thu 11:00 AM") and days is null.
+function scheduleFromRules(rules) {
+  if (!rules || rules.length === 0) return null;
+  const byTime = new Map();
+  for (const r of rules) {
+    const t = String(r.start_time).slice(0, 5);
+    if (!byTime.has(t)) byTime.set(t, new Set());
+    const set = byTime.get(t);
+    if (r.day_of_week === null || r.day_of_week === undefined) [0, 1, 2, 3, 4, 5, 6].forEach(x => set.add(x));
+    else set.add(r.day_of_week);
+  }
+  const times = [...byTime.keys()].sort();
+  const dayKeys = times.map(t => [...byTime.get(t)].sort().join(","));
+  if (dayKeys.every(k => k === dayKeys[0])) {
+    return { chips: times.map(fmtStart), days: fmtDays(byTime.get(times[0])) };
+  }
+  return { chips: times.map(t => `${fmtDays(byTime.get(t))} ${fmtStart(t)}`), days: null };
+}
+
 // Merges a live DB package row with its presentation metadata
 function mergePackage(dbPkg) {
   const meta = PACKAGE_META[dbPkg.slug] || CATEGORY_FALLBACK;
@@ -138,6 +180,7 @@ function mergePackage(dbPkg) {
     price: dbPkg.price_thb,
     duration: dbPkg.duration_minutes,
     calendar: dbPkg.calendar_type,
+    schedule: scheduleFromRules(dbPkg.package_time_rules),
     ...meta,
   };
 }
@@ -369,6 +412,23 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
             {pkg.takeaway.includes("+") && " +more"}
           </span>
         </div>
+
+        {/* Start times — info only (picked later, in Date & Time) */}
+        {pkg.schedule && (
+          <div style={{
+            display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8,
+            fontFamily: "'DM Sans'", fontSize: 12, color: C.sageDark,
+          }}>
+            <span>Starts</span>
+            {pkg.schedule.chips.map(c => (
+              <span key={c} style={{
+                background: isSelected ? C.white : C.sageLight, borderRadius: 999,
+                padding: "3px 9px", fontWeight: 600, whiteSpace: "nowrap",
+              }}>{c}</span>
+            ))}
+            {pkg.schedule.days && <span style={{ color: C.barkLight }}>· {pkg.schedule.days}</span>}
+          </div>
+        )}
       </div>
 
       {/* Selection indicator */}
@@ -1934,12 +1994,15 @@ export default function BookingFlow() {
 
       {step > 0 && step < 4 && (
         <div style={{ padding: "10px 16px 0" }}>
+          {/* Customer survey 2026-10-01: the old pale text link was hard
+              to find — now an outlined, bold pill button. */}
           <button onClick={handleBack} style={{
-            background: "none", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 4,
-            fontFamily: "'DM Sans'", fontSize: 14, color: C.sage, fontWeight: 500, padding: "4px 0",
+            background: C.white, border: `1.5px solid ${C.sage}`, borderRadius: 999,
+            cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
+            fontFamily: "'DM Sans'", fontSize: 15, color: C.forest, fontWeight: 700,
+            padding: "8px 16px 8px 12px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
           }}>
-            <ChevronLeftSVG/> Back
+            <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>←</span> Back
           </button>
         </div>
       )}
