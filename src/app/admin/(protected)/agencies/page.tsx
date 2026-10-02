@@ -193,7 +193,7 @@ export default function AgenciesAdminPage() {
               ))}
             </Section>
 
-            <Section title="Active partners" count={byStatus('active').length + byStatus('suspended').length}>
+            <Section title="Active agencies" count={byStatus('active').length + byStatus('suspended').length}>
               {[...byStatus('active'), ...byStatus('suspended')].map(a => {
                 const mine = bookings.filter(b => b.agency_id === a.id && b.status === 'confirmed' && b.slot_date >= today);
                 const owed = mine.filter(b => b.payment_status === 'unpaid').reduce((s, b) => s + b.total_price_thb, 0);
@@ -216,7 +216,7 @@ export default function AgenciesAdminPage() {
                       <strong>{mine.length}</strong> upcoming bookings · <strong>{baht(owed)}</strong> unpaid
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                      <CopyBtn text={`${SITE}/agency/${a.portal_token}`} label="Copy partner page link" />
+                      <CopyBtn text={`${SITE}/agency/${a.portal_token}`} label="Copy agency page link" />
                       <CopyBtn text={`${SITE}/agency/contract/${a.contract_token}`} label="Agreement link" />
                       <button type="button" style={btn} disabled={busy === `st-${a.id}`} onClick={() => run(`st-${a.id}`, () => updateAgency(a.id, { status: a.status === 'active' ? 'suspended' : 'active' }))}>
                         {a.status === 'active' ? 'Pause' : 'Re-activate'}

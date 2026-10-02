@@ -2,7 +2,7 @@
 // src/lib/agency-emails.ts  (server-only)
 // ============================================================
 // Emails + scheduled jobs for the travel-agency (B2B) flow:
-// application received, contract to sign, welcome (partner page link
+// application received, contract to sign, welcome (agency page link
 // + signed contract copy), booking created, payment reminders (18 days
 // before and on the due date = 14 days before), automatic cancellation
 // of unpaid bookings after the due date, agency cancellations and
@@ -59,42 +59,42 @@ export async function sendApplicationEmails(a: any) {
     shell('New agency application', `<table style="font-size:14px;">${table}</table><p>Approve or reject it in Admin → Agencies.</p>`,
       { href: `${SITE_URL}/admin/agencies`, label: 'Open Agencies' }),
     rows.map(([k, v]) => `${k}: ${v}`).join('\n'));
-  await send(a.email, `We received your partner application — ${SHOP_NAME}`,
+  await send(a.email, `We received your agency application — ${SHOP_NAME}`,
     shell('Thank you for applying!', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)},</p>
-      <p>We received your application to become a ${SHOP_NAME} partner. We usually reply within 1–2 working days. Once approved, you'll receive your partner agreement to sign online, and then your personal partner page for bookings.</p>`),
-    `Hi ${a.contact_name || a.company_name}, we received your application to become a ${SHOP_NAME} partner. We usually reply within 1–2 working days.`);
+      <p>We received your application for a ${SHOP_NAME} agency account. We usually reply within 1–2 working days. Once approved, you'll receive your agency agreement to sign online, and then your personal agency page for bookings.</p>`),
+    `Hi ${a.contact_name || a.company_name}, we received your application for a ${SHOP_NAME} agency account. We usually reply within 1–2 working days.`);
 }
 
 // ── Approved → contract to sign ────────────────────────────
 export async function sendContractEmail(a: any) {
   const url = contractUrl(a.contract_token);
-  return send(a.email, `Your partner agreement is ready to sign — ${SHOP_NAME}`,
+  return send(a.email, `Your agency agreement is ready to sign — ${SHOP_NAME}`,
     shell('Welcome aboard — one last step', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)},</p>
-      <p>Your partner application for <strong>${escapeHtml(a.company_name)}</strong> is approved. Please read and accept the partner agreement online — it takes two minutes. Right after, you'll get your personal partner page to book workshops for your clients at your partner rate (${Number(a.commission_pct)}% below retail).</p>`,
+      <p>Your agency application for <strong>${escapeHtml(a.company_name)}</strong> is approved. Please read and accept the agency agreement online — it takes two minutes. Right after, you'll get your personal agency page to book workshops for your clients at your agency rate (${Number(a.commission_pct)}% below retail).</p>`,
       { href: url, label: 'Read & sign the agreement' }),
-    `Your application is approved. Read & sign the partner agreement: ${url}`);
+    `Your application is approved. Read & sign the agency agreement: ${url}`);
 }
 
-// ── Signed → welcome with partner page + contract copy ─────
+// ── Signed → welcome with agency page + contract copy ─────
 export async function sendWelcomeEmails(a: any, contractTextCopy: string) {
   const url = portalUrl(a.portal_token);
   const pre = `<pre style="white-space:pre-wrap; font-family: Arial, sans-serif; font-size:12px; background:#FAF7F0; border:1px solid #E8E2D8; border-radius:10px; padding:12px; color:#5C4A3D;">${escapeHtml(contractTextCopy)}</pre>`;
-  await send(a.email, `Your partner page is ready — ${SHOP_NAME}`,
-    shell('You’re all set 🌿', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)}, thank you for signing. Your personal partner page is ready — book workshops for your clients there, pay online or by bank transfer, and see all your bookings.</p>
-      <p style="font-size:13px; color:#8A7668;">Keep this link private — it is your login. Lost it? Use “Get my partner link” on uriherbs.com/trade.</p>
-      ${pre}`, { href: url, label: 'Open my partner page' }),
-    `Your partner page: ${url}\n\n${contractTextCopy}`);
+  await send(a.email, `Your agency page is ready — ${SHOP_NAME}`,
+    shell('You’re all set 🌿', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)}, thank you for signing. Your personal agency page is ready — book workshops for your clients there, pay online or by bank transfer, and see all your bookings.</p>
+      <p style="font-size:13px; color:#8A7668;">Keep this link private — it is your login. Lost it? Use “Get my agency link” on uriherbs.com/trade.</p>
+      ${pre}`, { href: url, label: 'Open my agency page' }),
+    `Your agency page: ${url}\n\n${contractTextCopy}`);
   await send(OWNER_EMAIL, `Agency signed — ${a.company_name}`,
-    shell(`Agency signed: ${escapeHtml(a.company_name)}`, `<p>${escapeHtml(a.signed_name || '')} accepted the partner agreement. The agency can now book from its partner page.</p>${pre}`),
+    shell(`Agency signed: ${escapeHtml(a.company_name)}`, `<p>${escapeHtml(a.signed_name || '')} accepted the agency agreement. The agency can now book from its agency page.</p>${pre}`),
     `${a.company_name} signed.\n\n${contractTextCopy}`);
 }
 
 export async function sendLoginLinkEmail(a: any) {
   const url = portalUrl(a.portal_token);
-  return send(a.email, `Your partner page link — ${SHOP_NAME}`,
-    shell('Your partner page', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)}, here is your personal partner page link for ${escapeHtml(a.company_name)}.</p>`,
-      { href: url, label: 'Open my partner page' }),
-    `Your partner page: ${url}`);
+  return send(a.email, `Your agency page link — ${SHOP_NAME}`,
+    shell('Your agency page', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)}, here is your personal agency page link for ${escapeHtml(a.company_name)}.</p>`,
+      { href: url, label: 'Open my agency page' }),
+    `Your agency page: ${url}`);
 }
 
 // ── Booking created ────────────────────────────────────────
@@ -112,9 +112,9 @@ export async function sendAgencyBookingCreatedEmails(db: any, bookingId: string)
     await send(a?.email, `Booking ${b.booking_ref} reserved — pay ${thb(b.total_price_thb)} by ${due}`,
       shell('Booking reserved', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
         <p>Amount to pay: <strong>${thb(b.total_price_thb)}</strong> (retail ${thb(b.retail_price_thb)}).<br>
-        Payment due by <strong>${due}</strong> — online or by bank transfer on your partner page. Unpaid bookings are cancelled automatically after this date.</p>`,
-        a ? { href: portalUrl(a.portal_token), label: 'Pay on my partner page' } : undefined),
-      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${due} on your partner page.`);
+        Payment due by <strong>${due}</strong> — online or by bank transfer on your agency page. Unpaid bookings are cancelled automatically after this date.</p>`,
+        a ? { href: portalUrl(a.portal_token), label: 'Pay on my agency page' } : undefined),
+      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${due} on your agency page.`);
   }
   await send(OWNER_EMAIL, `Agency booking — ${b.booking_ref} · ${a?.company_name || ''} (${b.num_participants} guests)`,
     shell(`Agency booking · ${escapeHtml(a?.company_name || '')}`, `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
@@ -185,8 +185,8 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
       cancelled++;
       await send(a?.email, `Booking ${b.booking_ref} cancelled — not paid by ${formatDateLong(due)}`,
         shell('Booking cancelled (unpaid)', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
-          <p>This booking was not paid by the due date, so it has been cancelled and the places released. If you still need it, book again on your partner page (subject to availability).</p>`,
-          { href: page, label: 'Open my partner page' }),
+          <p>This booking was not paid by the due date, so it has been cancelled and the places released. If you still need it, book again on your agency page (subject to availability).</p>`,
+          { href: page, label: 'Open my agency page' }),
         `${b.booking_ref} was not paid by ${due} and has been cancelled. ${line}`);
       await send(OWNER_EMAIL, `Auto-cancelled unpaid agency booking — ${b.booking_ref} · ${a?.company_name || ''}`,
         shell('Unpaid agency booking cancelled', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>Due ${formatDateLong(due)} — ${thb(b.total_price_thb)} unpaid. Places released.</p>`),

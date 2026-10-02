@@ -79,7 +79,7 @@ export default function AgencyContractPage() {
       ` }} />
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 0 48px' }}>
         <div style={{ background: C.forest, color: C.white, padding: '24px 20px 20px' }}>
-          <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.gold, fontWeight: 700 }}>Partner agreement</div>
+          <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.gold, fontWeight: 700 }}>Agency agreement</div>
           <div style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, marginTop: 4 }}>
             {BUSINESS.name}{info ? ` × ${info.company_name}` : ''}
           </div>
@@ -130,7 +130,7 @@ export default function AgencyContractPage() {
                   </p>
                   {portalToken && (
                     <a href={`/agency/${portalToken}`} className="no-print" style={{ display: 'inline-block', marginTop: 14, background: C.sage, color: C.white, padding: '12px 20px', borderRadius: 999, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
-                      Open my partner page →
+                      Open my agency page →
                     </a>
                   )}
                   <button type="button" className="no-print" onClick={() => window.print()} style={{ display: 'block', marginTop: 12, background: 'none', border: 'none', padding: 0, color: C.sageDark, textDecoration: 'underline', cursor: 'pointer', fontSize: 13 }}>
