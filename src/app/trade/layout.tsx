@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Travel Agents & Group Bookings',
   description:
-    'Partner with Uri Herbs Workshop in Chiang Mai: herbal workshops for tour groups, schools and companies, with partner commission and flexible group scheduling.',
+    'Work with Uri Herbs Workshop in Chiang Mai: herbal workshops for tour groups, schools and companies, with agency commission and flexible group scheduling.',
   alternates: { canonical: '/trade' },
 };
 

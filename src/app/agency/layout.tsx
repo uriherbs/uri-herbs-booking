@@ -3,7 +3,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Partner · Uri Herbs Workshop',
+  title: 'Agency · Uri Herbs Workshop',
   robots: { index: false, follow: false },
 };
 

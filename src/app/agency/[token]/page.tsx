@@ -363,17 +363,17 @@ export default function AgencyPortalPage() {
         {state === 'loading' && <div style={{ padding: 40, textAlign: 'center', color: C.barkLight }}>Loading…</div>}
         {state === 'notfound' && (
           <div style={{ padding: '60px 24px', textAlign: 'center', lineHeight: 1.6 }}>
-            <div style={{ fontFamily: "'Crimson Pro'", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>This partner link is not active</div>
-            Get a fresh link on uriherbs.com/trade (“Already a partner?”) or WhatsApp +66 64 334 9890.
+            <div style={{ fontFamily: "'Crimson Pro'", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>This agency link is not active</div>
+            Get a fresh link on uriherbs.com/trade (“Already have an agency account?”) or WhatsApp +66 64 334 9890.
           </div>
         )}
         {state === 'ok' && data && (
           <>
             <div style={{ background: C.forest, color: C.white, padding: '22px 18px 18px' }}>
-              <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.gold, fontWeight: 700 }}>Uri Herbs Workshop · Partner page</div>
+              <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.gold, fontWeight: 700 }}>Uri Herbs Workshop · Agency page</div>
               <div style={{ fontFamily: "'Crimson Pro'", fontSize: 24, fontWeight: 700, marginTop: 4 }}>{data.agency.company_name}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 2 }}>
-                Partner rate: retail − {Number(data.agency.commission_pct)}% ·{' '}
+                Agency rate: retail − {Number(data.agency.commission_pct)}% ·{' '}
                 <a href={`/agency/contract/${data.agency.contract_token}`} style={{ color: C.white, textDecoration: 'underline' }}>your agreement</a>
               </div>
             </div>

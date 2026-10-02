@@ -229,10 +229,10 @@ export default function TradePage() {
           Bring Your Groups to<br />Uri Herbs Workshop
         </h1>
         <p style={{ position: 'relative', fontFamily: "'DM Sans'", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,0.82)', maxWidth: 420, margin: '0 auto 30px' }}>
-          Hands-on Thai herbal experiences in Chiang Mai&rsquo;s Old City — built for groups, priced for partners.
+          Hands-on Thai herbal experiences in Chiang Mai&rsquo;s Old City — built for groups, priced for agencies.
         </p>
         <PillButton href="#apply" variant="primary" size="lg" style={{ position: 'relative', background: C.gold, color: C.forest }}>
-          Become a Partner &rarr;
+          Apply for an Agency Account &rarr;
         </PillButton>
       </div>
 
@@ -244,7 +244,7 @@ export default function TradePage() {
       {TRADE_VIDEO_URL && (
         <div className="trade-section">
           <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 18, overflow: 'hidden', background: C.forest, boxShadow: '0 10px 30px rgba(45,70,57,0.12)' }}>
-            <iframe src={TRADE_VIDEO_URL} title="Uri Herbs Workshop for travel partners" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
+            <iframe src={TRADE_VIDEO_URL} title="Uri Herbs Workshop for travel agencies" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
           </div>
         </div>
@@ -252,14 +252,14 @@ export default function TradePage() {
 
       {/* ══════════ WHAT YOU GET ══════════ */}
       <div className="trade-section">
-        <Eyebrow>Partner With Us</Eyebrow>
+        <Eyebrow>Work With Us</Eyebrow>
         <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 22 }}>What You Get</h2>
         <div className="trade-benefit-grid">
           <BenefitCard
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.sageDark} strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>}
-            title="20% partner commission"
+            title="20% agency commission"
           >
-            Built into every rate, on every workshop — see the full partner rate card below.
+            Built into every rate, on every workshop — see the full agency rate card below.
           </BenefitCard>
           <BenefitCard
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.sageDark} strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>}
@@ -285,7 +285,7 @@ export default function TradePage() {
       {/* ══════════ PARTNER RATE CARD ══════════ */}
       <div className="trade-section">
         <Eyebrow>2026 &amp; 2027 Rates</Eyebrow>
-        <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 12 }}>Partner Rate Card</h2>
+        <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 12 }}>Agency Rate Card</h2>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: C.sageLight, borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={C.sageDark} strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><path d="M12 16v-5M12 8h.01" /></svg>
@@ -331,13 +331,13 @@ export default function TradePage() {
         <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 22 }}>How It Works</h2>
         <div>
           <Step n={1} title="Apply in two minutes">
-            Fill in the partner application below — company details, the kind of groups you bring.
+            Fill in the agency application below — company details, the kind of groups you bring.
           </Step>
           <Step n={2} title="Sign your agreement online">
-            Once we approve, you get your partner agreement by email — read it, tick, type your name. Done.
+            Once we approve, you get your agency agreement by email — read it, tick, type your name. Done.
           </Step>
-          <Step n={3} title="Book on your partner page">
-            Your own page with live availability: pick the workshop, date and guests and see your partner price instantly.
+          <Step n={3} title="Book on your agency page">
+            Your own page with live availability: pick the workshop, date and guests and see your agency price instantly.
           </Step>
           <Step n={4} title="Pay 14 days before" last>
             Pay online or by bank transfer (upload the slip). We remind you 18 days before and on the due date.
@@ -371,7 +371,7 @@ export default function TradePage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.forest }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Crimson Pro'", fontWeight: 700, color: C.forest, fontSize: 13 }}>UH</div>
             <div>
-              <div style={{ fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 700, color: '#fff' }}>Uri Herbs Partner Assistant</div>
+              <div style={{ fontFamily: "'DM Sans'", fontSize: 13, fontWeight: 700, color: '#fff' }}>Uri Herbs Agency Assistant</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8FD19E' }} />
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Illustrative example</span>
@@ -386,7 +386,7 @@ export default function TradePage() {
               14 guests, mid-October, interested in Tea Blending + Massage Ball
             </div>
             <div style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.white, border: `1px solid ${C.sand}`, borderRadius: '14px 14px 14px 3px', padding: '10px 13px', fontSize: 13, color: C.forest, lineHeight: 1.5 }}>
-              Tea + Massage Ball is our 2-hour combo — at your partner rate that&rsquo;s ฿1,336/person. Want me to hold mid-October dates for 14?
+              Tea + Massage Ball is our 2-hour combo — at your agency rate that&rsquo;s ฿1,336/person. Want me to hold mid-October dates for 14?
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, padding: '12px 14px', borderTop: `1px solid ${C.sand}` }}>
@@ -397,8 +397,8 @@ export default function TradePage() {
 
       {/* ══════════ PARTNER APPLICATION ══════════ */}
       <div className="trade-section" id="apply">
-        <Eyebrow>Become a Partner</Eyebrow>
-        <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 8 }}>Partner Application</h2>
+        <Eyebrow>Apply for an Agency Account</Eyebrow>
+        <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 8 }}>Agency Application</h2>
         <p style={{ fontSize: 14, color: C.barkLight, lineHeight: 1.6, marginBottom: 22 }}>
           For travel agencies, tour guides, hotels and group leaders. We reply within 1–2 working days.
         </p>
@@ -408,7 +408,7 @@ export default function TradePage() {
             <div style={{ fontSize: 40, marginBottom: 10 }}>🌿</div>
             <h3 style={{ fontFamily: "'Crimson Pro'", fontSize: 21, fontWeight: 700, color: C.forest, margin: '0 0 8px' }}>Application received!</h3>
             <p style={{ fontSize: 14, color: C.bark, lineHeight: 1.6, margin: 0 }}>
-              Thank you — we sent a confirmation to your email. Once approved, you&rsquo;ll receive your partner agreement to sign online.
+              Thank you — we sent a confirmation to your email. Once approved, you&rsquo;ll receive your agency agreement to sign online.
             </p>
           </div>
         ) : (
@@ -471,15 +471,15 @@ export default function TradePage() {
 
         {/* Existing partners: re-send the partner-page link */}
         <div style={{ marginTop: 22, background: C.white, border: `1px solid ${C.sand}`, borderRadius: 16, padding: '16px 18px' }}>
-          <div style={{ fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest }}>Already a partner?</div>
+          <div style={{ fontFamily: "'Crimson Pro'", fontSize: 17, fontWeight: 700, color: C.forest }}>Already have an agency account?</div>
           {loginSent ? (
-            <p style={{ fontSize: 13.5, color: C.bark, margin: '6px 0 0' }}>If that email belongs to an active partner, your partner-page link is on its way.</p>
+            <p style={{ fontSize: 13.5, color: C.bark, margin: '6px 0 0' }}>If that email belongs to an active agency, your agency-page link is on its way.</p>
           ) : (
             <form onSubmit={sendLoginLink} style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Your partner email"
+              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Your agency email"
                 style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
               <button type="submit" style={{ padding: '12px 18px', borderRadius: 12, border: 'none', background: C.sage, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
-                Get my partner link
+                Get my agency link
               </button>
             </form>
           )}

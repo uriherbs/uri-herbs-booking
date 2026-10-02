@@ -1,7 +1,7 @@
 // ============================================================
 // src/lib/agency-contract.ts
 // ============================================================
-// The partner agreement shown to travel agencies / group leaders on
+// The agency agreement shown to travel agencies / group leaders on
 // /agency/contract/<token> and stored (as plain text) when they sign.
 // Terms come from the owner's existing agency contract (see project
 // doc claude/b2b-agency-partner-rates-2026-08-22.md) plus the owner's
@@ -11,7 +11,7 @@
 // changes — each signature records the version it accepted.
 // ============================================================
 
-export const CONTRACT_VERSION = '2026-10';
+export const CONTRACT_VERSION = '2026-10b';
 
 export const BUSINESS = {
   name: 'Uri Herbs Workshop',
@@ -72,23 +72,23 @@ export function contractSections(party: ContractParty): ContractSection[] {
     {
       title: '1. Parties',
       body: [
-        `This agreement is between ${BUSINESS.name} (${BUSINESS.legal}), ${BUSINESS.address} (“Uri Herbs”), and ${party.company_name}${party.country ? `, ${party.country}` : ''}${party.license_no ? ` (licence no. ${party.license_no})` : ''} (“the Partner”).`,
+        `This agreement is between ${BUSINESS.name} (${BUSINESS.legal}), ${BUSINESS.address} (“Uri Herbs”), and ${party.company_name}${party.country ? `, ${party.country}` : ''}${party.license_no ? ` (licence no. ${party.license_no})` : ''} (“the Agency”).`,
       ],
     },
     {
-      title: '2. Partner rates',
+      title: '2. Agency rates',
       body: [
-        `The Partner pays Uri Herbs the retail price of each workshop minus ${c}% (the Partner's commission). The Partner may charge its clients the retail price or its own price; the difference is the Partner's to keep.`,
+        `The Agency pays Uri Herbs the retail price of each workshop minus ${c}% (the Agency's commission). The Agency may charge its clients the retail price or its own price; the difference is the Agency's to keep.`,
         'The rate that applies is the one in force on the date of the workshop (see the rate table). Rates include materials, instruction, a welcome drink and the handcrafted products participants take home.',
       ],
     },
     {
       title: '3. Bookings',
       body: [
-        'The Partner books through its personal partner page, subject to availability shown there. A booking is for one workshop, date and time.',
+        'The Agency books through its personal agency page, subject to availability shown there. A booking is for one workshop, date and time.',
         'Shared-table bookings: up to 12 guests per booking, at the per-person rate.',
         'Private sessions: priced for at least 4 guests (1–4 guests pay for 4); 5–16 guests pay per actual guest.',
-        'The Partner gives the correct number of guests and passes on Uri Herbs’ policies to its clients (including the health & allergy questionnaire).',
+        'The Agency gives the correct number of guests and passes on Uri Herbs’ policies to its clients (including the health & allergy questionnaire).',
       ],
     },
     {
@@ -96,12 +96,12 @@ export function contractSections(party: ContractParty): ContractSection[] {
       body: [
         '100% payment confirms a booking and is due no later than 14 days before the workshop.',
         'Bookings made less than 14 days before the workshop must be paid when booking — otherwise the places are not held.',
-        'Payment is made online (card / PayPal) on the partner page, or by bank transfer with the transfer slip uploaded on the partner page.',
+        'Payment is made online (card / PayPal) on the agency page, or by bank transfer with the transfer slip uploaded on the agency page.',
         'Reminders are sent 18 days before the workshop and on the payment due date. A booking still unpaid after the due date is cancelled automatically and its places are released.',
       ],
     },
     {
-      title: '5. Cancellations by the Partner',
+      title: '5. Cancellations by the Agency',
       body: [
         '7 days or more before the workshop: full refund.',
         '1–6 days before the workshop: 30% cancellation fee (70% refunded).',
@@ -136,7 +136,7 @@ export function contractText(
   signature?: { name: string; at: string; ip?: string | null }
 ): string {
   const lines: string[] = [];
-  lines.push(`PARTNER AGREEMENT — ${BUSINESS.name} × ${party.company_name}`);
+  lines.push(`AGENCY AGREEMENT — ${BUSINESS.name} × ${party.company_name}`);
   lines.push(`Version ${CONTRACT_VERSION}`);
   lines.push('');
   for (const s of contractSections(party)) {
@@ -151,7 +151,7 @@ export function contractText(
       period = r.period;
       lines.push(period === 'current' ? 'Current rates:' : `Workshops from ${period}:`);
     }
-    lines.push(`  ${r.label}: retail ${baht(r.retail)} · partner pays ${baht(r.partner)}`);
+    lines.push(`  ${r.label}: retail ${baht(r.retail)} · agency pays ${baht(r.partner)}`);
   }
   if (signature) {
     lines.push('');
