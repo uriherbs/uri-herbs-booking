@@ -11,7 +11,8 @@
 // Cancellation → the matching booking is cancelled, seats freed, shop
 //                cancellation email, calendar event removed.
 // Anything the rules can't handle safely (unknown package, slot full,
-// >6 guests, unreadable email) is NOT guessed: the shop gets a
+// too many guests, unreadable email, a time the workshop doesn't start
+// at, a price that belongs to another workshop) is NOT guessed: the shop gets a
 // "please add manually" email instead.
 //
 // Always answers 200 for handled/ignored emails so the script marks the
@@ -65,10 +66,53 @@ function friendlyError(msg: string): string {
   if (/DUPLICATE/.test(msg)) return 'already in the system';
   if (/CAPACITY_FULL/.test(msg)) return 'not enough seats left at that time';
   if (/INVALID_PARTICIPANTS/.test(msg)) return 'too many guests for one group';
+  if (/is not a start time of/.test(msg)) return 'the workshop does not start at that time on that day — it was probably read wrong';
   if (/DATE_BLOCKED|SLOT_BLOCKED/.test(msg)) return 'that day/time is closed in the admin';
   if (/INVALID_DATE/.test(msg)) return 'date is in the past';
   if (/INVALID_PACKAGE/.test(msg)) return 'workshop not found';
   return 'unexpected error';
+}
+
+/** Returns a reason (for the shop) when the parsed booking doesn't add up, else null. */
+async function sanityCheck(
+  db: any, slug: string, date: string, time: string, guests: number, priceText?: string
+): Promise<string | null> {
+  const { data: pkgs, error } = await db
+    .from('packages')
+    .select('slug, name, price_thb, package_time_rules ( day_of_week, start_time ), package_prices ( valid_from, price_thb )')
+    .eq('is_active', true);
+  if (error || !pkgs) return null; // can't check — the database function still checks the time
+  const pkg = pkgs.find((x: any) => x.slug === slug);
+  if (!pkg) return null;
+
+  const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const starts = (pkg.package_time_rules || [])
+    .filter((r: any) => Number(r.day_of_week) === dow)
+    .map((r: any) => String(r.start_time).slice(0, 5));
+  if (!starts.includes(time.slice(0, 5))) {
+    return `"${pkg.name}" does not start at ${time} on that day (it starts at ${starts.sort().join(' / ') || 'no time that day'}) — the workshop was probably read wrong`;
+  }
+
+  // Price per person, when the OTA email shows one. Only a clear match with
+  // a DIFFERENT workshop length counts (OTA prices can differ from ours).
+  const total = priceText ? parseFloat(priceText.replace(/[^\d.]/g, '')) : NaN;
+  if (Number.isFinite(total) && total > 0 && guests > 0) {
+    const priceOn = (x: any) => {
+      let price = Number(x.price_thb);
+      const rows = [...(x.package_prices || [])].sort((a: any, b: any) => String(a.valid_from).localeCompare(String(b.valid_from)));
+      for (const r of rows) if (String(r.valid_from).slice(0, 10) <= date) price = Number(r.price_thb);
+      return price;
+    };
+    const each = Math.round(total / guests);
+    const mine = priceOn(pkg);
+    if (each !== mine) {
+      const other = pkgs.find((x: any) => priceOn(x) === each);
+      if (other) {
+        return `the price in the email (฿${each.toLocaleString('en-US')} per person) is the price of "${other.name}", not of "${pkg.name}" (฿${mine.toLocaleString('en-US')}) — the workshop was probably read wrong`;
+      }
+    }
+  }
+  return null;
 }
 
 export async function POST(request: NextRequest) {
@@ -137,6 +181,16 @@ export async function POST(request: NextRequest) {
   if (!p.packageSlug) {
     await notifyManual(p.platform, email.subject, `could not tell which workshop "${p.packageText}" is`, details);
     return NextResponse.json({ result: 'manual', reason: 'unknown_package' });
+  }
+
+  // Sanity check before booking: the workshop we read must really start at
+  // that time on that weekday, and the OTA's price must not point at a
+  // different workshop. If either fails the email was probably read wrong,
+  // so nothing is booked and the shop is asked to add it by hand.
+  const doubt = await sanityCheck(db, p.packageSlug, p.date, p.time, p.guests, p.price);
+  if (doubt) {
+    await notifyManual(p.platform, email.subject, doubt, details);
+    return NextResponse.json({ result: 'manual', reason: 'sanity_check' });
   }
 
   const notes = [

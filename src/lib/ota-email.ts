@@ -51,6 +51,7 @@ export const PLATFORM_LABEL: Record<OtaPlatform, string> = {
 export function normalize(text: string): string {
   return String(text || '')
     .replace(/\[[^\]]*\]\([^)]*\)/g, ' ')   // markdown links
+    .replace(/\[(?:image|cid)\s*:[^\]]*\]/gi, ' ') // "[image: alt text]" placeholders (Gmail plain-text body)
     .replace(/https?:\/\/\S+/g, ' ')
     .replace(/[|#*]/g, ' ')
     .replace(/[ \s]+/g, ' ')
@@ -106,6 +107,19 @@ const GYG_PRODUCT_TITLES = [
   'Chiang Mai: Herbal Tea, Thai Inhaler and Massage Ball Workshop',
 ];
 
+// Remove the listing title wherever it appears (it can be repeated, e.g.
+// as an image caption before the real title). If nothing but the title
+// is left, keep the original text so mapPackage sees all three workshops.
+export function stripGygTitle(option: string): string {
+  let out = option;
+  for (const title of GYG_PRODUCT_TITLES) {
+    const re = new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'gi');
+    out = out.replace(re, ' ');
+  }
+  out = out.replace(/\s+/g, ' ').trim();
+  return out.length > 3 ? out : option.trim();
+}
+
 function detectPlatform(from: string): OtaPlatform | null {
   const f = from.toLowerCase();
   if (f.includes('klook.com')) return 'klook';
@@ -151,11 +165,7 @@ function parseGyg(subject: string, t: string): OtaParsed {
   const ref = neu[1];
 
   let option = t.match(/(?:last-minute booking|has been booked|new booking)\s*:\s*(.+?)\s*Reference number/i)?.[1]?.trim() || '';
-  for (const title of GYG_PRODUCT_TITLES) {
-    if (option.toLowerCase().startsWith(title.toLowerCase()) && option.length > title.length + 3) {
-      option = option.slice(title.length).trim();
-    }
-  }
+  option = stripGygTitle(option);
   const dm = t.match(/Date\s*:?\s*([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4}),?\s*(\d{1,2}):(\d{2})\s*([AP]M)/i);
   const partText = t.match(/Number of participants\s*:?\s*(.+?)\s*(?:Main customer|Tour language|Price)/i)?.[1] || '';
   const guests = sumCounts(partText);
