@@ -20,13 +20,17 @@ export async function POST(request: NextRequest) {
     phone: s(body.phone, 100) || null,
     country: s(body.country, 100) || null,
     website: s(body.website, 300) || null,
+    address: s(body.address, 500) || null,
     license_no: s(body.license_no, 100) || null,
+    tat_no: s(body.tat_no, 100) || null,
     business_type: s(body.business_type, 100) || null,
     monthly_groups: s(body.monthly_groups, 100) || null,
     message: s(body.message, 3000) || null,
   };
   if (!row.company_name) return NextResponse.json({ error: 'Please enter your company or business name.' }, { status: 400 });
   if (!EMAIL_RE.test(row.email)) return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
+  if (!row.address) return NextResponse.json({ error: 'Please enter your business address.' }, { status: 400 });
+  if (!row.license_no) return NextResponse.json({ error: 'Please enter your business licence number.' }, { status: 400 });
 
   const db = getServiceClient();
   // One open application per email — a repeat just re-sends the emails.

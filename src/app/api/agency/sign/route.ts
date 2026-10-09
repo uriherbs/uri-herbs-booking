@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { CONTRACT_VERSION, contractText, rateRows } from '@/lib/agency-contract';
 import { sendWelcomeEmails } from '@/lib/agency-emails';
+import { agencyContractPdf, agencyContractPdfName } from '@/lib/agency-contract-pdf';
+
+export const runtime = 'nodejs'; // the PDF attachment is built with react-pdf
 
 export async function POST(request: NextRequest) {
   let body: any;
@@ -38,6 +41,14 @@ export async function POST(request: NextRequest) {
   }).eq('id', a.id).eq('status', 'approved').select('*').maybeSingle();
   if (error || !updated) return NextResponse.json({ error: 'Could not save — please try again.' }, { status: 500 });
 
-  await sendWelcomeEmails(updated, text);
+  // Signed agreement as a PDF attachment — best effort: if it fails the
+  // emails still go out (the PDF can be downloaded from the agreement page).
+  let pdf: { filename: string; content: string } | null = null;
+  try {
+    pdf = { filename: agencyContractPdfName(updated.company_name), content: (await agencyContractPdf(text)).toString('base64') };
+  } catch (err: any) {
+    console.error('agency contract PDF for email failed:', err?.message);
+  }
+  await sendWelcomeEmails(updated, text, pdf);
   return NextResponse.json({ ok: true, portal_token: updated.portal_token });
 }

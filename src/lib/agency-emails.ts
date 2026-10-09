@@ -30,11 +30,14 @@ ${cta ? `<p style="margin:18px 0 0;"><a href="${cta.href}" style="display:inline
 </table></td></tr></table></body></html>`;
 }
 
-async function send(to: string | null | undefined, subject: string, html: string, text: string) {
+async function send(
+  to: string | null | undefined, subject: string, html: string, text: string,
+  attachments?: { filename: string; content: string }[]
+) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || !to) return false;
   try {
-    await sendEmailViaResend({ to, subject, html, text, replyTo: OWNER_EMAIL }, apiKey);
+    await sendEmailViaResend({ to, subject, html, text, replyTo: OWNER_EMAIL, attachments }, apiKey);
     return true;
   } catch (err: any) {
     console.error(`agency email "${subject}" to ${to} failed:`, err?.message);
@@ -51,7 +54,8 @@ function bookingLine(b: any, pkgName: string) {
 export async function sendApplicationEmails(a: any) {
   const rows = [
     ['Company', a.company_name], ['Contact', a.contact_name], ['Email', a.email], ['Phone / WhatsApp', a.phone],
-    ['Country', a.country], ['Website', a.website], ['Licence no.', a.license_no], ['Type', a.business_type],
+    ['Business address', a.address], ['Country', a.country], ['Website', a.website],
+    ['Business licence no.', a.license_no], ['TAT licence no.', a.tat_no], ['Type', a.business_type],
     ['Groups per month', a.monthly_groups], ['Message', a.message],
   ].filter(r => r[1]);
   const table = rows.map(([k, v]) => `<tr><td style="padding:3px 8px 3px 0; color:#8A7668; vertical-align:top;">${k}</td><td style="padding:3px 0;">${escapeHtml(String(v))}</td></tr>`).join('');
@@ -76,17 +80,21 @@ export async function sendContractEmail(a: any) {
 }
 
 // ── Signed → welcome with agency page + contract copy ─────
-export async function sendWelcomeEmails(a: any, contractTextCopy: string) {
+export async function sendWelcomeEmails(
+  a: any, contractTextCopy: string, pdf?: { filename: string; content: string } | null
+) {
+  const files = pdf ? [pdf] : undefined;
   const url = portalUrl(a.portal_token);
   const pre = `<pre style="white-space:pre-wrap; font-family: Arial, sans-serif; font-size:12px; background:#FAF7F0; border:1px solid #E8E2D8; border-radius:10px; padding:12px; color:#5C4A3D;">${escapeHtml(contractTextCopy)}</pre>`;
   await send(a.email, `Your agency page is ready — ${SHOP_NAME}`,
     shell('You’re all set 🌿', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)}, thank you for signing. Your personal agency page is ready — book workshops for your clients there, pay online or by bank transfer, and see all your bookings.</p>
       <p style="font-size:13px; color:#8A7668;">Keep this link private — it is your login. Lost it? Use “Get my agency link” on uriherbs.com/trade.</p>
+      ${pdf ? '<p style="font-size:13px; color:#8A7668;">Your signed agreement is attached as a PDF.</p>' : ''}
       ${pre}`, { href: url, label: 'Open my agency page' }),
-    `Your agency page: ${url}\n\n${contractTextCopy}`);
+    `Your agency page: ${url}\n\n${contractTextCopy}`, files);
   await send(OWNER_EMAIL, `Agency signed — ${a.company_name}`,
     shell(`Agency signed: ${escapeHtml(a.company_name)}`, `<p>${escapeHtml(a.signed_name || '')} accepted the agency agreement. The agency can now book from its agency page.</p>${pre}`),
-    `${a.company_name} signed.\n\n${contractTextCopy}`);
+    `${a.company_name} signed.\n\n${contractTextCopy}`, files);
 }
 
 export async function sendLoginLinkEmail(a: any) {

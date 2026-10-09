@@ -139,8 +139,8 @@ export default function TradePage() {
   // Partner application (owner flow 2026-10-01): saved for admin approval,
   // then the agency signs the agreement online and gets its partner page.
   const [f, setF] = useState({
-    company_name: '', contact_name: '', email: '', phone: '', country: '', website: '',
-    license_no: '', business_type: '', monthly_groups: '', message: '', website_hp: '',
+    company_name: '', contact_name: '', email: '', phone: '', country: '', website: '', address: '',
+    license_no: '', tat_no: '', business_type: '', monthly_groups: '', message: '', website_hp: '',
   });
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
@@ -148,7 +148,7 @@ export default function TradePage() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginSent, setLoginSent] = useState(false);
 
-  const canSubmit = f.company_name.trim() && EMAIL_RE.test(f.email.trim());
+  const canSubmit = f.company_name.trim() && EMAIL_RE.test(f.email.trim()) && f.address.trim() && f.license_no.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -429,10 +429,10 @@ export default function TradePage() {
               <input type="text" value={f.phone} onChange={(e) => set('phone', e.target.value)} placeholder="WhatsApp / LINE / phone" style={inputStyle} />
               <input type="text" value={f.country} onChange={(e) => set('country', e.target.value)} placeholder="Country" style={inputStyle} />
             </div>
-            <div className="trade-form-row">
-              <input type="text" value={f.website} onChange={(e) => set('website', e.target.value)} placeholder="Website or Instagram" style={inputStyle} />
-              <input type="text" value={f.license_no} onChange={(e) => set('license_no', e.target.value)} placeholder="TAT / business licence no. (optional)" style={inputStyle} />
-            </div>
+            <input type="text" value={f.address} onChange={(e) => set('address', e.target.value)} required placeholder="Business address *" style={inputStyle} />
+            <input type="text" value={f.website} onChange={(e) => set('website', e.target.value)} placeholder="Website or Instagram" style={inputStyle} />
+            <input type="text" value={f.license_no} onChange={(e) => set('license_no', e.target.value)} required placeholder="Business licence no. *" style={inputStyle} />
+            <input type="text" value={f.tat_no} onChange={(e) => set('tat_no', e.target.value)} placeholder="TAT licence no. (optional)" style={inputStyle} />
 
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: C.forest, marginBottom: 9 }}>You are a…</div>
