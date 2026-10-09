@@ -9,13 +9,38 @@
 // Replaces the old "Print / save as PDF" button (window.print), which
 // does nothing in the in-app browsers phones open email links in.
 //
-// Standard PDF fonts only (no network fetch, same as legal-pdf.tsx).
-// They have no ฿ glyph, so amounts are written "THB 1,234".
+// Fonts: Noto Sans (Latin) with Noto Sans Thai, SC and TC as
+// per-character fallbacks, so agency names/addresses typed in Thai or
+// Chinese and the ฿ sign all print. Files live in assets/fonts (SIL OFL,
+// bundled with these routes via outputFileTracingIncludes in
+// next.config.js) — no network fetch at render time.
 // ============================================================
 
-import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
+import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer } from '@react-pdf/renderer';
 import path from 'path';
 import { BUSINESS } from './agency-contract';
+
+const FONT_DIR = path.join(process.cwd(), 'assets', 'fonts');
+const f = (file: string) => path.join(FONT_DIR, file);
+Font.register({ family: 'NotoSans', fonts: [
+  { src: f('NotoSans-Regular.ttf'), fontWeight: 400 },
+  { src: f('NotoSans-Bold.ttf'), fontWeight: 700 },
+] });
+Font.register({ family: 'NotoSansThai', fonts: [
+  { src: f('NotoSansThai-Regular.ttf'), fontWeight: 400 },
+  { src: f('NotoSansThai-Bold.ttf'), fontWeight: 700 },
+] });
+// Chinese: regular only — also registered as 700 so bold text falls back cleanly.
+Font.register({ family: 'NotoSansSC', fonts: [
+  { src: f('NotoSansSC-Regular.otf'), fontWeight: 400 },
+  { src: f('NotoSansSC-Regular.otf'), fontWeight: 700 },
+] });
+Font.register({ family: 'NotoSansTC', fonts: [
+  { src: f('NotoSansTC-Regular.otf'), fontWeight: 400 },
+  { src: f('NotoSansTC-Regular.otf'), fontWeight: 700 },
+] });
+Font.registerHyphenationCallback(word => [word]); // never split words (Thai/Chinese have no spaces)
+const FAMILY = ['NotoSans', 'NotoSansThai', 'NotoSansSC', 'NotoSansTC'];
 
 const COLOR = {
   forest: '#2D4639', sageDark: '#4A7050', gold: '#A89068',
@@ -23,14 +48,14 @@ const COLOR = {
 };
 
 const styles = StyleSheet.create({
-  page: { paddingTop: 44, paddingBottom: 54, paddingHorizontal: 46, fontFamily: 'Helvetica', fontSize: 10, color: COLOR.bark, lineHeight: 1.45 },
+  page: { paddingTop: 44, paddingBottom: 54, paddingHorizontal: 46, fontFamily: FAMILY as any, fontSize: 9.5, color: COLOR.bark, lineHeight: 1.45 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   logo: { width: 26, height: 26, borderRadius: 13 },
-  headerName: { fontFamily: 'Times-Bold', fontSize: 12, color: COLOR.forest },
-  title: { fontFamily: 'Times-Bold', fontSize: 20, lineHeight: 1.2, color: COLOR.forest, marginBottom: 6 },
+  headerName: { fontWeight: 700, fontSize: 11.5, color: COLOR.forest },
+  title: { fontWeight: 700, fontSize: 19, lineHeight: 1.2, color: COLOR.forest, marginBottom: 6 },
   version: { fontSize: 8.5, color: COLOR.barkLight, marginBottom: 16 },
-  heading: { fontFamily: 'Times-Bold', fontSize: 12.5, color: COLOR.forest, marginTop: 12, marginBottom: 5 },
-  subheading: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: COLOR.bark, marginTop: 6, marginBottom: 3 },
+  heading: { fontWeight: 700, fontSize: 12, color: COLOR.forest, marginTop: 12, marginBottom: 5 },
+  subheading: { fontWeight: 700, fontSize: 9.5, color: COLOR.bark, marginTop: 6, marginBottom: 3 },
   box: { backgroundColor: COLOR.panel, borderWidth: 1, borderColor: COLOR.sand, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 10 },
   detailRow: { flexDirection: 'row', marginBottom: 2 },
   detailKey: { width: 150, color: COLOR.barkLight },
@@ -43,8 +68,6 @@ const styles = StyleSheet.create({
   footerLeft: { position: 'absolute', bottom: 22, left: 46, fontSize: 7.5, color: COLOR.barkLight },
 });
 
-// Standard fonts cover Latin-1 + typographic quotes/dashes; ฿ isn't in it.
-const clean = (s: string) => s.replace(/฿\s?/g, 'THB ');
 
 type Block =
   | { kind: 'heading'; text: string }
@@ -85,7 +108,7 @@ const prettyDate = (s: string) => s.replace(/(\d{4})-(\d{2})-(\d{2})/, (_, y, m,
 const titleCase = (s: string) => s.toLowerCase().replace(/[a-z]/, c => c.toUpperCase());
 
 function AgencyContractPdf({ snapshot }: { snapshot: string }) {
-  const all = clean(snapshot).split('\n');
+  const all = snapshot.split('\n');
   const title = all[0] || 'AGENCY AGREEMENT';
   const version = /^Version /.test(all[1] || '') ? all[1] : '';
   const body = all.slice(version ? 2 : 1);
