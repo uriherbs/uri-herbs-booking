@@ -16,31 +16,12 @@
 // next.config.js) — no network fetch at render time.
 // ============================================================
 
-import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer } from '@react-pdf/renderer';
-import path from 'path';
+import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
+import { registerPdfFonts, PDF_FAMILY, PDF_LOGO } from './pdf-fonts';
 import { BUSINESS } from './agency-contract';
 
-const FONT_DIR = path.join(process.cwd(), 'assets', 'fonts');
-const f = (file: string) => path.join(FONT_DIR, file);
-Font.register({ family: 'NotoSans', fonts: [
-  { src: f('NotoSans-Regular.ttf'), fontWeight: 400 },
-  { src: f('NotoSans-Bold.ttf'), fontWeight: 700 },
-] });
-Font.register({ family: 'NotoSansThai', fonts: [
-  { src: f('NotoSansThai-Regular.ttf'), fontWeight: 400 },
-  { src: f('NotoSansThai-Bold.ttf'), fontWeight: 700 },
-] });
-// Chinese: regular only — also registered as 700 so bold text falls back cleanly.
-Font.register({ family: 'NotoSansSC', fonts: [
-  { src: f('NotoSansSC-Regular.otf'), fontWeight: 400 },
-  { src: f('NotoSansSC-Regular.otf'), fontWeight: 700 },
-] });
-Font.register({ family: 'NotoSansTC', fonts: [
-  { src: f('NotoSansTC-Regular.otf'), fontWeight: 400 },
-  { src: f('NotoSansTC-Regular.otf'), fontWeight: 700 },
-] });
-Font.registerHyphenationCallback(word => [word]); // never split words (Thai/Chinese have no spaces)
-const FAMILY = ['NotoSans', 'NotoSansThai', 'NotoSansSC', 'NotoSansTC'];
+registerPdfFonts();
+const FAMILY = PDF_FAMILY;
 
 const COLOR = {
   forest: '#2D4639', sageDark: '#4A7050', gold: '#A89068',
@@ -116,7 +97,7 @@ function AgencyContractPdf({ snapshot }: { snapshot: string }) {
   const sigAt = body.findIndex(l => l.startsWith('Accepted electronically by'));
   const blocks = parse(sigAt >= 0 ? body.slice(0, sigAt) : body);
   const signature = sigAt >= 0 ? body.slice(sigAt).filter(l => l.trim()).join(' ') : '';
-  const logoPath = path.join(process.cwd(), 'public', 'uri-herbs-logo.jpg');
+  const logoPath = PDF_LOGO;
 
   // Group consecutive detail rows into one box.
   const rendered: JSX.Element[] = [];

@@ -172,6 +172,13 @@ export async function markAgencyBookingPaid(id: string, paid: boolean) {
     ? { payment_status: 'paid', payment_method: 'transfer', paid_at: new Date().toISOString() }
     : { payment_status: 'unpaid', paid_at: null }).eq('id', id);
   if (error) throw new Error(error.message);
+  // "Thank you — payment received" email with the receipt PDF (server re-checks; sent once).
+  if (paid) {
+    await fetch('/api/agency/notify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'paid', booking_id: id }),
+    }).catch(() => {});
+  }
 }
 
 export async function getSlipUrl(bookingId: string): Promise<string> {

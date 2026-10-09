@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { getStripe } from '@/lib/stripe-server';
 import { sendBookingConfirmationEmails } from '@/lib/notifications';
+import { sendAgencyPaidEmail } from '@/lib/agency-emails';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 export const runtime = 'nodejs'; // Stripe's SDK needs Node, not Edge
@@ -101,6 +102,10 @@ export async function POST(request: NextRequest) {
           console.error(`sendBookingConfirmationEmails threw for ${bookingRef}:`, err?.message)
         );
         await syncBookingToCalendar(db, data[0].booking_id);
+        // Agency bookings: "thank you" email + receipt PDF (no-op for customers; sent once).
+        await sendAgencyPaidEmail(db, data[0].booking_id).catch((err) =>
+          console.error(`sendAgencyPaidEmail threw for ${bookingRef}:`, err?.message)
+        );
       }
     }
     // payment_intent.payment_failed and others: no DB action needed —

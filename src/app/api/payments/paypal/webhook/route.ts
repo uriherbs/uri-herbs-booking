@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { PAYPAL_API_BASE, getPayPalAccessToken } from '@/lib/paypal-server';
 import { sendBookingConfirmationEmails } from '@/lib/notifications';
+import { sendAgencyPaidEmail } from '@/lib/agency-emails';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 export async function POST(request: NextRequest) {
@@ -119,6 +120,11 @@ export async function POST(request: NextRequest) {
           console.error(`sendBookingConfirmationEmails threw for ${bookingRef}:`, err?.message)
         );
         await syncBookingToCalendar(db, bookingId);
+        if (bookingId) {
+          await sendAgencyPaidEmail(db, bookingId).catch((err) =>
+            console.error(`sendAgencyPaidEmail threw for ${bookingRef}:`, err?.message)
+          );
+        }
       }
     }
   } catch (err: any) {
