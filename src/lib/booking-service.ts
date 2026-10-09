@@ -78,7 +78,7 @@ export async function getAvailableSlots(
   if (!date || !packageSlug) {
     throw new Error('Date and package are required');
   }
-  const maxGuests = isPrivate ? 16 : 6;
+  const maxGuests = isPrivate ? 16 : 12; // group: up to 12 per booking (DB check_party_size has the final say, e.g. aromatherapy 4)
   if (numParticipants < 1 || numParticipants > maxGuests) {
     throw new Error(`Participants must be between 1 and ${maxGuests}`);
   }
@@ -156,7 +156,7 @@ export async function createBooking(
   if (!req.start_time)     errors.push('Start time is required');
   if (!req.customer_name?.trim()) errors.push('Name is required');
 
-  const maxGuests = req.is_private ? 16 : 6;
+  const maxGuests = req.is_private ? 16 : 12; // group: up to 12 per booking (DB check_party_size has the final say, e.g. aromatherapy 4)
   if (req.num_participants < 1 || req.num_participants > maxGuests) {
     errors.push(`Participants must be between 1 and ${maxGuests}`);
   }
@@ -313,7 +313,7 @@ export async function createManualBooking(
   if (!req.start_time)     errors.push('Please select a start time');
   if (!req.customer_name?.trim()) errors.push('Please enter a customer name');
 
-  const maxGuests = req.is_private ? 16 : 6;
+  const maxGuests = req.is_private ? 16 : 12; // group: up to 12 per booking (DB check_party_size has the final say, e.g. aromatherapy 4)
   if (req.num_participants < 1 || req.num_participants > maxGuests) {
     errors.push(`Number of guests must be between 1 and ${maxGuests}`);
   }
