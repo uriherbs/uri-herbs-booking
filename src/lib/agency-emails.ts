@@ -13,6 +13,7 @@ import {
   sendEmailViaResend, OWNER_EMAIL, SHOP_NAME, SITE_URL,
   formatDateLong, formatTime12, escapeHtml,
 } from './notifications';
+import { agencyDocPdf, agencyDocData, agencyDocFilename, AGENCY_DOC_SELECT, type AgencyDocKind } from './agency-docs-pdf';
 
 const thb = (n: number) => `฿${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 export const portalUrl = (token: string) => `${SITE_URL}/agency/${token}`;
@@ -42,6 +43,21 @@ async function send(
   } catch (err: any) {
     console.error(`agency email "${subject}" to ${to} failed:`, err?.message);
     return false;
+  }
+}
+
+// Invoice / receipt PDF for one agency booking, as an email attachment.
+// Best effort: null if anything fails (the email still goes out, and the
+// agency can download the document from its agency page).
+async function docAttachment(db: any, bookingId: string, kind: AgencyDocKind) {
+  try {
+    const { data: b } = await db.from('bookings').select(AGENCY_DOC_SELECT).eq('id', bookingId).maybeSingle();
+    if (!b?.agency_id) return null;
+    const pdf = await agencyDocPdf(agencyDocData(b, kind, SITE_URL));
+    return { filename: agencyDocFilename(kind, b.booking_ref), content: pdf.toString('base64') };
+  } catch (err: any) {
+    console.error(`agency ${kind} PDF failed for ${bookingId}:`, err?.message);
+    return null;
   }
 }
 
@@ -117,12 +133,15 @@ export async function sendAgencyBookingCreatedEmails(db: any, bookingId: string)
   const payNow = b.status === 'pending_payment';
   const due = b.payment_due_date ? formatDateLong(b.payment_due_date) : '';
   if (!payNow) {
+    const invoice = await docAttachment(db, bookingId, 'invoice');
     await send(a?.email, `Booking ${b.booking_ref} reserved — pay ${thb(b.total_price_thb)} by ${due}`,
       shell('Booking reserved', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
         <p>Amount to pay: <strong>${thb(b.total_price_thb)}</strong> (retail ${thb(b.retail_price_thb)}).<br>
-        Payment due by <strong>${due}</strong> — online or by bank transfer on your agency page. Unpaid bookings are cancelled automatically after this date.</p>`,
+        Payment due by <strong>${due}</strong> — online or by bank transfer on your agency page. Unpaid bookings are cancelled automatically after this date.</p>
+        ${invoice ? '<p style="font-size:13px; color:#8A7668;">Your invoice is attached as a PDF.</p>' : ''}`,
         a ? { href: portalUrl(a.portal_token), label: 'Pay on my agency page' } : undefined),
-      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${due} on your agency page.`);
+      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${due} on your agency page.`,
+      invoice ? [invoice] : undefined);
   }
   await send(OWNER_EMAIL, `Agency booking — ${b.booking_ref} · ${a?.company_name || ''} (${b.num_participants} guests)`,
     shell(`Agency booking · ${escapeHtml(a?.company_name || '')}`, `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
@@ -220,18 +239,36 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
   return { reminded, cancelled };
 }
 
+// Payment received → "thank you" email with the receipt PDF.
+// Called after admin "Mark paid" (bank transfer) and after an online
+// card/PayPal payment (agency page + payment webhooks). Sent ONCE per
+// booking: `agency_receipt_sent_at` is claimed atomically, so the several
+// callers of an online payment can't double-send. Only for a payment
+// recorded in the last 15 minutes (the notify route is public).
 export async function sendAgencyPaidEmail(db: any, bookingId: string) {
   const { data: b } = await db.from('bookings')
-    .select('booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_method, paid_at, agencies ( company_name, email ), packages ( name )')
+    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_status, payment_method, paid_at, agency_id, agencies ( company_name, contact_name, email ), packages ( name )')
     .eq('id', bookingId).maybeSingle();
-  if (!b || !b.paid_at || Date.now() - new Date(b.paid_at).getTime() > 15 * 60_000) return;
+  if (!b?.agency_id || b.payment_status !== 'paid' || !b.paid_at || Date.now() - new Date(b.paid_at).getTime() > 15 * 60_000) return;
+  const { data: claimed } = await db.from('bookings').update({ agency_receipt_sent_at: new Date().toISOString() })
+    .eq('id', b.id).is('agency_receipt_sent_at', null).select('id').maybeSingle();
+  if (!claimed) return; // already sent
   const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
   const pkg = (Array.isArray(b.packages) ? b.packages[0] : b.packages)?.name || 'Workshop';
   const line = bookingLine(b, pkg);
-  await send(a?.email, `Payment received — booking ${b.booking_ref} confirmed`,
-    shell('Payment received ✓', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>We received ${thb(b.total_price_thb)}. The booking is confirmed — see you in Chiang Mai!</p>`),
-    `Payment of ${thb(b.total_price_thb)} received — ${b.booking_ref} confirmed. ${line}`);
-  await send(OWNER_EMAIL, `Agency paid online — ${b.booking_ref} · ${thb(b.total_price_thb)} · ${a?.company_name || ''}`,
-    shell('Agency payment received', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>${thb(b.total_price_thb)} paid online (${escapeHtml(b.payment_method || '')}).</p>`),
-    `${a?.company_name} paid ${thb(b.total_price_thb)} for ${b.booking_ref}.`);
+  const receipt = await docAttachment(db, b.id, 'receipt');
+  await send(a?.email, `Thank you — payment received for ${b.booking_ref}`,
+    shell('Thank you — payment received ✓', `<p>Hi ${escapeHtml(a?.contact_name || a?.company_name || '')},</p>
+      <p>Thank you! We received your payment of <strong>${thb(b.total_price_thb)}</strong>. The booking is confirmed:</p>
+      <p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+      ${receipt ? '<p>Here is the receipt for your order (PDF attached).</p>' : ''}
+      <p>See you in Chiang Mai!</p>`),
+    `Thank you — we received ${thb(b.total_price_thb)} for ${b.booking_ref}. The booking is confirmed. ${line}`,
+    receipt ? [receipt] : undefined);
+  // The shop only needs to hear about ONLINE payments (Mark paid is done by the shop itself).
+  if (b.payment_method === 'stripe' || b.payment_method === 'paypal') {
+    await send(OWNER_EMAIL, `Agency paid online — ${b.booking_ref} · ${thb(b.total_price_thb)} · ${a?.company_name || ''}`,
+      shell('Agency payment received', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>${thb(b.total_price_thb)} paid online (${escapeHtml(b.payment_method || '')}). The receipt was emailed to the agency.</p>`),
+      `${a?.company_name} paid ${thb(b.total_price_thb)} for ${b.booking_ref}.`);
+  }
 }

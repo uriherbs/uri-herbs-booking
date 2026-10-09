@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { PAYPAL_API_BASE, getPayPalAccessToken } from '@/lib/paypal-server';
 import { sendBookingConfirmationEmails } from '@/lib/notifications';
+import { sendAgencyPaidEmail } from '@/lib/agency-emails';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
 
 export async function POST(request: NextRequest) {
@@ -119,6 +120,10 @@ export async function POST(request: NextRequest) {
       console.error(`sendBookingConfirmationEmails threw for ${booking.booking_ref}:`, err?.message)
     );
     await syncBookingToCalendar(db, booking.id);
+    // Agency bookings: "thank you" email + receipt PDF (no-op for customers; sent once).
+    await sendAgencyPaidEmail(db, booking.id).catch((err) =>
+      console.error(`sendAgencyPaidEmail threw for ${booking.booking_ref}:`, err?.message)
+    );
 
     return NextResponse.json({ booking_ref: booking.booking_ref, status: 'confirmed' });
   } catch (err: any) {

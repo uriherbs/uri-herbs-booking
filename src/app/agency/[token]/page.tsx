@@ -292,6 +292,8 @@ function BookingCard({ b, token, onChange }: { b: AgencyBooking; token: string; 
           {(awaiting || holding) && <button type="button" onClick={() => setOpen(open === 'pay' ? null : 'pay')} style={btn(true)}>Pay online</button>}
           {awaiting && <button type="button" onClick={() => setOpen(open === 'slip' ? null : 'slip')} style={btn()}>Bank transfer</button>}
           {!holding && <button type="button" onClick={() => setOpen(open === 'cancel' ? null : 'cancel')} style={btn()}>Cancel</button>}
+          <a href={`/api/agency/document?token=${token}&ref=${encodeURIComponent(b.booking_ref)}&type=invoice`} download style={{ ...btn(), textDecoration: 'none', display: 'inline-block' }}>Invoice (PDF)</a>
+          {paid && <a href={`/api/agency/document?token=${token}&ref=${encodeURIComponent(b.booking_ref)}&type=receipt`} download style={{ ...btn(), textDecoration: 'none', display: 'inline-block' }}>Receipt (PDF)</a>}
         </div>
       )}
 
