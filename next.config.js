@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fonts read from disk by the agency-agreement PDF (react-pdf) — make
+  // sure Vercel ships them with the two routes that build the PDF.
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/agency/contract-pdf': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      '/api/agency/sign': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+    },
+  },
   async redirects() {
     return [
       // Internal health & allergy questionnaire (systeme.io). Before the

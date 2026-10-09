@@ -32,7 +32,8 @@ export interface AgencyBooking {
 
 export interface AgencyContractInfo {
   company_name: string; contact_name: string | null; email: string; country: string | null;
-  license_no: string | null; status: string; commission_pct: number;
+  phone?: string | null; website?: string | null; address?: string | null;
+  license_no: string | null; tat_no?: string | null; status: string; commission_pct: number;
   signed_name: string | null; signed_at: string | null; contract_version: string | null;
 }
 
@@ -120,7 +121,8 @@ export async function uploadTransferSlip(token: string, bookingId: string, file:
 // ── Admin ──
 export interface AgencyRow {
   id: string; company_name: string; contact_name: string | null; email: string; phone: string | null;
-  country: string | null; website: string | null; license_no: string | null; business_type: string | null;
+  country: string | null; website: string | null; address: string | null; license_no: string | null;
+  tat_no: string | null; business_type: string | null;
   monthly_groups: string | null; message: string | null; status: string; commission_pct: number;
   contract_token: string; portal_token: string; approved_at: string | null; signed_name: string | null;
   signed_at: string | null; admin_note: string | null; created_at: string;
@@ -128,7 +130,7 @@ export interface AgencyRow {
 
 export async function listAgencies(): Promise<AgencyRow[]> {
   const { data, error } = await supabase.from('agencies')
-    .select('id, company_name, contact_name, email, phone, country, website, license_no, business_type, monthly_groups, message, status, commission_pct, contract_token, portal_token, approved_at, signed_name, signed_at, admin_note, created_at')
+    .select('id, company_name, contact_name, email, phone, country, website, address, license_no, tat_no, business_type, monthly_groups, message, status, commission_pct, contract_token, portal_token, approved_at, signed_name, signed_at, admin_note, created_at')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []) as AgencyRow[];

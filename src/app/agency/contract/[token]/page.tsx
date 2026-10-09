@@ -8,13 +8,13 @@
 // the agency ticks "I agree", types its name and signs. Signing is
 // recorded server-side (/api/agency/sign: name, time, IP, version and
 // a text copy) and the partner-page link is emailed. Already-signed
-// agreements show who signed and when, with a print/PDF button.
+// agreements show who signed and when, with a PDF download.
 // ============================================================
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getAgencyContract, loadPortalPackages, AgencyContractInfo } from '@/lib/agency';
-import { contractSections, rateRows, BUSINESS, CONTRACT_VERSION } from '@/lib/agency-contract';
+import { contractSections, rateRows, agencyDetails, BUSINESS, CONTRACT_VERSION } from '@/lib/agency-contract';
 
 const C = {
   sage: '#6B8F71', sageDark: '#4A7050', sageLight: '#E7EFEA', forest: '#2D4639', parchment: '#F8F5EF',
@@ -95,6 +95,16 @@ export default function AgencyContractPage() {
 
         {state === 'ok' && info && (
           <div style={{ padding: '8px 20px 0' }}>
+            <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, margin: '18px 0 8px' }}>Agency details</h2>
+            <div style={{ background: C.white, border: `1px solid ${C.sand}`, borderRadius: 14, padding: '10px 14px' }}>
+              {agencyDetails(info).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', gap: 10, padding: '4px 0', fontSize: 13.5, lineHeight: 1.45 }}>
+                  <span style={{ color: C.barkLight, minWidth: 140 }}>{k}</span>
+                  <span style={{ color: C.forest, wordBreak: 'break-word' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+
             {contractSections(info).map(sct => (
               <div key={sct.title} style={{ marginTop: 18 }}>
                 <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 19, fontWeight: 700, margin: '0 0 6px' }}>{sct.title}</h2>
@@ -133,9 +143,11 @@ export default function AgencyContractPage() {
                       Open my agency page →
                     </a>
                   )}
-                  <button type="button" className="no-print" onClick={() => window.print()} style={{ display: 'block', marginTop: 12, background: 'none', border: 'none', padding: 0, color: C.sageDark, textDecoration: 'underline', cursor: 'pointer', fontSize: 13 }}>
-                    Print / save as PDF
-                  </button>
+                  {/* Real PDF file from the server — window.print() does nothing
+                      in the in-app browsers phones open email links in. */}
+                  <a href={`/api/agency/contract-pdf?token=${token}`} download className="no-print" style={{ display: 'block', marginTop: 12, color: C.sageDark, textDecoration: 'underline', fontSize: 13 }}>
+                    Download signed agreement (PDF)
+                  </a>
                 </>
               ) : (
                 <div className="no-print">

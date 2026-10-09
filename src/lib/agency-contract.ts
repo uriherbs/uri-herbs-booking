@@ -11,7 +11,7 @@
 // changes — each signature records the version it accepted.
 // ============================================================
 
-export const CONTRACT_VERSION = '2026-10b';
+export const CONTRACT_VERSION = '2026-10c';
 
 export const BUSINESS = {
   name: 'Uri Herbs Workshop',
@@ -27,9 +27,34 @@ export interface ContractParty {
   company_name: string;
   contact_name?: string | null;
   email: string;
+  phone?: string | null;
   country?: string | null;
+  website?: string | null;
+  address?: string | null;
   license_no?: string | null;
+  tat_no?: string | null;
   commission_pct: number;
+}
+
+// The agency's own details from the /trade application form, shown at
+// the top of the agreement and in the PDF. Owner decision 2026-10-09:
+// business type ("You are a…"), groups per month and the free message
+// are NOT part of the agreement.
+export function agencyDetails(party: ContractParty): [string, string][] {
+  const rows: [string, string | null | undefined][] = [
+    ['Company / business name', party.company_name],
+    ['Contact person', party.contact_name],
+    ['Email', party.email],
+    ['WhatsApp / LINE / phone', party.phone],
+    ['Business address', party.address],
+    ['Country', party.country],
+    ['Website / Instagram', party.website],
+    ['Business licence no.', party.license_no],
+    ['TAT licence no.', party.tat_no],
+  ];
+  return rows
+    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+    .map(([k, v]) => [k, String(v).trim()]);
 }
 
 export interface ContractSection { title: string; body: string[] }
@@ -72,7 +97,7 @@ export function contractSections(party: ContractParty): ContractSection[] {
     {
       title: '1. Parties',
       body: [
-        `This agreement is between ${BUSINESS.name} (${BUSINESS.legal}), ${BUSINESS.address} (“Uri Herbs”), and ${party.company_name}${party.country ? `, ${party.country}` : ''}${party.license_no ? ` (licence no. ${party.license_no})` : ''} (“the Agency”).`,
+        `This agreement is between ${BUSINESS.name} (${BUSINESS.legal}), ${BUSINESS.address} (“Uri Herbs”), and ${party.company_name}${party.address ? `, ${party.address}` : ''}${party.country ? `, ${party.country}` : ''} (“the Agency”), whose details are listed under “Agency details”.`,
       ],
     },
     {
@@ -138,6 +163,9 @@ export function contractText(
   const lines: string[] = [];
   lines.push(`AGENCY AGREEMENT — ${BUSINESS.name} × ${party.company_name}`);
   lines.push(`Version ${CONTRACT_VERSION}`);
+  lines.push('');
+  lines.push('AGENCY DETAILS');
+  for (const [k, v] of agencyDetails(party)) lines.push(`  ${k}: ${v}`);
   lines.push('');
   for (const s of contractSections(party)) {
     lines.push(s.title.toUpperCase());
