@@ -87,7 +87,7 @@ async function run(request: NextRequest) {
   // automatic cancellation of bookings still unpaid after the due date.
   const agencyPayments = await processAgencyPayments(db).catch((err) => {
     console.error('cron/reminders: agency payments failed:', err?.message);
-    return { reminded: 0, cancelled: 0 };
+    return { reminded: 0, cancelled: 0, shop: 0 };
   });
 
   return NextResponse.json({ checked: (due || []).length, sent, skipped, partnerSummaries, agencyPayments, window: `${from.date} ${from.time}–${toTime}` });
