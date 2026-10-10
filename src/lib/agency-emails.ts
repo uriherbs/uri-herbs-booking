@@ -192,6 +192,29 @@ export async function sendAgencyCancellationEmails(db: any, bookingRef: string) 
     `${b.customer_name}\n${line}\n${b.cancel_reason || ''}`);
 }
 
+// ── Shop cancelled an agency booking (admin) ──────────────
+// Owner decision 2026-10-10: the agency is told, and if it had already
+// paid: "we will contact you about the refund". Called once per booking
+// from /api/bookings/notify-cancelled (inside its cancellation-email claim).
+export async function sendAgencyShopCancelledEmail(db: any, bookingId: string) {
+  const { data: b } = await db.from('bookings')
+    .select('booking_ref, slot_date, start_time, num_participants, is_private, customer_name, status, cancelled_by, payment_status, total_price_thb, agency_id, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
+    .eq('id', bookingId).maybeSingle();
+  if (!b?.agency_id || b.status !== 'cancelled' || b.cancelled_by !== 'staff') return;
+  const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
+  const pkg = (Array.isArray(b.packages) ? b.packages[0] : b.packages)?.name || 'Workshop';
+  const line = bookingLine(b, pkg);
+  const paid = b.payment_status === 'paid';
+  await send(a?.email, `Booking ${b.booking_ref} cancelled by ${SHOP_NAME}`,
+    shell('Booking cancelled', `<p>Hi ${escapeHtml(a?.contact_name || a?.company_name || '')},</p>
+      <p>We're sorry — we have had to cancel this booking:</p>
+      <p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+      ${paid ? `<p>You have already paid <strong>${thb(b.total_price_thb)}</strong> for this booking. <strong>We will contact you about the refund.</strong></p>` : '<p>This booking was not paid, so there is nothing to refund.</p>'}
+      <p>Questions? Just reply to this email or WhatsApp us.</p>`,
+      a ? { href: portalUrl(a.portal_token), label: 'Open my agency page' } : undefined),
+    `${b.booking_ref} was cancelled by ${SHOP_NAME}. ${line}${paid ? ` You paid ${thb(b.total_price_thb)} — we will contact you about the refund.` : ''}`);
+}
+
 export async function sendSlipReceivedEmail(db: any, bookingId: string) {
   const { data: b } = await db.from('bookings')
     .select('booking_ref, customer_name, total_price_thb, agency_pay_deadline, slot_date, agencies ( company_name )').eq('id', bookingId).maybeSingle();
