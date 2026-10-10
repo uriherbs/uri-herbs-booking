@@ -1178,7 +1178,7 @@ export async function sendOwnerCancellationEmail(
 
   const { data: b, error } = await db
     .from('bookings')
-    .select('booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, total_price_thb, payment_method, cancelled_at, packages ( name, slug )')
+    .select('booking_ref, customer_name, customer_email, customer_phone, slot_date, start_time, end_time, num_participants, total_price_thb, payment_method, payment_status, agency_id, cancelled_at, packages ( name, slug )')
     .eq('id', bookingId)
     .single();
   if (error || !b) {
@@ -1191,7 +1191,15 @@ export async function sendOwnerCancellationEmail(
   const pkgName = pkg?.name || 'Uri Herbs Workshop';
   const paidOnline = isPaidOnlineMethod(b.payment_method);
   const hours = hoursBeforeStart(b.slot_date, b.start_time, b.cancelled_at ? new Date(b.cancelled_at) : new Date());
-  const refundLine = by === 'platform'
+  // Agency bookings: paid by bank transfer or online on the agency page.
+  // Owner decision 2026-10-10: when the shop cancels, the agency is told
+  // "we will contact you about the refund" — the shop decides case by case.
+  const agencyPaid = !!b.agency_id && b.payment_status === 'paid';
+  const refundLine = b.agency_id
+    ? (agencyPaid
+        ? `Agency booking — PAID ฿${Number(b.total_price_thb).toLocaleString()} (${b.payment_method === 'transfer' ? 'bank transfer' : b.payment_method === 'paypal' ? 'PayPal' : b.payment_method === 'stripe' ? 'card' : b.payment_method || 'paid'}). The agency was told "we will contact you about the refund" — please contact them.`
+        : 'Agency booking — not paid yet: nothing to refund.')
+    : by === 'platform'
     ? 'Paid through the booking platform: any refund is handled by the platform.'
     : !paidOnline
     ? 'Pay on arrival: nothing to refund.'
@@ -1202,7 +1210,7 @@ export async function sendOwnerCancellationEmail(
       : `No refund: cancelled ${Math.max(0, Math.floor(hours))}h before the workshop (inside 48h).`;
   const when = `${formatDateLong(b.slot_date)}, ${formatTime12(String(b.start_time).slice(0, 5))} – ${formatTime12(String(b.end_time).slice(0, 5))}`;
   const byLabel = by === 'staff' ? 'staff (admin)' : by === 'platform' ? 'the booking platform' : 'customer';
-  const refundDue = by !== 'platform' && paidOnline && (by === 'staff' || hours >= 48);
+  const refundDue = agencyPaid || (!b.agency_id && by !== 'platform' && paidOnline && (by === 'staff' || hours >= 48));
   const safeReason = reason ? escapeHtml(reason) : '';
   const safeName = escapeHtml(String(b.customer_name || ''));
 

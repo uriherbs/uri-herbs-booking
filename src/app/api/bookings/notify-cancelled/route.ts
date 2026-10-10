@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendCancellationEmail, sendOwnerCancellationEmail } from '@/lib/notifications';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
+import { sendAgencyShopCancelledEmail } from '@/lib/agency-emails';
 
 export async function POST(request: NextRequest) {
   let body: any;
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
   const db = getServiceClient();
   const { data: booking, error } = await db
     .from('bookings')
-    .select('id, status')
+    .select('id, status, agency_id, cancelled_by')
     .eq('booking_ref', bookingRef)
     .single();
 
@@ -56,6 +57,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sent: false });
   }
 
+  // Agency bookings cancelled by the agency itself or by the payment
+  // deadline have their own emails (agency-emails.ts) — only a shop/admin
+  // cancellation (cancelled_by = 'staff', set by admin_cancel_booking) is
+  // handled here, so this public route can't send a wrong "cancelled by
+  // the shop" email for them.
+  if (booking.agency_id && booking.cancelled_by !== 'staff') {
+    return NextResponse.json({ sent: false });
+  }
+
   // Only the call that wins the claim sends the shop copy too, so a
   // retried/duplicate request never emails the shop twice.
   const firstSend = await sendCancellationEmail(db, booking.id).catch((err) => {
@@ -66,6 +76,12 @@ export async function POST(request: NextRequest) {
     await sendOwnerCancellationEmail(db, booking.id, 'Cancelled in the admin area', 'staff').catch((err) =>
       console.error(`sendOwnerCancellationEmail threw for ${bookingRef}:`, err?.message)
     );
+    // Agency booking: tell the agency too (once — inside the same claim).
+    if (booking.agency_id) {
+      await sendAgencyShopCancelledEmail(db, booking.id).catch((err) =>
+        console.error(`sendAgencyShopCancelledEmail threw for ${bookingRef}:`, err?.message)
+      );
+    }
   }
   await syncBookingToCalendar(db, booking.id);
 
