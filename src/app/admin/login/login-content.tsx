@@ -35,7 +35,7 @@ export default function AdminLoginContent() {
       const redirectUrl = searchParams.get('redirect') || '/admin';
       router.push(redirectUrl);
     } catch (err: any) {
-      setError(err.message || 'שגיאה בהתחברות');
+      setError(err.message || 'Could not sign in. Please check your email and password.');
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ export default function AdminLoginContent() {
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      setError('נא להזין כתובת אימייל');
+      setError('Please enter your email address.');
       return;
     }
     setError(null);
@@ -53,20 +53,20 @@ export default function AdminLoginContent() {
       await requestPasswordReset(email);
       setResetSent(true);
     } catch (err: any) {
-      setError(err.message || 'שגיאה באיפוס הסיסמה');
+      setError(err.message || 'Could not send the reset link. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: C.parchment, padding: '20px', direction: 'rtl' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: C.parchment, padding: '20px', direction: 'ltr' }}>
       <div style={{ width: '100%', maxWidth: '400px', background: C.white, padding: '32px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(92, 74, 61, 0.08)' }}>
         <h1 style={{ color: C.forest, fontSize: '24px', fontWeight: '700', marginBottom: '8px', textAlign: 'center' }}>
-          {mode === 'login' ? 'כניסת מנהלים' : 'איפוס סיסמה'}
+          {mode === 'login' ? 'Admin sign in' : 'Reset password'}
         </h1>
         <p style={{ color: C.barkLight, fontSize: '14px', marginBottom: '24px', textAlign: 'center' }}>
-          {mode === 'login' ? 'מערכת ניהול uri-herbs' : 'הזן את האימייל שלך לשליחת הוראות איפוס'}
+          {mode === 'login' ? 'Uri Herbs Workshop · management' : 'Enter your email and we will send you a reset link.'}
         </p>
 
         {error && (
@@ -78,7 +78,7 @@ export default function AdminLoginContent() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin}>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', color: C.forest, fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>אימייל</label>
+              <label style={{ display: 'block', color: C.forest, fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Email</label>
               <input
                 type="email"
                 value={email}
@@ -88,7 +88,7 @@ export default function AdminLoginContent() {
               />
             </div>
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: C.forest, fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>סיסמה</label>
+              <label style={{ display: 'block', color: C.forest, fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Password</label>
               <input
                 type="password"
                 value={password}
@@ -102,26 +102,26 @@ export default function AdminLoginContent() {
               disabled={loading}
               style={{ width: '100%', padding: '12px', background: C.sage, color: C.white, border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', marginBottom: '12px' }}
             >
-              {loading ? 'מתחבר...' : 'התחבר'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
             <button
               type="button"
               onClick={() => { setMode('forgot'); setError(null); }}
               style={{ width: '100%', background: 'none', border: 'none', color: C.barkLight, fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
             >
-              שכחת סיסמה?
+              Forgot password?
             </button>
           </form>
         ) : (
           <form onSubmit={handlePasswordReset}>
             {resetSent ? (
               <div style={{ color: C.forest, textAlign: 'center', fontSize: '14px', marginBottom: '16px' }}>
-                הוראות לאיפוס הסיסמה נשלחו לכתובת האימייל שלך.
+                A password reset link was sent to your email.
               </div>
             ) : (
               <>
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', color: C.forest, fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>אימייל</label>
+                  <label style={{ display: 'block', color: C.forest, fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Email</label>
                   <input
                     type="email"
                     value={email}
@@ -135,7 +135,7 @@ export default function AdminLoginContent() {
                   disabled={loading}
                   style={{ width: '100%', padding: '12px', background: C.sage, color: C.white, border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', marginBottom: '12px' }}
                 >
-                  {loading ? 'שולח...' : 'שלח קישור איפוס'}
+                  {loading ? 'Sending…' : 'Send reset link'}
                 </button>
               </>
             )}
@@ -144,7 +144,7 @@ export default function AdminLoginContent() {
               onClick={() => { setMode('login'); setError(null); setResetSent(false); }}
               style={{ width: '100%', background: 'none', border: 'none', color: C.sage, fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}
             >
-              ← חזרה להתחברות
+              ← Back to sign in
             </button>
           </form>
         )}
