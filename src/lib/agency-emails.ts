@@ -184,14 +184,25 @@ export async function sendSlipReceivedEmail(db: any, bookingId: string) {
 //   due date − 4 days (= 18 days before the workshop) → reminder
 //   on the due date (14 days before)                   → last-day reminder
 //   after the due date                                 → cancelled, places released
-export async function processAgencyPayments(db: any): Promise<{ reminded: number; cancelled: number }> {
+// Daily agency payment job (runs from the 5-minute reminders cron, from
+// 09:00 Chiang Mai time). Payment is due 14 days before the workshop.
+//
+//   18 days before (4 days before due) → agency: payment reminder
+//   due date                           → agency: "last day to pay" (unless a slip is uploaded)
+//                                        shop:   "due today" summary for that booking
+//   day after due, NO slip             → cancelled automatically, agency + shop emailed
+//   day after due, slip uploaded       → NOT cancelled (owner decision 2026-10-10); no more
+//                                        agency reminders; shop gets "slip waiting — please
+//                                        check and Mark paid", once a day until marked paid
+// Every email is claimed with a column first, so overlapping cron runs never double-send.
+export async function processAgencyPayments(db: any): Promise<{ reminded: number; cancelled: number; shop: number }> {
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const nowH = new Date(Date.now() + 7 * 3600 * 1000).getUTCHours();
-  let reminded = 0; let cancelled = 0;
-  if (nowH < 9) return { reminded, cancelled }; // send in Chiang Mai daytime
+  let reminded = 0; let cancelled = 0; let shop = 0;
+  if (nowH < 9) return { reminded, cancelled, shop }; // send in Chiang Mai daytime
 
   const { data: rows } = await db.from('bookings')
-    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_due_date, agency_reminder18_at, agency_reminder_last_at, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
+    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_due_date, payment_proof_at, agency_reminder18_at, agency_reminder_last_at, agency_shop_due_at, agency_slip_reminded_on, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
     .not('agency_id', 'is', null).eq('status', 'confirmed').eq('payment_status', 'unpaid')
     .not('payment_due_date', 'is', null).lte('payment_due_date', new Date(Date.parse(today) + 4 * 86400000).toISOString().slice(0, 10));
 
@@ -201,12 +212,32 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
     const line = bookingLine(b, pkg);
     const due = b.payment_due_date as string;
     const page = a ? portalUrl(a.portal_token) : SITE_URL;
+    const hasSlip = !!b.payment_proof_at;
+    const slipWhen = hasSlip ? new Date(b.payment_proof_at).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const adminLink = { href: `${SITE_URL}/admin/agencies`, label: 'Open Agencies' };
 
     if (today > due) {
-      // Unpaid after the due date → cancel and release the places.
+      if (hasSlip) {
+        // Slip uploaded → never auto-cancel. Remind the shop once a day until Mark paid.
+        if (b.agency_slip_reminded_on && b.agency_slip_reminded_on >= today) continue;
+        const { data: claimed } = await db.from('bookings').update({ agency_slip_reminded_on: today })
+          .eq('id', b.id).eq('payment_status', 'unpaid')
+          .or(`agency_slip_reminded_on.is.null,agency_slip_reminded_on.lt.${today}`)
+          .select('id').maybeSingle();
+        if (!claimed) continue;
+        shop++;
+        await send(OWNER_EMAIL, `Slip waiting — please check and Mark paid · ${b.booking_ref} · ${thb(b.total_price_thb)}`,
+          shell('Bank slip waiting for you', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+            <p>Payment was due <strong>${formatDateLong(due)}</strong>. The agency uploaded a bank-transfer slip on ${escapeHtml(slipWhen)}, so the booking was <strong>not</strong> cancelled.</p>
+            <p>Please check that <strong>${thb(b.total_price_thb)}</strong> arrived in the bank account, then click <strong>Mark paid</strong> in Admin → Agencies (the agency then gets the receipt). This reminder repeats every day until it is marked paid.</p>`, adminLink),
+          `${b.booking_ref}: slip uploaded ${slipWhen}, due ${due}. Check ${thb(b.total_price_thb)} arrived and Mark paid in Admin → Agencies.`);
+        continue;
+      }
+      // Unpaid after the due date and no slip → cancel and release the places.
       const { data: claimed } = await db.from('bookings')
         .update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: 'system', cancel_reason: `Not paid by the due date (${due})` })
-        .eq('id', b.id).eq('status', 'confirmed').eq('payment_status', 'unpaid').select('id').maybeSingle();
+        .eq('id', b.id).eq('status', 'confirmed').eq('payment_status', 'unpaid').is('payment_proof_at', null)
+        .select('id').maybeSingle();
       if (!claimed) continue;
       await db.from('booking_slots').delete().eq('booking_id', b.id);
       cancelled++;
@@ -216,12 +247,32 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
           { href: page, label: 'Open my agency page' }),
         `${b.booking_ref} was not paid by ${due} and has been cancelled. ${line}`);
       await send(OWNER_EMAIL, `Auto-cancelled unpaid agency booking — ${b.booking_ref} · ${a?.company_name || ''}`,
-        shell('Unpaid agency booking cancelled', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>Due ${formatDateLong(due)} — ${thb(b.total_price_thb)} unpaid. Places released.</p>`),
+        shell('Unpaid agency booking cancelled', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>Due ${formatDateLong(due)} — ${thb(b.total_price_thb)} unpaid, no transfer slip. Places released.</p>`),
         `${b.booking_ref} auto-cancelled (unpaid, due ${due}).`);
       continue;
     }
 
     const isLastDay = today === due;
+
+    // Shop: "due today" for every agency booking still unpaid on its due date.
+    if (isLastDay && !b.agency_shop_due_at) {
+      const { data: claimed } = await db.from('bookings').update({ agency_shop_due_at: new Date().toISOString() })
+        .eq('id', b.id).is('agency_shop_due_at', null).select('id').maybeSingle();
+      if (claimed) {
+        shop++;
+        await send(OWNER_EMAIL,
+          hasSlip ? `Due today, slip uploaded — please check · ${b.booking_ref} · ${thb(b.total_price_thb)}`
+                  : `Due today, unpaid — ${b.booking_ref} · ${a?.company_name || ''} · ${thb(b.total_price_thb)}`,
+          shell(hasSlip ? 'Agency payment due today — slip uploaded' : 'Agency payment due today', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+            ${hasSlip
+              ? `<p>The agency uploaded a bank-transfer slip on ${escapeHtml(slipWhen)}. Please check that <strong>${thb(b.total_price_thb)}</strong> arrived, then click <strong>Mark paid</strong>. A booking with a slip is never cancelled automatically.</p>`
+              : `<p><strong>${thb(b.total_price_thb)}</strong> is still unpaid and due today. If it is not paid (and no slip is uploaded), it will be <strong>cancelled automatically tomorrow at 9:00</strong>.</p>`}`, adminLink),
+          `${b.booking_ref} (${a?.company_name || ''}) — ${thb(b.total_price_thb)} due today${hasSlip ? `, slip uploaded ${slipWhen}` : ', unpaid — auto-cancel tomorrow 9:00 if still unpaid'}.`);
+      }
+    }
+
+    // Agency reminders stop once a slip is uploaded.
+    if (hasSlip) continue;
     const flag = isLastDay ? 'agency_reminder_last_at' : 'agency_reminder18_at';
     if (b[flag]) continue;
     const { data: claimed } = await db.from('bookings').update({ [flag]: new Date().toISOString() })
@@ -232,11 +283,12 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
       isLastDay ? `Last day to pay — booking ${b.booking_ref} (${thb(b.total_price_thb)})` : `Payment reminder — booking ${b.booking_ref} due ${formatDateLong(due)}`,
       shell(isLastDay ? 'Today is the last day to pay' : 'Payment reminder', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
         <p>Amount: <strong>${thb(b.total_price_thb)}</strong> · due <strong>${formatDateLong(due)}</strong>.
-        ${isLastDay ? 'If it is not paid today, the booking will be cancelled automatically tomorrow.' : 'Unpaid bookings are cancelled automatically after the due date.'}</p>`,
+        ${isLastDay ? 'If it is not paid today, the booking will be cancelled automatically tomorrow.' : 'Unpaid bookings are cancelled automatically after the due date.'}</p>
+        <p style="font-size:13px; color:#8A7668;">Paid by bank transfer? Upload the slip on your agency page and the booking will not be cancelled while we check it.</p>`,
         { href: page, label: 'Pay now' }),
       `${b.booking_ref}: pay ${thb(b.total_price_thb)} by ${due}. ${page}`);
   }
-  return { reminded, cancelled };
+  return { reminded, cancelled, shop };
 }
 
 // Payment received → "thank you" email with the receipt PDF.
