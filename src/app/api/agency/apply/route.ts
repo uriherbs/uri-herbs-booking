@@ -4,11 +4,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendApplicationEmails } from '@/lib/agency-emails';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const s = (v: unknown, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 export async function POST(request: NextRequest) {
+  // 5 applications per hour per connection — each one creates an Admin
+  // row and 2 emails, so a script must not be able to flood them.
+  const rate = await checkRateLimit('agency-apply', getClientIp(request), { maxHits: 5, windowSeconds: 60 * 60 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many tries from this connection. Please wait a few minutes and try again, or message us on WhatsApp.' },
+      { status: 429 }
+    );
+  }
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }); }
   if (s(body.website_hp)) return NextResponse.json({ ok: true }); // honeypot

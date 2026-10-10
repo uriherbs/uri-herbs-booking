@@ -3,8 +3,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendLoginLinkEmail } from '@/lib/agency-emails';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  // 5 link requests per 15 minutes per connection — every request can send an email.
+  const rate = await checkRateLimit('agency-login-link', getClientIp(request), { maxHits: 5, windowSeconds: 15 * 60 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many tries from this connection. Please wait a few minutes and try again, or message us on WhatsApp.' },
+      { status: 429 }
+    );
+  }
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: true }); }
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
