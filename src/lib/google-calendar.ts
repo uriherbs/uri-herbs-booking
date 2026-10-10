@@ -84,12 +84,31 @@ function buildEvent(b: any) {
   const icon = pkg?.calendar_type === 'aromatherapy' ? '❋' : '🌿';
   const guests = `${b.num_participants} guest${b.num_participants === 1 ? '' : 's'}`;
   const unpaid = b.payment_status !== 'paid';
-  const money = unpaid
-    ? `Collect ฿${Number(b.total_price_thb).toLocaleString()} on arrival`
-    : `Paid ฿${Number(b.total_price_thb).toLocaleString()}${b.payment_method === 'stripe' ? ' (card)' : b.payment_method === 'paypal' ? ' (PayPal)' : ''}`;
+  const amount = `฿${Number(b.total_price_thb).toLocaleString()}`;
+  const paidVia = b.payment_method === 'stripe' ? ' (card)' : b.payment_method === 'paypal' ? ' (PayPal)' : b.payment_method === 'transfer' ? ' (bank transfer)' : '';
+  // Agency booking: the AGENCY pays the shop (online / bank transfer) —
+  // staff must not collect money from the guests.
+  const ag = b.agency_id ? (Array.isArray(b.agencies) ? b.agencies[0] : b.agencies) : null;
+  const agencyName: string = ag?.company_name || '';
+  const agencyDue = b.agency_pay_deadline
+    ? new Date(b.agency_pay_deadline).toLocaleString('en-GB', { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : b.payment_due_date || '';
+  const money = b.agency_id
+    ? (unpaid
+      ? `Agency has NOT paid yet: ${amount}${agencyDue ? ` (due ${agencyDue})` : ''} — the agency pays us, do not collect from the guests`
+      : `Agency paid ${amount}${paidVia} — do not collect from the guests`)
+    : unpaid
+      ? `Collect ${amount} on arrival`
+      : `Paid ${amount}${paidVia}`;
+  // Agency bookings store the guest as "Guest name (Agency name)".
+  let guestName: string = b.customer_name || '';
+  if (agencyName && guestName.endsWith(` (${agencyName})`)) guestName = guestName.slice(0, -(agencyName.length + 3));
+  const who = b.agency_id ? `${agencyName || 'Agency'} (agency)${guestName ? ` · ${guestName}` : ''}` : b.customer_name;
   const group = b.is_private ? 'Private session' : 'Group';
   const lines = [
     `Booking: ${b.booking_ref}`,
+    b.agency_id && `Agency: ${agencyName}${ag?.contact_name ? ` · ${ag.contact_name}` : ''}${ag?.phone ? ` · ${ag.phone}` : ''}${ag?.email ? ` · ${ag.email}` : ''}`,
+    b.agency_id && guestName && `Guest: ${guestName}`,
     `Workshop: ${pkgName}${b.is_private ? ' (private)' : ''}`,
     `Guests: ${b.num_participants}${b.has_minors ? ' (includes under-18s)' : ''}`,
     group && `Type: ${group}`,
@@ -100,7 +119,7 @@ function buildEvent(b: any) {
     b.booking_source && `Source: ${b.booking_source}`,
   ].filter(Boolean);
   return {
-    summary: `${icon} ${pkgName} · ${b.customer_name} · ${guests}${unpaid ? ' · 💵' : ' · ✅'}`,
+    summary: `${icon} ${pkgName} · ${who} · ${guests}${unpaid ? ' · 💵' : ' · ✅'}`,
     description: lines.join('\n'),
     location: 'Uri Herbs Workshop, 44/3 Si Phum Soi 9, Chiang Mai',
     start: { dateTime: `${b.slot_date}T${hhmm(b.start_time)}:00`, timeZone: TZ },
@@ -121,7 +140,7 @@ export async function syncBookingToCalendar(db: any, bookingId: string): Promise
   try {
     const { data: b, error } = await db
       .from('bookings')
-      .select('id, booking_ref, status, customer_name, customer_email, customer_phone, customer_notes, slot_date, start_time, end_time, num_participants, instructor_group, is_private, has_minors, total_price_thb, payment_status, payment_method, booking_source, packages ( name, calendar_type )')
+      .select('id, booking_ref, status, customer_name, customer_email, customer_phone, customer_notes, slot_date, start_time, end_time, num_participants, instructor_group, is_private, has_minors, total_price_thb, payment_status, payment_method, booking_source, agency_id, agency_pay_deadline, payment_due_date, agencies ( company_name, contact_name, email, phone ), packages ( name, calendar_type )')
       .eq('id', bookingId)
       .single();
     if (error || !b) {

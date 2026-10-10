@@ -13,6 +13,7 @@ import {
   sendEmailViaResend, OWNER_EMAIL, SHOP_NAME, SITE_URL,
   formatDateLong, formatTime12, escapeHtml,
 } from './notifications';
+import { syncBookingToCalendar } from './google-calendar';
 import { agencyDocPdf, agencyDocData, agencyDocFilename, AGENCY_DOC_SELECT, type AgencyDocKind } from './agency-docs-pdf';
 
 const thb = (n: number) => `฿${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
@@ -264,6 +265,7 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
     if (!claimed) continue;
     await db.from('booking_slots').delete().eq('booking_id', b.id);
     cancelled++;
+    await syncBookingToCalendar(db, b.id); // remove it from the shop's Google Calendar
     const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
     const pkg = (Array.isArray(b.packages) ? b.packages[0] : b.packages)?.name || 'Workshop';
     const line = bookingLine(b, pkg);
@@ -320,6 +322,7 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
       if (!claimed) continue;
       await db.from('booking_slots').delete().eq('booking_id', b.id);
       cancelled++;
+      await syncBookingToCalendar(db, b.id); // remove it from the shop's Google Calendar
       await send(a?.email, `Booking ${b.booking_ref} cancelled — not paid by ${formatDateLong(due)}`,
         shell('Booking cancelled (unpaid)', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
           <p>This booking was not paid by the due date, so it has been cancelled and the places released. If you still need it, book again on your agency page (subject to availability).</p>`,
