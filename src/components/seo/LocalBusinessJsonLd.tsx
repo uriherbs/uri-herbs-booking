@@ -6,9 +6,15 @@
 // Keep the address/phone identical to the Google Business Profile.
 // ============================================================
 
+import { listPrices, baht } from '@/lib/price-list';
+
 const SITE_URL = 'https://www.uriherbs.com';
 
-const data = {
+// Built per request (the homepage is dynamic) so the prices switch to
+// the 2027 list on 1 Jan 2027 without a redeploy.
+function businessData() {
+  const p = listPrices();
+  return {
   '@context': 'https://schema.org',
   '@type': 'LocalBusiness',
   '@id': `${SITE_URL}/#business`,
@@ -20,7 +26,7 @@ const data = {
   image: [`${SITE_URL}/og-image.jpg`, `${SITE_URL}/hero-wide.jpg`],
   telephone: '+66643349890',
   email: 'uherbhouse@gmail.com',
-  priceRange: '฿920 – ฿2,700',
+  priceRange: `${baht(p.single)} – ${baht(p.aroma)}`,
   currenciesAccepted: 'THB',
   paymentAccepted: 'Cash, PromptPay, WeChat Pay, Credit Card, PayPal',
   address: {
@@ -41,12 +47,12 @@ const data = {
     'https://www.getyourguide.com/uri-herbs-workshop-s647905/',
   ],
   makesOffer: [
-    { name: 'Herbal Tea Blending Workshop (1 hour)', price: 920, url: `${SITE_URL}/workshops/tea-blending` },
-    { name: 'Ya Dom Thai Herbal Inhaler Workshop (1 hour)', price: 920, url: `${SITE_URL}/workshops/ya-dom-inhaler` },
-    { name: 'Herbal Massage Ball Workshop (1 hour)', price: 920, url: `${SITE_URL}/workshops/herbal-massage-ball` },
-    { name: 'Combo: any 2 herbal workshops (2 hours)', price: 1670, url: `${SITE_URL}/book` },
-    { name: 'Integrated Herbal Journey: all 3 workshops (3 hours)', price: 2320, url: `${SITE_URL}/book` },
-    { name: 'Natural Skincare & Aromatherapy Mastery (2 hours)', price: 2700, url: `${SITE_URL}/workshops/skincare-aromatherapy` },
+    { name: 'Herbal Tea Blending Workshop (1 hour)', price: p.single, url: `${SITE_URL}/workshops/tea-blending` },
+    { name: 'Ya Dom Thai Herbal Inhaler Workshop (1 hour)', price: p.single, url: `${SITE_URL}/workshops/ya-dom-inhaler` },
+    { name: 'Herbal Massage Ball Workshop (1 hour)', price: p.single, url: `${SITE_URL}/workshops/herbal-massage-ball` },
+    { name: 'Combo: any 2 herbal workshops (2 hours)', price: p.combo, url: `${SITE_URL}/book` },
+    { name: 'Integrated Herbal Journey: all 3 workshops (3 hours)', price: p.journey, url: `${SITE_URL}/book` },
+    { name: 'Natural Skincare & Aromatherapy Mastery (2 hours)', price: p.aroma, url: `${SITE_URL}/workshops/skincare-aromatherapy` },
   ].map((o) => ({
     '@type': 'Offer',
     priceCurrency: 'THB',
@@ -54,7 +60,8 @@ const data = {
     url: o.url,
     itemOffered: { '@type': 'Service', name: o.name },
   })),
-};
+  };
+}
 
 export function LocalBusinessJsonLd() {
   return (
@@ -62,7 +69,7 @@ export function LocalBusinessJsonLd() {
       type="application/ld+json"
       // JSON.stringify output contains no "</script>" sequences here
       // (all values are fixed strings above).
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(businessData()) }}
     />
   );
 }
