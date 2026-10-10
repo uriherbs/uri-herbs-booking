@@ -147,6 +147,7 @@ export default function TradePage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginSent, setLoginSent] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   const canSubmit = f.company_name.trim() && EMAIL_RE.test(f.email.trim()) && f.address.trim() && f.license_no.trim();
 
@@ -177,9 +178,15 @@ export default function TradePage() {
   const sendLoginLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!EMAIL_RE.test(loginEmail.trim())) return;
-    await fetch('/api/agency/login-link', {
+    setLoginError('');
+    const res = await fetch('/api/agency/login-link', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: loginEmail }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (res && res.status === 429) {
+      const data = await res.json().catch(() => ({}));
+      setLoginError(data.error || 'Too many tries. Please wait a few minutes and try again.');
+      return;
+    }
     setLoginSent(true);
   };
 
@@ -481,6 +488,7 @@ export default function TradePage() {
               <button type="submit" style={{ padding: '12px 18px', borderRadius: 12, border: 'none', background: C.sage, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
                 Get my agency link
               </button>
+              {loginError ? <p style={{ width: '100%', fontSize: 13, color: '#B4533C', margin: '2px 0 0' }}>{loginError}</p> : null}
             </form>
           )}
         </div>
