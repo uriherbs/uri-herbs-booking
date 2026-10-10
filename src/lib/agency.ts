@@ -28,6 +28,7 @@ export interface AgencyBooking {
   status: 'pending_payment' | 'confirmed' | 'cancelled' | string;
   payment_status: 'paid' | 'unpaid'; retail: number | null; net: number; due: string | null;
   proof_sent: boolean; cancel_reason: string | null; created_at: string;
+  pay_deadline?: string | null; // bookings < 14 days ahead: pay within 3 h (1 h same day) of booking
 }
 
 export interface AgencyContractInfo {

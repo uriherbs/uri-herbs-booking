@@ -11,7 +11,7 @@
 // changes — each signature records the version it accepted.
 // ============================================================
 
-export const CONTRACT_VERSION = '2026-10c';
+export const CONTRACT_VERSION = '2026-10d';
 
 export const BUSINESS = {
   name: 'Uri Herbs Workshop',
@@ -120,7 +120,7 @@ export function contractSections(party: ContractParty): ContractSection[] {
       title: '4. Payment',
       body: [
         '100% payment confirms a booking and is due no later than 14 days before the workshop.',
-        'Bookings made less than 14 days before the workshop must be paid when booking — otherwise the places are not held.',
+        'Bookings made less than 14 days before the workshop must be paid within 3 hours of booking (within 1 hour if the workshop is on the same day), online or by bank transfer with the transfer slip uploaded on the agency page. Otherwise the booking is cancelled automatically and its places are released.',
         'Payment is made online (card / PayPal) on the agency page, or by bank transfer with the transfer slip uploaded on the agency page.',
         'Reminders are sent 18 days before the workshop and on the payment due date. A booking still unpaid after the due date is cancelled automatically and its places are released.',
       ],
