@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fonts read from disk by the agency-agreement PDF (react-pdf) — make
+  // sure Vercel ships them with the two routes that build the PDF.
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/agency/contract-pdf': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      '/api/agency/sign': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      // Invoice / receipt PDFs (agency booking + payment emails, agency page downloads)
+      '/api/agency/document': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      '/api/agency/notify': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      '/api/payments/stripe/webhook': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      '/api/payments/paypal/capture-order': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+      '/api/payments/paypal/webhook': ['./assets/fonts/**', './public/uri-herbs-logo.jpg'],
+    },
+  },
   async redirects() {
     return [
       // Internal health & allergy questionnaire (systeme.io). Before the

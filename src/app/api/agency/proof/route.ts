@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { sendSlipReceivedEmail } from '@/lib/agency-emails';
 
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024; // Vercel rejects bodies over ~4.5 MB anyway; the page shrinks photos first
 const TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'application/pdf': 'pdf' };
 
 export async function POST(request: NextRequest) {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const bookingId = String(form.get('booking_id') || '');
   const file = form.get('file');
   if (!(file instanceof File)) return NextResponse.json({ error: 'Please choose a file.' }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'File is too large (max 8 MB).' }, { status: 400 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'File is too large (max 4 MB). Please upload a screenshot of the slip.' }, { status: 400 });
   const ext = TYPES[file.type];
   if (!ext) return NextResponse.json({ error: 'Please upload a photo (JPG/PNG) or PDF of the slip.' }, { status: 400 });
 

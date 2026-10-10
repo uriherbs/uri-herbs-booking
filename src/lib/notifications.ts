@@ -497,6 +497,7 @@ export interface SendEmailParams {
   html: string;
   text: string;
   replyTo?: string; // e.g. the contact form sender, so Mali can just hit Reply
+  attachments?: { filename: string; content: string }[]; // content = base64
 }
 
 export async function sendEmailViaResend(
@@ -516,6 +517,7 @@ export async function sendEmailViaResend(
       html: params.html,
       text: params.text,
       ...(params.replyTo ? { reply_to: params.replyTo } : {}),
+      ...(params.attachments?.length ? { attachments: params.attachments } : {}),
     }),
   });
 

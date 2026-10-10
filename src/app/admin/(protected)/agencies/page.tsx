@@ -60,7 +60,8 @@ function CopyBtn({ text, label }: { text: string; label: string }) {
 function Details({ a }: { a: AgencyRow }) {
   const rows: [string, string | null][] = [
     ['Contact', a.contact_name], ['Email', a.email], ['Phone', a.phone], ['Country', a.country],
-    ['Website', a.website], ['Licence', a.license_no], ['Type', a.business_type], ['Groups / month', a.monthly_groups],
+    ['Address', a.address], ['Website', a.website], ['Business licence', a.license_no],
+    ['TAT licence', a.tat_no], ['Type', a.business_type], ['Groups / month', a.monthly_groups],
   ];
   return (
     <div style={{ fontSize: 12.5, color: C.bark, lineHeight: 1.6, marginTop: 4 }}>

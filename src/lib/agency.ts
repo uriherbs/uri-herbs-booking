@@ -32,7 +32,8 @@ export interface AgencyBooking {
 
 export interface AgencyContractInfo {
   company_name: string; contact_name: string | null; email: string; country: string | null;
-  license_no: string | null; status: string; commission_pct: number;
+  phone?: string | null; website?: string | null; address?: string | null;
+  license_no: string | null; tat_no?: string | null; status: string; commission_pct: number;
   signed_name: string | null; signed_at: string | null; contract_version: string | null;
 }
 
@@ -107,20 +108,57 @@ export async function agencyCancelBooking(token: string, bookingRef: string) {
   return row as { booking_ref: string; refund_pct: number; refund_thb: number; was_paid: boolean };
 }
 
-export async function uploadTransferSlip(token: string, bookingId: string, file: File) {
+// Vercel refuses request bodies over ~4.5 MB (the upload then fails with
+// a bare "Failed to fetch"), and phone camera photos are often 3–8 MB.
+// So photos are shrunk in the browser first: longest side max 2000 px,
+// JPEG ~80% — a bank slip stays perfectly readable at ~200–800 KB.
+const UPLOAD_LIMIT = 4 * 1024 * 1024;
+
+async function shrinkImage(file: File): Promise<File> {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size <= 1024 * 1024) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // PNG transparency → white
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const blob: Blob | null = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } catch {
+    return file; // browser can't decode it — send as is (size check below)
+  }
+}
+
+export async function uploadTransferSlip(token: string, bookingId: string, original: File) {
+  const file = await shrinkImage(original);
+  if (file.size > UPLOAD_LIMIT) {
+    throw new Error('This file is too large (max 4 MB). Please upload a screenshot of the slip, or a smaller photo or PDF.');
+  }
   const fd = new FormData();
   fd.append('token', token);
   fd.append('booking_id', bookingId);
   fd.append('file', file);
-  const res = await fetch('/api/agency/proof', { method: 'POST', body: fd });
+  let res: Response;
+  try {
+    res = await fetch('/api/agency/proof', { method: 'POST', body: fd });
+  } catch {
+    throw new Error('Upload failed — please check your internet connection and try again, or upload a screenshot of the slip.');
+  }
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || 'Upload failed');
+  if (!res.ok) throw new Error(json.error || (res.status === 413 ? 'This file is too large — please upload a screenshot of the slip.' : 'Upload failed — please try again.'));
 }
 
 // ── Admin ──
 export interface AgencyRow {
   id: string; company_name: string; contact_name: string | null; email: string; phone: string | null;
-  country: string | null; website: string | null; license_no: string | null; business_type: string | null;
+  country: string | null; website: string | null; address: string | null; license_no: string | null;
+  tat_no: string | null; business_type: string | null;
   monthly_groups: string | null; message: string | null; status: string; commission_pct: number;
   contract_token: string; portal_token: string; approved_at: string | null; signed_name: string | null;
   signed_at: string | null; admin_note: string | null; created_at: string;
@@ -128,7 +166,7 @@ export interface AgencyRow {
 
 export async function listAgencies(): Promise<AgencyRow[]> {
   const { data, error } = await supabase.from('agencies')
-    .select('id, company_name, contact_name, email, phone, country, website, license_no, business_type, monthly_groups, message, status, commission_pct, contract_token, portal_token, approved_at, signed_name, signed_at, admin_note, created_at')
+    .select('id, company_name, contact_name, email, phone, country, website, address, license_no, tat_no, business_type, monthly_groups, message, status, commission_pct, contract_token, portal_token, approved_at, signed_name, signed_at, admin_note, created_at')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []) as AgencyRow[];
@@ -170,6 +208,13 @@ export async function markAgencyBookingPaid(id: string, paid: boolean) {
     ? { payment_status: 'paid', payment_method: 'transfer', paid_at: new Date().toISOString() }
     : { payment_status: 'unpaid', paid_at: null }).eq('id', id);
   if (error) throw new Error(error.message);
+  // "Thank you — payment received" email with the receipt PDF (server re-checks; sent once).
+  if (paid) {
+    await fetch('/api/agency/notify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'paid', booking_id: id }),
+    }).catch(() => {});
+  }
 }
 
 export async function getSlipUrl(bookingId: string): Promise<string> {

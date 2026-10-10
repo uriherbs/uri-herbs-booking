@@ -13,6 +13,7 @@ import {
   sendEmailViaResend, OWNER_EMAIL, SHOP_NAME, SITE_URL,
   formatDateLong, formatTime12, escapeHtml,
 } from './notifications';
+import { agencyDocPdf, agencyDocData, agencyDocFilename, AGENCY_DOC_SELECT, type AgencyDocKind } from './agency-docs-pdf';
 
 const thb = (n: number) => `฿${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 export const portalUrl = (token: string) => `${SITE_URL}/agency/${token}`;
@@ -30,15 +31,33 @@ ${cta ? `<p style="margin:18px 0 0;"><a href="${cta.href}" style="display:inline
 </table></td></tr></table></body></html>`;
 }
 
-async function send(to: string | null | undefined, subject: string, html: string, text: string) {
+async function send(
+  to: string | null | undefined, subject: string, html: string, text: string,
+  attachments?: { filename: string; content: string }[]
+) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || !to) return false;
   try {
-    await sendEmailViaResend({ to, subject, html, text, replyTo: OWNER_EMAIL }, apiKey);
+    await sendEmailViaResend({ to, subject, html, text, replyTo: OWNER_EMAIL, attachments }, apiKey);
     return true;
   } catch (err: any) {
     console.error(`agency email "${subject}" to ${to} failed:`, err?.message);
     return false;
+  }
+}
+
+// Invoice / receipt PDF for one agency booking, as an email attachment.
+// Best effort: null if anything fails (the email still goes out, and the
+// agency can download the document from its agency page).
+async function docAttachment(db: any, bookingId: string, kind: AgencyDocKind) {
+  try {
+    const { data: b } = await db.from('bookings').select(AGENCY_DOC_SELECT).eq('id', bookingId).maybeSingle();
+    if (!b?.agency_id) return null;
+    const pdf = await agencyDocPdf(agencyDocData(b, kind, SITE_URL));
+    return { filename: agencyDocFilename(kind, b.booking_ref), content: pdf.toString('base64') };
+  } catch (err: any) {
+    console.error(`agency ${kind} PDF failed for ${bookingId}:`, err?.message);
+    return null;
   }
 }
 
@@ -51,7 +70,8 @@ function bookingLine(b: any, pkgName: string) {
 export async function sendApplicationEmails(a: any) {
   const rows = [
     ['Company', a.company_name], ['Contact', a.contact_name], ['Email', a.email], ['Phone / WhatsApp', a.phone],
-    ['Country', a.country], ['Website', a.website], ['Licence no.', a.license_no], ['Type', a.business_type],
+    ['Business address', a.address], ['Country', a.country], ['Website', a.website],
+    ['Business licence no.', a.license_no], ['TAT licence no.', a.tat_no], ['Type', a.business_type],
     ['Groups per month', a.monthly_groups], ['Message', a.message],
   ].filter(r => r[1]);
   const table = rows.map(([k, v]) => `<tr><td style="padding:3px 8px 3px 0; color:#8A7668; vertical-align:top;">${k}</td><td style="padding:3px 0;">${escapeHtml(String(v))}</td></tr>`).join('');
@@ -76,17 +96,21 @@ export async function sendContractEmail(a: any) {
 }
 
 // ── Signed → welcome with agency page + contract copy ─────
-export async function sendWelcomeEmails(a: any, contractTextCopy: string) {
+export async function sendWelcomeEmails(
+  a: any, contractTextCopy: string, pdf?: { filename: string; content: string } | null
+) {
+  const files = pdf ? [pdf] : undefined;
   const url = portalUrl(a.portal_token);
   const pre = `<pre style="white-space:pre-wrap; font-family: Arial, sans-serif; font-size:12px; background:#FAF7F0; border:1px solid #E8E2D8; border-radius:10px; padding:12px; color:#5C4A3D;">${escapeHtml(contractTextCopy)}</pre>`;
   await send(a.email, `Your agency page is ready — ${SHOP_NAME}`,
     shell('You’re all set 🌿', `<p>Hi ${escapeHtml(a.contact_name || a.company_name)}, thank you for signing. Your personal agency page is ready — book workshops for your clients there, pay online or by bank transfer, and see all your bookings.</p>
       <p style="font-size:13px; color:#8A7668;">Keep this link private — it is your login. Lost it? Use “Get my agency link” on uriherbs.com/trade.</p>
+      ${pdf ? '<p style="font-size:13px; color:#8A7668;">Your signed agreement is attached as a PDF.</p>' : ''}
       ${pre}`, { href: url, label: 'Open my agency page' }),
-    `Your agency page: ${url}\n\n${contractTextCopy}`);
+    `Your agency page: ${url}\n\n${contractTextCopy}`, files);
   await send(OWNER_EMAIL, `Agency signed — ${a.company_name}`,
     shell(`Agency signed: ${escapeHtml(a.company_name)}`, `<p>${escapeHtml(a.signed_name || '')} accepted the agency agreement. The agency can now book from its agency page.</p>${pre}`),
-    `${a.company_name} signed.\n\n${contractTextCopy}`);
+    `${a.company_name} signed.\n\n${contractTextCopy}`, files);
 }
 
 export async function sendLoginLinkEmail(a: any) {
@@ -109,12 +133,15 @@ export async function sendAgencyBookingCreatedEmails(db: any, bookingId: string)
   const payNow = b.status === 'pending_payment';
   const due = b.payment_due_date ? formatDateLong(b.payment_due_date) : '';
   if (!payNow) {
+    const invoice = await docAttachment(db, bookingId, 'invoice');
     await send(a?.email, `Booking ${b.booking_ref} reserved — pay ${thb(b.total_price_thb)} by ${due}`,
       shell('Booking reserved', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
         <p>Amount to pay: <strong>${thb(b.total_price_thb)}</strong> (retail ${thb(b.retail_price_thb)}).<br>
-        Payment due by <strong>${due}</strong> — online or by bank transfer on your agency page. Unpaid bookings are cancelled automatically after this date.</p>`,
+        Payment due by <strong>${due}</strong> — online or by bank transfer on your agency page. Unpaid bookings are cancelled automatically after this date.</p>
+        ${invoice ? '<p style="font-size:13px; color:#8A7668;">Your invoice is attached as a PDF.</p>' : ''}`,
         a ? { href: portalUrl(a.portal_token), label: 'Pay on my agency page' } : undefined),
-      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${due} on your agency page.`);
+      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${due} on your agency page.`,
+      invoice ? [invoice] : undefined);
   }
   await send(OWNER_EMAIL, `Agency booking — ${b.booking_ref} · ${a?.company_name || ''} (${b.num_participants} guests)`,
     shell(`Agency booking · ${escapeHtml(a?.company_name || '')}`, `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
@@ -157,14 +184,25 @@ export async function sendSlipReceivedEmail(db: any, bookingId: string) {
 //   due date − 4 days (= 18 days before the workshop) → reminder
 //   on the due date (14 days before)                   → last-day reminder
 //   after the due date                                 → cancelled, places released
-export async function processAgencyPayments(db: any): Promise<{ reminded: number; cancelled: number }> {
+// Daily agency payment job (runs from the 5-minute reminders cron, from
+// 09:00 Chiang Mai time). Payment is due 14 days before the workshop.
+//
+//   18 days before (4 days before due) → agency: payment reminder
+//   due date                           → agency: "last day to pay" (unless a slip is uploaded)
+//                                        shop:   "due today" summary for that booking
+//   day after due, NO slip             → cancelled automatically, agency + shop emailed
+//   day after due, slip uploaded       → NOT cancelled (owner decision 2026-10-10); no more
+//                                        agency reminders; shop gets "slip waiting — please
+//                                        check and Mark paid", once a day until marked paid
+// Every email is claimed with a column first, so overlapping cron runs never double-send.
+export async function processAgencyPayments(db: any): Promise<{ reminded: number; cancelled: number; shop: number }> {
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const nowH = new Date(Date.now() + 7 * 3600 * 1000).getUTCHours();
-  let reminded = 0; let cancelled = 0;
-  if (nowH < 9) return { reminded, cancelled }; // send in Chiang Mai daytime
+  let reminded = 0; let cancelled = 0; let shop = 0;
+  if (nowH < 9) return { reminded, cancelled, shop }; // send in Chiang Mai daytime
 
   const { data: rows } = await db.from('bookings')
-    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_due_date, agency_reminder18_at, agency_reminder_last_at, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
+    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_due_date, payment_proof_at, agency_reminder18_at, agency_reminder_last_at, agency_shop_due_at, agency_slip_reminded_on, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
     .not('agency_id', 'is', null).eq('status', 'confirmed').eq('payment_status', 'unpaid')
     .not('payment_due_date', 'is', null).lte('payment_due_date', new Date(Date.parse(today) + 4 * 86400000).toISOString().slice(0, 10));
 
@@ -174,12 +212,32 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
     const line = bookingLine(b, pkg);
     const due = b.payment_due_date as string;
     const page = a ? portalUrl(a.portal_token) : SITE_URL;
+    const hasSlip = !!b.payment_proof_at;
+    const slipWhen = hasSlip ? new Date(b.payment_proof_at).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const adminLink = { href: `${SITE_URL}/admin/agencies`, label: 'Open Agencies' };
 
     if (today > due) {
-      // Unpaid after the due date → cancel and release the places.
+      if (hasSlip) {
+        // Slip uploaded → never auto-cancel. Remind the shop once a day until Mark paid.
+        if (b.agency_slip_reminded_on && b.agency_slip_reminded_on >= today) continue;
+        const { data: claimed } = await db.from('bookings').update({ agency_slip_reminded_on: today })
+          .eq('id', b.id).eq('payment_status', 'unpaid')
+          .or(`agency_slip_reminded_on.is.null,agency_slip_reminded_on.lt.${today}`)
+          .select('id').maybeSingle();
+        if (!claimed) continue;
+        shop++;
+        await send(OWNER_EMAIL, `Slip waiting — please check and Mark paid · ${b.booking_ref} · ${thb(b.total_price_thb)}`,
+          shell('Bank slip waiting for you', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+            <p>Payment was due <strong>${formatDateLong(due)}</strong>. The agency uploaded a bank-transfer slip on ${escapeHtml(slipWhen)}, so the booking was <strong>not</strong> cancelled.</p>
+            <p>Please check that <strong>${thb(b.total_price_thb)}</strong> arrived in the bank account, then click <strong>Mark paid</strong> in Admin → Agencies (the agency then gets the receipt). This reminder repeats every day until it is marked paid.</p>`, adminLink),
+          `${b.booking_ref}: slip uploaded ${slipWhen}, due ${due}. Check ${thb(b.total_price_thb)} arrived and Mark paid in Admin → Agencies.`);
+        continue;
+      }
+      // Unpaid after the due date and no slip → cancel and release the places.
       const { data: claimed } = await db.from('bookings')
         .update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: 'system', cancel_reason: `Not paid by the due date (${due})` })
-        .eq('id', b.id).eq('status', 'confirmed').eq('payment_status', 'unpaid').select('id').maybeSingle();
+        .eq('id', b.id).eq('status', 'confirmed').eq('payment_status', 'unpaid').is('payment_proof_at', null)
+        .select('id').maybeSingle();
       if (!claimed) continue;
       await db.from('booking_slots').delete().eq('booking_id', b.id);
       cancelled++;
@@ -189,12 +247,32 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
           { href: page, label: 'Open my agency page' }),
         `${b.booking_ref} was not paid by ${due} and has been cancelled. ${line}`);
       await send(OWNER_EMAIL, `Auto-cancelled unpaid agency booking — ${b.booking_ref} · ${a?.company_name || ''}`,
-        shell('Unpaid agency booking cancelled', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>Due ${formatDateLong(due)} — ${thb(b.total_price_thb)} unpaid. Places released.</p>`),
+        shell('Unpaid agency booking cancelled', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>Due ${formatDateLong(due)} — ${thb(b.total_price_thb)} unpaid, no transfer slip. Places released.</p>`),
         `${b.booking_ref} auto-cancelled (unpaid, due ${due}).`);
       continue;
     }
 
     const isLastDay = today === due;
+
+    // Shop: "due today" for every agency booking still unpaid on its due date.
+    if (isLastDay && !b.agency_shop_due_at) {
+      const { data: claimed } = await db.from('bookings').update({ agency_shop_due_at: new Date().toISOString() })
+        .eq('id', b.id).is('agency_shop_due_at', null).select('id').maybeSingle();
+      if (claimed) {
+        shop++;
+        await send(OWNER_EMAIL,
+          hasSlip ? `Due today, slip uploaded — please check · ${b.booking_ref} · ${thb(b.total_price_thb)}`
+                  : `Due today, unpaid — ${b.booking_ref} · ${a?.company_name || ''} · ${thb(b.total_price_thb)}`,
+          shell(hasSlip ? 'Agency payment due today — slip uploaded' : 'Agency payment due today', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+            ${hasSlip
+              ? `<p>The agency uploaded a bank-transfer slip on ${escapeHtml(slipWhen)}. Please check that <strong>${thb(b.total_price_thb)}</strong> arrived, then click <strong>Mark paid</strong>. A booking with a slip is never cancelled automatically.</p>`
+              : `<p><strong>${thb(b.total_price_thb)}</strong> is still unpaid and due today. If it is not paid (and no slip is uploaded), it will be <strong>cancelled automatically tomorrow at 9:00</strong>.</p>`}`, adminLink),
+          `${b.booking_ref} (${a?.company_name || ''}) — ${thb(b.total_price_thb)} due today${hasSlip ? `, slip uploaded ${slipWhen}` : ', unpaid — auto-cancel tomorrow 9:00 if still unpaid'}.`);
+      }
+    }
+
+    // Agency reminders stop once a slip is uploaded.
+    if (hasSlip) continue;
     const flag = isLastDay ? 'agency_reminder_last_at' : 'agency_reminder18_at';
     if (b[flag]) continue;
     const { data: claimed } = await db.from('bookings').update({ [flag]: new Date().toISOString() })
@@ -205,25 +283,44 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
       isLastDay ? `Last day to pay — booking ${b.booking_ref} (${thb(b.total_price_thb)})` : `Payment reminder — booking ${b.booking_ref} due ${formatDateLong(due)}`,
       shell(isLastDay ? 'Today is the last day to pay' : 'Payment reminder', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
         <p>Amount: <strong>${thb(b.total_price_thb)}</strong> · due <strong>${formatDateLong(due)}</strong>.
-        ${isLastDay ? 'If it is not paid today, the booking will be cancelled automatically tomorrow.' : 'Unpaid bookings are cancelled automatically after the due date.'}</p>`,
+        ${isLastDay ? 'If it is not paid today, the booking will be cancelled automatically tomorrow.' : 'Unpaid bookings are cancelled automatically after the due date.'}</p>
+        <p style="font-size:13px; color:#8A7668;">Paid by bank transfer? Upload the slip on your agency page and the booking will not be cancelled while we check it.</p>`,
         { href: page, label: 'Pay now' }),
       `${b.booking_ref}: pay ${thb(b.total_price_thb)} by ${due}. ${page}`);
   }
-  return { reminded, cancelled };
+  return { reminded, cancelled, shop };
 }
 
+// Payment received → "thank you" email with the receipt PDF.
+// Called after admin "Mark paid" (bank transfer) and after an online
+// card/PayPal payment (agency page + payment webhooks). Sent ONCE per
+// booking: `agency_receipt_sent_at` is claimed atomically, so the several
+// callers of an online payment can't double-send. Only for a payment
+// recorded in the last 15 minutes (the notify route is public).
 export async function sendAgencyPaidEmail(db: any, bookingId: string) {
   const { data: b } = await db.from('bookings')
-    .select('booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_method, paid_at, agencies ( company_name, email ), packages ( name )')
+    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_status, payment_method, paid_at, agency_id, agencies ( company_name, contact_name, email ), packages ( name )')
     .eq('id', bookingId).maybeSingle();
-  if (!b || !b.paid_at || Date.now() - new Date(b.paid_at).getTime() > 15 * 60_000) return;
+  if (!b?.agency_id || b.payment_status !== 'paid' || !b.paid_at || Date.now() - new Date(b.paid_at).getTime() > 15 * 60_000) return;
+  const { data: claimed } = await db.from('bookings').update({ agency_receipt_sent_at: new Date().toISOString() })
+    .eq('id', b.id).is('agency_receipt_sent_at', null).select('id').maybeSingle();
+  if (!claimed) return; // already sent
   const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
   const pkg = (Array.isArray(b.packages) ? b.packages[0] : b.packages)?.name || 'Workshop';
   const line = bookingLine(b, pkg);
-  await send(a?.email, `Payment received — booking ${b.booking_ref} confirmed`,
-    shell('Payment received ✓', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>We received ${thb(b.total_price_thb)}. The booking is confirmed — see you in Chiang Mai!</p>`),
-    `Payment of ${thb(b.total_price_thb)} received — ${b.booking_ref} confirmed. ${line}`);
-  await send(OWNER_EMAIL, `Agency paid online — ${b.booking_ref} · ${thb(b.total_price_thb)} · ${a?.company_name || ''}`,
-    shell('Agency payment received', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>${thb(b.total_price_thb)} paid online (${escapeHtml(b.payment_method || '')}).</p>`),
-    `${a?.company_name} paid ${thb(b.total_price_thb)} for ${b.booking_ref}.`);
+  const receipt = await docAttachment(db, b.id, 'receipt');
+  await send(a?.email, `Thank you — payment received for ${b.booking_ref}`,
+    shell('Thank you — payment received ✓', `<p>Hi ${escapeHtml(a?.contact_name || a?.company_name || '')},</p>
+      <p>Thank you! We received your payment of <strong>${thb(b.total_price_thb)}</strong>. The booking is confirmed:</p>
+      <p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+      ${receipt ? '<p>Here is the receipt for your order (PDF attached).</p>' : ''}
+      <p>See you in Chiang Mai!</p>`),
+    `Thank you — we received ${thb(b.total_price_thb)} for ${b.booking_ref}. The booking is confirmed. ${line}`,
+    receipt ? [receipt] : undefined);
+  // The shop only needs to hear about ONLINE payments (Mark paid is done by the shop itself).
+  if (b.payment_method === 'stripe' || b.payment_method === 'paypal') {
+    await send(OWNER_EMAIL, `Agency paid online — ${b.booking_ref} · ${thb(b.total_price_thb)} · ${a?.company_name || ''}`,
+      shell('Agency payment received', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>${thb(b.total_price_thb)} paid online (${escapeHtml(b.payment_method || '')}). The receipt was emailed to the agency.</p>`),
+      `${a?.company_name} paid ${thb(b.total_price_thb)} for ${b.booking_ref}.`);
+  }
 }
