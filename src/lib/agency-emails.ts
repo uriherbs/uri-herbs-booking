@@ -61,6 +61,16 @@ async function docAttachment(db: any, bookingId: string, kind: AgencyDocKind) {
   }
 }
 
+// "1:00 PM today" style deadline in Chiang Mai time (for the 3-hour / 1-hour payment window).
+function fmtDeadline(iso: string) {
+  const bkk = new Date(Date.parse(iso) + 7 * 3600 * 1000);
+  const h = bkk.getUTCHours(), m = bkk.getUTCMinutes();
+  const time = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const day = bkk.toISOString().slice(0, 10);
+  return day === today ? `${time} today` : `${time}, ${formatDateLong(day)}`;
+}
+
 function bookingLine(b: any, pkgName: string) {
   const start = formatTime12(String(b.start_time).slice(0, 5));
   return `${pkgName} · ${formatDateLong(b.slot_date)}, ${start} · ${b.num_participants} guest${b.num_participants > 1 ? 's' : ''}${b.is_private ? ' (private)' : ''}`;
@@ -124,7 +134,7 @@ export async function sendLoginLinkEmail(a: any) {
 // ── Booking created ────────────────────────────────────────
 export async function sendAgencyBookingCreatedEmails(db: any, bookingId: string) {
   const { data: b } = await db.from('bookings')
-    .select('booking_ref, slot_date, start_time, num_participants, is_private, customer_name, customer_notes, status, payment_status, total_price_thb, retail_price_thb, payment_due_date, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
+    .select('booking_ref, slot_date, start_time, num_participants, is_private, customer_name, customer_notes, status, payment_status, total_price_thb, retail_price_thb, payment_due_date, agency_pay_deadline, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
     .eq('id', bookingId).maybeSingle();
   if (!b) return;
   const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
@@ -132,7 +142,21 @@ export async function sendAgencyBookingCreatedEmails(db: any, bookingId: string)
   const line = bookingLine(b, pkg);
   const payNow = b.status === 'pending_payment';
   const due = b.payment_due_date ? formatDateLong(b.payment_due_date) : '';
-  if (!payNow) {
+  const deadline = b.agency_pay_deadline ? fmtDeadline(b.agency_pay_deadline) : '';
+  const hours = b.agency_pay_deadline && b.slot_date === new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10) ? 1 : 3;
+  if (deadline) {
+    // Less than 14 days ahead: pay within 3 hours (1 hour same day) or it is cancelled.
+    const invoice = await docAttachment(db, bookingId, 'invoice');
+    await send(a?.email, `Booking ${b.booking_ref} reserved — pay ${thb(b.total_price_thb)} by ${deadline}`,
+      shell('Booking reserved — please pay now', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+        <p>Amount to pay: <strong>${thb(b.total_price_thb)}</strong> (retail ${thb(b.retail_price_thb)}).<br>
+        This workshop is less than 14 days away, so please pay within ${hours} hour${hours > 1 ? 's' : ''}: by <strong>${escapeHtml(deadline)}</strong> — online, or by bank transfer with the slip uploaded on your agency page.
+        <strong>If it is not paid (or no slip is uploaded) by then, the booking is cancelled automatically.</strong></p>
+        ${invoice ? '<p style="font-size:13px; color:#8A7668;">Your invoice is attached as a PDF.</p>' : ''}`,
+        a ? { href: portalUrl(a.portal_token), label: 'Pay on my agency page' } : undefined),
+      `${b.customer_name}\n${line}\nPay ${thb(b.total_price_thb)} by ${deadline} on your agency page, or the booking is cancelled automatically.`,
+      invoice ? [invoice] : undefined);
+  } else if (!payNow) {
     const invoice = await docAttachment(db, bookingId, 'invoice');
     await send(a?.email, `Booking ${b.booking_ref} reserved — pay ${thb(b.total_price_thb)} by ${due}`,
       shell('Booking reserved', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
@@ -146,8 +170,8 @@ export async function sendAgencyBookingCreatedEmails(db: any, bookingId: string)
   await send(OWNER_EMAIL, `Agency booking — ${b.booking_ref} · ${a?.company_name || ''} (${b.num_participants} guests)`,
     shell(`Agency booking · ${escapeHtml(a?.company_name || '')}`, `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
       ${b.customer_notes ? `<p><strong>Notes:</strong> ${escapeHtml(b.customer_notes)}</p>` : ''}
-      <p>Net ${thb(b.total_price_thb)} (retail ${thb(b.retail_price_thb)}) · ${payNow ? 'paying now (30-minute hold)' : `unpaid — due ${due}`}</p>`),
-    `${b.customer_name}\n${line}\nNet ${thb(b.total_price_thb)} · ${payNow ? 'paying now' : `due ${due}`}`);
+      <p>Net ${thb(b.total_price_thb)} (retail ${thb(b.retail_price_thb)}) · ${deadline ? `unpaid — must pay within ${hours} h, by ${escapeHtml(deadline)} (otherwise cancelled automatically)` : payNow ? 'paying now (30-minute hold)' : `unpaid — due ${due}`}</p>`),
+    `${b.customer_name}\n${line}\nNet ${thb(b.total_price_thb)} · ${deadline ? `pay by ${deadline}` : payNow ? 'paying now' : `due ${due}`}`);
 }
 
 // ── Agency cancelled ───────────────────────────────────────
@@ -170,10 +194,11 @@ export async function sendAgencyCancellationEmails(db: any, bookingRef: string) 
 
 export async function sendSlipReceivedEmail(db: any, bookingId: string) {
   const { data: b } = await db.from('bookings')
-    .select('booking_ref, customer_name, total_price_thb, agencies ( company_name )').eq('id', bookingId).maybeSingle();
+    .select('booking_ref, customer_name, total_price_thb, agency_pay_deadline, slot_date, agencies ( company_name )').eq('id', bookingId).maybeSingle();
   if (!b) return;
   const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
-  await send(OWNER_EMAIL, `Transfer slip uploaded — ${b.booking_ref} · ${thb(b.total_price_thb)}`,
+  const urgent = b.agency_pay_deadline ? ` — last-minute booking for ${formatDateLong(b.slot_date)}, please check now` : '';
+  await send(OWNER_EMAIL, `Transfer slip uploaded — ${b.booking_ref} · ${thb(b.total_price_thb)}${urgent}`,
     shell('Transfer slip received', `<p>${escapeHtml(a?.company_name || '')} uploaded a bank-transfer slip for <strong>${escapeHtml(b.booking_ref)}</strong> (${escapeHtml(b.customer_name)}) — ${thb(b.total_price_thb)}.</p><p>Check it and mark the booking paid in Admin → Agencies.</p>`,
       { href: `${SITE_URL}/admin/agencies`, label: 'Open Agencies' }),
     `${a?.company_name} uploaded a transfer slip for ${b.booking_ref} — ${thb(b.total_price_thb)}.`);
@@ -199,10 +224,41 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const nowH = new Date(Date.now() + 7 * 3600 * 1000).getUTCHours();
   let reminded = 0; let cancelled = 0; let shop = 0;
-  if (nowH < 9) return { reminded, cancelled, shop }; // send in Chiang Mai daytime
+
+  // ── Bookings < 14 days ahead: pay within 3 h (1 h same day) of booking ──
+  // Checked on every run (any hour): past the deadline, unpaid and NO slip →
+  // cancelled. A booking with an uploaded slip is kept (owner checks it; the
+  // daily "slip waiting" reminder below covers it from the next day).
+  const { data: late } = await db.from('bookings')
+    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, agency_pay_deadline, agencies ( company_name, email, portal_token ), packages ( name )')
+    .not('agency_id', 'is', null).eq('status', 'confirmed').eq('payment_status', 'unpaid')
+    .is('payment_proof_at', null).not('agency_pay_deadline', 'is', null).lt('agency_pay_deadline', new Date().toISOString());
+  for (const b of late || []) {
+    const { data: claimed } = await db.from('bookings')
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: 'system', cancel_reason: `Not paid by ${fmtDeadline(b.agency_pay_deadline)}` })
+      .eq('id', b.id).eq('status', 'confirmed').eq('payment_status', 'unpaid').is('payment_proof_at', null)
+      .select('id').maybeSingle();
+    if (!claimed) continue;
+    await db.from('booking_slots').delete().eq('booking_id', b.id);
+    cancelled++;
+    const a = Array.isArray(b.agencies) ? b.agencies[0] : b.agencies;
+    const pkg = (Array.isArray(b.packages) ? b.packages[0] : b.packages)?.name || 'Workshop';
+    const line = bookingLine(b, pkg);
+    const page = a ? portalUrl(a.portal_token) : SITE_URL;
+    await send(a?.email, `Booking ${b.booking_ref} cancelled — not paid in time`,
+      shell('Booking cancelled (unpaid)', `<p><strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p>
+        <p>This booking was not paid (and no transfer slip was uploaded) by ${escapeHtml(fmtDeadline(b.agency_pay_deadline))}, so it has been cancelled and the places released. If you still need it, book again on your agency page (subject to availability).</p>`,
+        { href: page, label: 'Open my agency page' }),
+      `${b.booking_ref} was not paid by ${fmtDeadline(b.agency_pay_deadline)} and has been cancelled. ${line}`);
+    await send(OWNER_EMAIL, `Auto-cancelled unpaid last-minute agency booking — ${b.booking_ref} · ${a?.company_name || ''}`,
+      shell('Unpaid agency booking cancelled', `<p>${escapeHtml(a?.company_name || '')} · <strong>${escapeHtml(b.customer_name)}</strong><br>${escapeHtml(line)}</p><p>${thb(b.total_price_thb)} was not paid and no slip uploaded by ${escapeHtml(fmtDeadline(b.agency_pay_deadline))}. Places released.</p>`),
+      `${b.booking_ref} auto-cancelled (not paid by ${fmtDeadline(b.agency_pay_deadline)}).`);
+  }
+
+  if (nowH < 9) return { reminded, cancelled, shop }; // the emails below go out in Chiang Mai daytime
 
   const { data: rows } = await db.from('bookings')
-    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_due_date, payment_proof_at, agency_reminder18_at, agency_reminder_last_at, agency_shop_due_at, agency_slip_reminded_on, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
+    .select('id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, total_price_thb, payment_due_date, payment_proof_at, agency_pay_deadline, agency_reminder18_at, agency_reminder_last_at, agency_shop_due_at, agency_slip_reminded_on, agencies ( company_name, contact_name, email, portal_token ), packages ( name )')
     .not('agency_id', 'is', null).eq('status', 'confirmed').eq('payment_status', 'unpaid')
     .not('payment_due_date', 'is', null).lte('payment_due_date', new Date(Date.parse(today) + 4 * 86400000).toISOString().slice(0, 10));
 
@@ -251,6 +307,10 @@ export async function processAgencyPayments(db: any): Promise<{ reminded: number
         `${b.booking_ref} auto-cancelled (unpaid, due ${due}).`);
       continue;
     }
+
+    // Last-minute bookings (3 h / 1 h window) have their own deadline handling above —
+    // no 18-day / last-day / due-today emails for them.
+    if (b.agency_pay_deadline) continue;
 
     const isLastDay = today === due;
 
