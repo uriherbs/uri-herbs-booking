@@ -17,6 +17,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { createClient } from '@supabase/supabase-js';
 
 const publicClient = createClient(
@@ -63,6 +64,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // 8 comments per 15 minutes per IP — generous enough for a genuine
+  // back-and-forth, tight enough to stop a script from flooding a post.
+  const rate = await checkRateLimit('comments', getClientIp(request), { maxHits: 8, windowSeconds: 15 * 60 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many comments from this connection. Please try again in a few minutes.' },
+      { status: 429 }
+    );
+  }
+
   let body: any;
   try {
     body = await request.json();
