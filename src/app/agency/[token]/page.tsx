@@ -305,6 +305,7 @@ function BookingCard({ b, token, onChange }: { b: AgencyBooking; token: string; 
             : <div style={{ marginBottom: 8 }}>For our bank details, message us on <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" style={{ color: C.sageDark, fontWeight: 700 }}>WhatsApp</a>.</div>}
           Transfer <strong>{baht(b.net)}</strong> (reference {b.booking_ref}), then upload the slip:
           <input type="file" accept="image/*,application/pdf" disabled={busy} onChange={e => onFile(e.target.files?.[0])} style={{ display: 'block', marginTop: 8 }} />
+          <div style={{ fontSize: 12, color: C.barkLight, marginTop: 4 }}>{busy ? 'Uploading…' : 'A photo or screenshot of the transfer slip (JPG, PNG or PDF).'}</div>
         </div>
       )}
       {open === 'cancel' && (
