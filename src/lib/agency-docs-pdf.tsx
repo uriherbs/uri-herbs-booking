@@ -166,6 +166,7 @@ export async function agencyDocPdf(d: AgencyDocData): Promise<Buffer> {
 
 // ── Load the data for one booking ─────────────────────────────
 const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDateTime = (d: string) => new Date(d).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
 const fmtSlot = (date: string, time: string) => {
   const d = new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
   const [h, m] = String(time).slice(0, 5).split(':').map(Number);
@@ -174,7 +175,7 @@ const fmtSlot = (date: string, time: string) => {
 const METHOD: Record<string, string> = { transfer: 'Bank transfer', stripe: 'Card', paypal: 'PayPal', cash: 'Cash', later: 'Pay on arrival' };
 
 export const AGENCY_DOC_SELECT =
-  'id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, status, payment_status, payment_method, paid_at, total_price_thb, retail_price_thb, payment_due_date, created_at, agency_id, ' +
+  'id, booking_ref, slot_date, start_time, num_participants, is_private, customer_name, status, payment_status, payment_method, paid_at, total_price_thb, retail_price_thb, payment_due_date, agency_pay_deadline, created_at, agency_id, ' +
   'agencies ( company_name, contact_name, email, phone, address, country, license_no, tat_no, portal_token ), packages ( name, calendar_type )';
 
 export function agencyDocData(b: any, kind: AgencyDocKind, siteUrl: string): AgencyDocData {
@@ -189,9 +190,11 @@ export function agencyDocData(b: any, kind: AgencyDocKind, siteUrl: string): Age
     bank
       ? `Or by bank transfer: ${bank} — then upload the transfer slip on your agency page.`
       : `Or by bank transfer — contact us for the bank details (${BUSINESS.email} · WhatsApp ${BUSINESS.phone}) and upload the transfer slip on your agency page.`,
-    b.status === 'pending_payment'
-      ? 'This workshop is less than 14 days away, so payment is needed now to hold the places.'
-      : 'Unpaid bookings are cancelled automatically after the due date.',
+    b.agency_pay_deadline
+      ? `This workshop is less than 14 days away: please pay by ${fmtDateTime(b.agency_pay_deadline)} (Chiang Mai time), otherwise the booking is cancelled automatically.`
+      : b.status === 'pending_payment'
+        ? 'This workshop is less than 14 days away, so payment is needed now to hold the places.'
+        : 'Unpaid bookings are cancelled automatically after the due date.',
   ];
   const rows: [string, string | null | undefined][] = [
     ['Company', a?.company_name], ['Contact person', a?.contact_name], ['Email', a?.email], ['Phone', a?.phone],
@@ -201,7 +204,8 @@ export function agencyDocData(b: any, kind: AgencyDocKind, siteUrl: string): Age
     kind,
     number: `${kind === 'invoice' ? 'INV' : 'RCP'}-${b.booking_ref}`,
     issueDate: fmtDate(b.created_at || new Date()),
-    dueDate: b.payment_due_date ? fmtDate(`${b.payment_due_date}T12:00:00+07:00`) : (b.status === 'pending_payment' ? 'Now (within 30 minutes)' : null),
+    dueDate: b.agency_pay_deadline ? fmtDateTime(b.agency_pay_deadline)
+      : b.payment_due_date ? fmtDate(`${b.payment_due_date}T12:00:00+07:00`) : (b.status === 'pending_payment' ? 'Now (within 30 minutes)' : null),
     paidDate: b.paid_at ? fmtDate(b.paid_at) : null,
     paymentMethod: b.payment_method ? (METHOD[b.payment_method] || b.payment_method) : null,
     agency: rows.filter(([, v]) => typeof v === 'string' && v.trim()).map(([k, v]) => [k, String(v).trim()]),

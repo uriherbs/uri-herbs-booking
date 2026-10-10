@@ -42,6 +42,17 @@ const addDays = (d: string, n: number) => new Date(Date.parse(d + 'T00:00:00Z') 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
 const fmtDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 const fmtTime = (t: string) => { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+// A payment deadline (timestamp) shown in Chiang Mai time, e.g. "1:00 PM today" / "1:00 PM, Sat 11 Oct".
+const fmtDeadline = (iso: string) => {
+  const bkk = new Date(Date.parse(iso) + 7 * 3600 * 1000);
+  const t = fmtTime(`${bkk.getUTCHours()}:${bkk.getUTCMinutes()}`);
+  const day = bkk.toISOString().slice(0, 10);
+  return day === todayStr() ? `${t} today` : `${t}, ${fmtDate(day)}`;
+};
+// Owner rule 2026-10-10: bookings less than 14 days ahead must be paid within
+// 3 hours of booking (1 hour if the workshop is the same day). Mirrors
+// agency_create_booking(), which sets the real deadline.
+const payWindowHours = (workshopDate: string) => (workshopDate === todayStr() ? 1 : 3);
 
 const input: React.CSSProperties = {
   width: '100%', padding: '11px 12px', borderRadius: 10, border: `1.5px solid ${C.sand}`,
@@ -91,7 +102,7 @@ function NewBooking({ token, packages, commission, onCreated }: {
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [payNow, setPayNow] = useState<{ booking_id: string; booking_ref: string; net: number } | null>(null);
+  const [payNow, setPayNow] = useState<{ booking_id: string; booking_ref: string; net: number; hours: number; by: string } | null>(null);
   const [created, setCreated] = useState<{ ref: string; net: number; due: string } | null>(null);
 
   const pkg = packages.find(p => p.slug === slug) || null;
@@ -115,7 +126,11 @@ function NewBooking({ token, packages, commission, onCreated }: {
     setBusy(true);
     try {
       const r = await agencyCreateBooking(token, { package_slug: pkg.slug, date, start_time: time, guests, is_private: isPrivate, client_name: client.trim(), notes });
-      if (r.pay_now) setPayNow({ booking_id: r.booking_id, booking_ref: r.booking_ref, net: r.total_price_thb });
+      if (r.pay_now) {
+        const hours = payWindowHours(date);
+        setPayNow({ booking_id: r.booking_id, booking_ref: r.booking_ref, net: r.total_price_thb, hours, by: fmtDeadline(new Date(Date.now() + hours * 3600 * 1000).toISOString()) });
+        onCreated();
+      }
       else { setCreated({ ref: r.booking_ref, net: r.total_price_thb, due: r.payment_due_date }); onCreated(); }
     } catch (e: any) { setErr(e.message); }
     finally { setBusy(false); }
@@ -138,11 +153,14 @@ function NewBooking({ token, packages, commission, onCreated }: {
   if (payNow) {
     return (
       <div style={{ background: C.white, border: `1.5px solid ${C.gold}`, borderRadius: 16, padding: 18 }}>
-        <div style={{ fontFamily: "'Crimson Pro'", fontSize: 21, fontWeight: 700 }}>Pay now to confirm — {payNow.booking_ref}</div>
+        <div style={{ fontFamily: "'Crimson Pro'", fontSize: 21, fontWeight: 700 }}>Booking reserved — please pay within {payNow.hours} hour{payNow.hours > 1 ? 's' : ''}</div>
         <p style={{ fontSize: 13.5, color: C.bark, lineHeight: 1.6 }}>
-          This workshop is less than 14 days away, so payment is needed now. The places are held for 30 minutes. Amount: <strong>{baht(payNow.net)}</strong>
+          {payNow.booking_ref} · amount <strong>{baht(payNow.net)}</strong>. This workshop is less than 14 days away, so please pay by <strong>{payNow.by}</strong> — online below, or by bank transfer (open “My bookings” → <em>Bank transfer</em> and upload the slip). If it is not paid or no slip is uploaded by then, the booking is cancelled automatically.
         </p>
         <PayPanel booking={{ booking_id: payNow.booking_id, net: payNow.net }} onPaid={() => { setPayNow(null); setCreated(null); onCreated(); }} />
+        <button type="button" onClick={() => { setPayNow(null); setClient(''); setNotes(''); setDate(''); }} style={{ marginTop: 10, padding: '10px 16px', borderRadius: 10, border: `1.5px solid ${C.sand}`, background: C.white, fontWeight: 700, color: C.forest, cursor: 'pointer' }}>
+          Pay later by bank transfer / make another booking
+        </button>
       </div>
     );
   }
@@ -252,6 +270,7 @@ function BookingCard({ b, token, onChange }: { b: AgencyBooking; token: string; 
     : paid ? <Badge text="Paid ✓" tone="ok" />
     : holding ? <Badge text="Awaiting payment (30 min)" tone="bad" />
     : b.proof_sent ? <Badge text="Slip sent — checking" tone="warn" />
+    : b.pay_deadline ? <Badge text={`Unpaid · pay by ${fmtDeadline(b.pay_deadline)}`} tone="bad" />
     : <Badge text={`Unpaid · due ${b.due ? fmtDate(b.due) : ''}`} tone={b.due && b.due <= today ? 'bad' : 'warn'} />;
 
   const doCancel = async () => {
@@ -421,6 +440,7 @@ export default function AgencyPortalPage() {
 
             <div style={{ margin: '20px 16px 0', fontSize: 12.5, color: C.barkLight, lineHeight: 1.6 }}>
               Payment is due 14 days before each workshop (we remind you 18 days before and on the due date; unpaid bookings are cancelled after the due date).
+              Booking less than 14 days ahead? Please pay within 3 hours of booking (1 hour for a same-day workshop), online or by bank transfer with the slip uploaded — otherwise the booking is cancelled automatically.
               Cancellation: 7+ days before = full refund · 1–6 days = 30% fee · same day = no refund. Questions? <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" style={{ color: C.sageDark }}>WhatsApp us</a>.
             </div>
           </>
