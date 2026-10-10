@@ -209,9 +209,12 @@ throw { code: 'VALIDATION_ERROR', message: errors.join('. ') } as any;  }
 // recalculates bookings.total_price_thb on the server, so PayPal,
 // card and pay-on-arrival all use the discounted amount. An empty
 // code removes the coupon again.
-export async function applyCoupon(bookingRef: string, code: string): Promise<CouponResult> {
+// bookingId (from create_booking) is required by the server together with
+// the ref, so a guessed ref alone can't touch someone else's booking.
+export async function applyCoupon(bookingRef: string, bookingId: string, code: string): Promise<CouponResult> {
   const { data, error } = await supabase.rpc('apply_coupon', {
     p_booking_ref: bookingRef.trim().toUpperCase(),
+    p_booking_id: bookingId,
     p_code: code.trim(),
   });
   if (error) {
@@ -236,11 +239,12 @@ export async function applyCoupon(bookingRef: string, code: string): Promise<Cou
 // equivalent of this).
 //
 // Usage:
-//   const result = await confirmPayLaterBooking('URI-20260728-001');
+//   const result = await confirmPayLaterBooking('URI-20260728-001', bookingId);
 //   → { booking_ref: 'URI-20260728-001', status: 'confirmed', ... }
 
 export async function confirmPayLaterBooking(
-  bookingRef: string
+  bookingRef: string,
+  bookingId: string
 ): Promise<PaymentConfirmation> {
   if (!bookingRef?.trim()) {
     throw { code: 'BOOKING_NOT_FOUND', message: 'Booking reference is required' };
@@ -248,6 +252,7 @@ export async function confirmPayLaterBooking(
 
   const { data, error } = await supabase.rpc('confirm_pay_later_booking', {
     p_booking_ref: bookingRef.trim().toUpperCase(),
+    p_booking_id: bookingId,
   });
 
   if (error) {
@@ -399,11 +404,12 @@ export async function createManualBooking(
 // immediately instead of waiting for the 30-min abandonment cleanup.
 //
 // Usage:
-//   const result = await cancelBooking('URI-20260728-001');
+//   const result = await cancelBooking('URI-20260728-001', bookingId);
 //   → { booking_ref: 'URI-20260728-001', status: 'cancelled', freed_spots: 2 }
 
 export async function cancelBooking(
-  bookingRef: string
+  bookingRef: string,
+  bookingId: string
 ): Promise<CancelConfirmation> {
   if (!bookingRef?.trim()) {
     throw { code: 'BOOKING_NOT_FOUND', message: 'Booking reference is required' };
@@ -411,6 +417,7 @@ export async function cancelBooking(
 
   const { data, error } = await supabase.rpc('cancel_booking', {
     p_booking_ref: bookingRef.trim().toUpperCase(),
+    p_booking_id: bookingId,
   });
 
   if (error) {

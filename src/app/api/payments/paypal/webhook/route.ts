@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 import { PAYPAL_API_BASE, getPayPalAccessToken } from '@/lib/paypal-server';
-import { sendBookingConfirmationEmails } from '@/lib/notifications';
+import { sendBookingConfirmationEmails, sendPaymentMismatchEmail } from '@/lib/notifications';
 import { sendAgencyPaidEmail } from '@/lib/agency-emails';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
 
@@ -95,14 +95,24 @@ export async function POST(request: NextRequest) {
       const orderId = resource?.supplementary_data?.related_ids?.order_id;
 
       let bookingRef: string | null = null;
+      let bookingTotal: number | null = null;
       if (bookingId) {
-        const { data: booking } = await db.from('bookings').select('booking_ref').eq('id', bookingId).single();
+        const { data: booking } = await db.from('bookings').select('booking_ref, total_price_thb').eq('id', bookingId).single();
         bookingRef = booking?.booking_ref ?? null;
+        bookingTotal = booking?.total_price_thb ?? null;
       }
 
       if (!bookingRef) {
         console.error('PAYMENT.CAPTURE.COMPLETED with no resolvable booking:', bookingId, orderId);
         return NextResponse.json({ received: true });
+      }
+
+      // Never confirm a booking for less than its current total.
+      const paidValue = parseFloat(resource?.amount?.value ?? '0');
+      if (bookingTotal != null && paidValue + 0.01 < bookingTotal) {
+        console.error(`PayPal amount mismatch for ${bookingRef}: paid ${paidValue}, total ${bookingTotal}`);
+        await sendPaymentMismatchEmail({ bookingRef, provider: 'PayPal', paidThb: paidValue, expectedThb: bookingTotal, providerRef: orderId ?? null });
+        return NextResponse.json({ received: true, mismatch: true });
       }
 
       const { error } = await db.rpc('confirm_booking_payment', {

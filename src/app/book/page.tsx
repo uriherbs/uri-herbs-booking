@@ -1930,7 +1930,7 @@ export default function BookingFlow() {
   // Apply / remove a coupon on the pending booking (Payment step).
   const handleApplyCoupon = useCallback(async (code: string) => {
     if (!result?.booking_ref) return;
-    const c = await applyCoupon(result.booking_ref, code);
+    const c = await applyCoupon(result.booking_ref, result.booking_id, code);
     patchResult({
       total_price_thb: c.total_price_thb,
       discount_thb: c.discount_thb,
@@ -2015,7 +2015,7 @@ export default function BookingFlow() {
 
       setConfirmingPayLater(true);
       try {
-        await confirmPayLaterBooking(result.booking_ref);
+        await confirmPayLaterBooking(result.booking_ref, result.booking_id);
       } catch (err: any) {
         setErrors(e => ({ ...e, submit: err.message || "Something went wrong. Please try again." }));
         setConfirmingPayLater(false);
@@ -2046,7 +2046,7 @@ export default function BookingFlow() {
       // Backing out of payment deliberately — free the slot right now
       // instead of leaving it locked until the 30-min abandonment
       // cleanup. Best-effort: if this fails, the cron still catches it.
-      cancelBooking(result.booking_ref).catch(() => {});
+      cancelBooking(result.booking_ref, result.booking_id).catch(() => {});
       resetBooking();
       setPaymentMethod(null);
       setAgreedToTerms(false);
@@ -2066,7 +2066,7 @@ export default function BookingFlow() {
       return;
     }
     if (step === 3 && result?.booking_ref) {
-      cancelBooking(result.booking_ref).catch(() => {});
+      cancelBooking(result.booking_ref, result.booking_id).catch(() => {});
     }
     router.push('/');
   };

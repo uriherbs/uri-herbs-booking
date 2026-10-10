@@ -1365,3 +1365,21 @@ Message:
 ${data.message}
 `.trim();
 }
+
+// Payment received for less than the booking's total (e.g. the coupon was
+// changed after the payment was started). The booking is NOT confirmed;
+// the shop is told so it can sort it out with the customer.
+export async function sendPaymentMismatchEmail(info: {
+  bookingRef: string; provider: string; paidThb: number; expectedThb: number; providerRef?: string | null;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  const line = `${info.provider} payment for ${info.bookingRef}: paid ฿${info.paidThb.toLocaleString('en-US')}, booking total ฿${info.expectedThb.toLocaleString('en-US')}.`;
+  await sendEmailViaResend({
+    to: OWNER_EMAIL,
+    subject: `⚠️ Payment amount does not match — ${info.bookingRef}`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#2d4639"><p><strong>⚠️ ${escapeHtml(line)}</strong></p>
+      <p>The booking was <strong>not</strong> confirmed. Check the payment in ${escapeHtml(info.provider)}${info.providerRef ? ` (${escapeHtml(info.providerRef)})` : ''}, then refund it or confirm the booking by hand in admin.</p></div>`,
+    text: `${line} The booking was NOT confirmed. Check the payment${info.providerRef ? ` (${info.providerRef})` : ''}, then refund it or confirm the booking by hand in admin.`,
+  }, apiKey).catch((err: any) => console.error('sendPaymentMismatchEmail failed:', err?.message));
+}

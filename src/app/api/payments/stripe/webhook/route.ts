@@ -20,8 +20,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
-import { getStripe } from '@/lib/stripe-server';
-import { sendBookingConfirmationEmails } from '@/lib/notifications';
+import { getStripe, thbToSatang } from '@/lib/stripe-server';
+import { sendBookingConfirmationEmails, sendPaymentMismatchEmail } from '@/lib/notifications';
 import { sendAgencyPaidEmail } from '@/lib/agency-emails';
 import { syncBookingToCalendar } from '@/lib/google-calendar';
 
@@ -79,6 +79,16 @@ export async function POST(request: NextRequest) {
       if (!bookingRef) {
         console.error('payment_intent.succeeded with no booking_ref in metadata:', intent.id);
         return NextResponse.json({ received: true });
+      }
+
+      // Never confirm a booking for less than its current total (the
+      // coupon could have been changed after this payment was started).
+      const { data: priced } = await db.from('bookings').select('total_price_thb').eq('booking_ref', bookingRef).maybeSingle();
+      const paidSatang = Number(intent.amount_received ?? intent.amount ?? 0);
+      if (priced && paidSatang < thbToSatang(priced.total_price_thb)) {
+        console.error(`Stripe amount mismatch for ${bookingRef}: paid ${paidSatang} satang, total ${priced.total_price_thb} THB`);
+        await sendPaymentMismatchEmail({ bookingRef, provider: 'Stripe', paidThb: paidSatang / 100, expectedThb: priced.total_price_thb, providerRef: intent.id });
+        return NextResponse.json({ received: true, mismatch: true });
       }
 
       const { data, error } = await db.rpc('confirm_booking_payment', {
