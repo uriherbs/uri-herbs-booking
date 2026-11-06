@@ -16,7 +16,7 @@ import { getServiceClient } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmailViaResend, SITE_URL } from '@/lib/notifications';
 import { LANDING_PAGES } from '@/lib/landing-pages';
-import { buildLeadGiftEmail } from '@/lib/lead-emails';
+import { buildLeadGiftEmail, LEAD_EMAIL_REPLY_TO } from '@/lib/lead-emails';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const clean = (v: unknown, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   if (apiKey) {
     try {
       const mail = buildLeadGiftEmail(page, name, SITE_URL);
-      await sendEmailViaResend({ to: email, subject: mail.subject, html: mail.html, text: mail.text }, apiKey);
+      await sendEmailViaResend({ to: email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: LEAD_EMAIL_REPLY_TO }, apiKey);
       await db.from('leads').update({ email_sent_at: new Date().toISOString() }).eq('id', data.id);
     } catch (err: any) {
       // The lead is saved and the page already shows the gift — log only.

@@ -228,7 +228,7 @@ function Gift({ config, bookHref, firstName }: { config: LandingPageConfig; book
       <div style={{ fontSize: 34 }} aria-hidden>🌿</div>
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, margin: 0 }}>Thank you{firstName ? `, ${firstName}` : ''}!</h2>
       <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: C.bark }}>
-        Your recipes are on the way to your inbox. You can also download them right now.
+        Your recipes are on the way to your inbox (check Promotions if you don't see them). You can also download them right now.
       </p>
       <a href={config.pdfUrl} target="_blank" rel="noopener noreferrer" className="lp-btn" style={{ background: C.sageDark, color: C.white }}>
         Download the recipe card (PDF)

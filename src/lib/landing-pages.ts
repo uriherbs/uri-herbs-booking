@@ -58,7 +58,7 @@ export const TEA_RECIPES: LandingPageConfig = {
   ],
   couponCode: 'TEA10',
   couponText: '10% off your Tea Blending workshop',
-  couponValidity: 'Valid for 30 days · applied automatically from the booking link',
+  couponValidity: 'Valid until 6 Dec 2026 · limited number of uses · take a screenshot to keep it',
   pdfUrl: '/downloads/uri-herbs-tea-recipes.pdf',
   defaultSource: 'tea-recipes-page',
   recipes: [
