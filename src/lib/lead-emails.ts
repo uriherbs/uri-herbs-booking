@@ -7,13 +7,14 @@
 // 2026-11-06: the first version landed in Gmail's Promotions tab).
 // Gmail sorts by how a message looks, so this version has:
 //   - plain text-style HTML: no coloured header, no buttons, no images
-//   - one link (the recipe card PDF) plus the website in the signature
+//   - one link (the recipes page: PDF + videos) plus the website in the signature
 //   - the personal code (2026-11-07: email is now the ONLY place the
 //     gift is delivered) sits in a plain-text P.S., no big coupon box;
 //     no "unsubscribe" wording — opt-out is a plain "just reply" line
 //   - a question that invites a reply (replies teach Gmail the sender
 //     is wanted); Reply-To is info@uriherbs.com
-// The recipes stay in the body so the email is useful on its own.
+// 2026-11-07: 13 recipes are too long for the body, so the email lists
+// the names with their one-line tagline and links to the recipes page.
 // ============================================================
 
 import type { LandingPageConfig, LeadOffer } from './landing-pages';
@@ -30,7 +31,7 @@ const fmtDate = (iso: string) =>
 
 export function buildLeadGiftEmail(page: LandingPageConfig, name: string, siteUrl: string, coupon: LeadCoupon | null = null) {
   const first = name.split(/\s+/)[0] || name;
-  const pdf = `${siteUrl}${page.pdfUrl}`;
+  const recipesUrl = `${siteUrl}${page.recipesPageUrl}`;
   const subject = 'Your tea recipes from Uri Herbs';
 
   const p = (html: string) => `<p style="margin:0 0 14px;">${html}</p>`;
@@ -42,22 +43,16 @@ export function buildLeadGiftEmail(page: LandingPageConfig, name: string, siteUr
     : '';
   const psHtml = psText ? p(esc(psText).replace(esc(book), `<a href="${book}">${esc(book.replace(/^https?:\/\//, ''))}</a>`)) : '';
 
-  const recipesHtml = page.recipes
-    .map(
-      (r, i) =>
-        p(
-          `<strong>${i + 1}. ${esc(r.name)}</strong><br/>` +
-            r.ingredients.map((x) => esc(x)).join('<br/>') +
-            `<br/>${esc(r.method)}`
-        )
-    )
-    .join('');
+  const recipesHtml = p(
+    page.recipes.map((r, i) => `${i + 1}. <strong>${esc(r.name)}</strong> – ${esc(r.tagline)}`).join('<br/>')
+  );
 
   const html = `<!doctype html><html><body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#222;">
 <div style="max-width:560px;">
 ${p(`Hi ${esc(first)},`)}
-${p(`Thank you for stopping by! Here are the ${page.recipes.length} Thai herbal teas we promised. A printable recipe card is here: <a href="${pdf}">${pdf.replace(/^https?:\/\//, '')}</a>`)}
+${p(`Thank you for stopping by! Here are the ${page.recipes.length} Thai herbal teas we brew in our workshop. Every recipe has a fresh-herb version and a tea-bag version.`)}
 ${recipesHtml}
+${p(`The full recipes (printable PDF) are here: <a href="${recipesUrl}">${recipesUrl.replace(/^https?:\/\//, '')}</a>`)}
 ${p('Which one will you try first? Just reply and tell me — I read every message.')}
 ${p(`Warmly,<br/>Mali<br/>Uri Herbs Workshop, Chiang Mai Old City<br/><a href="${siteUrl}">uriherbs.com</a> · WhatsApp +66 64 334 9890`)}
 ${psHtml}
@@ -67,10 +62,12 @@ ${psHtml}
   const text = [
     `Hi ${first},`,
     '',
-    `Thank you for stopping by! Here are the ${page.recipes.length} Thai herbal teas we promised.`,
-    `Printable recipe card: ${pdf}`,
+    `Thank you for stopping by! Here are the ${page.recipes.length} Thai herbal teas we brew in our workshop. Every recipe has a fresh-herb version and a tea-bag version.`,
     '',
-    ...page.recipes.flatMap((r, i) => [`${i + 1}. ${r.name}`, ...r.ingredients, r.method, '']),
+    ...page.recipes.map((r, i) => `${i + 1}. ${r.name} – ${r.tagline}`),
+    '',
+    `The full recipes (printable PDF) are here: ${recipesUrl}`,
+    '',
     'Which one will you try first? Just reply and tell me — I read every message.',
     '',
     'Warmly,',

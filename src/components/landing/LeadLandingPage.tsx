@@ -193,11 +193,11 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
       {/* Recipe teaser */}
       <section style={{ background: C.white, borderTop: `1px solid ${C.sand}`, borderBottom: `1px solid ${C.sand}` }}>
         <div className="lp-wrap" style={{ paddingTop: 36, paddingBottom: 36 }}>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, margin: '0 0 18px' }}>Inside the recipe card</h2>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, margin: '0 0 18px' }}>Inside the recipe book</h2>
           <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             {config.recipes.map((r, i) => (
               <li key={r.name} style={{ background: C.parchment, borderRadius: 16, padding: '16px 16px' }}>
-                <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, letterSpacing: 1 }}>RECIPE {i + 1}</div>
+                <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, letterSpacing: 1 }}>RECIPE {String(i + 1).padStart(2, '0')}</div>
                 <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 700, margin: '4px 0 2px' }}>{r.name}</div>
                 <div style={{ fontSize: 14, color: C.barkLight }}>{r.tagline}</div>
               </li>
@@ -281,7 +281,7 @@ function RedNoteBox() {
           {copied ? '已复制 ✓' : '复制'}
         </button>
       </div>
-      <div style={{ marginTop: 10, fontSize: 14 }}>下面留下邮箱，我们会把 5 款泰式草本茶配方和一张送给朋友的 9 折优惠码发给你。</div>
+      <div style={{ marginTop: 10, fontSize: 14 }}>下面留下邮箱，我们会把 13 款泰式草本茶配方和一张送给朋友的 9 折优惠码发给你。</div>
     </div>
   );
 }

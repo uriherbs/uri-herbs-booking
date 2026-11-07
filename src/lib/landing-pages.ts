@@ -9,17 +9,27 @@
 //   3. put the gift PDF in public/downloads/
 //   4. create the coupon code in Admin → Coupons
 //
-// The tea page is first (event 9–11 Nov 2026, 80–100 guests). The
-// recipes below are a DRAFT for the owner to approve — flavour words
-// only, no health claims (same rule as the workshop pages).
+// The tea page is first (event 9–11 Nov 2026, 80–100 guests). Its
+// recipes are the 13 from the workshop recipe book (owner-approved
+// 2026-11-07): traditional-use wording only, no medical claims.
 // ============================================================
 
 export interface Recipe {
   name: string;
-  tagline: string;
-  ingredients: string[];
-  method: string;
+  tagline: string;              // the "benefit" line from the recipe card menu page
 }
+
+/**
+ * Recipes page (/tea-recipes/full), linked from the gift email.
+ * Paste the YouTube video id (the part after watch?v=) and the playlist
+ * link here when the videos are up; until then the page shows
+ * "video coming soon" and no playlist button.
+ */
+export const RECIPE_VIDEOS: { overviewYoutubeId: string | null; playlistUrl: string | null } = {
+  overviewYoutubeId: null,
+  playlistUrl: null,
+};
+export const RECIPES_PAGE_PATH = '/tea-recipes/full';
 
 /**
  * What a guest gets, chosen by the ?src= of the link/QR they came from
@@ -54,6 +64,7 @@ export interface LandingPageConfig {
   offers: LeadOffer[];
   pdfUrl: string;               // public/downloads/...
   recipes: Recipe[];
+  recipesPageUrl: string;       // the page the email links to (PDF + videos)
   defaultSource: string;        // stored when the URL has no ?src=
 }
 
@@ -71,15 +82,15 @@ export const TEA_RECIPES: LandingPageConfig = {
   workshopUrl: '/workshops/tea-blending',
   bookUrl: '/book',
   heroImage: '/workshop-tea-blending.jpg',
-  eyebrow: 'Free recipe card · Uri Herbs Workshop, Chiang Mai',
-  title: '5 Thai herbal teas you can make at home',
+  eyebrow: 'Free recipe book · Uri Herbs Workshop, Chiang Mai',
+  title: '13 Thai herbal teas you can make at home',
   subtitle:
-    'Simple blends from the herbs we use in our tea workshop. Leave your email and we send you the recipe card, plus a discount for your own blending session in Chiang Mai.',
+    'The 13 blends we brew in our tea workshop, each with a fresh-herb and a tea-bag version. Leave your email and we send you the recipe book, plus a discount for your own blending session in Chiang Mai.',
   giftTitle: 'What you get',
   giftPoints: [
-    '5 Thai herbal tea recipes (PDF recipe card)',
+    '13 Thai herbal tea recipes from our workshop (printable PDF)',
+    'Fresh-herb and tea-bag versions of every blend',
     'A personal 10% code for our workshops (sent with the recipes)',
-    'Tips from our instructor on brewing and storing herbs',
   ],
   offers: [
     {
@@ -106,38 +117,24 @@ export const TEA_RECIPES: LandingPageConfig = {
   ],
   pdfUrl: '/downloads/uri-herbs-tea-recipes.pdf',
   defaultSource: 'tea-recipes-page',
+  // The 13 workshop recipes (owner-approved PDF, 2026-11-07). Taglines =
+  // the "Main benefits" column of the PDF menu page; keep them in sync.
   recipes: [
-    {
-      name: 'Lemongrass & Pandan',
-      tagline: 'Fresh, grassy and gently sweet',
-      ingredients: ['2 stalks fresh lemongrass, bruised and cut', '2 pandan leaves, knotted', '500 ml water', 'Honey to taste (optional)'],
-      method: 'Bring the water to a boil, add lemongrass and pandan, then simmer for 8–10 minutes. Strain and sweeten if you like. Lovely hot or over ice.',
-    },
-    {
-      name: 'Butterfly Pea & Lime',
-      tagline: 'The blue tea that turns purple',
-      ingredients: ['1 tbsp dried butterfly pea flowers', '1 stalk lemongrass', '400 ml hot water (not boiling)', 'A squeeze of lime'],
-      method: 'Steep the flowers and lemongrass for 5 minutes until deep blue. Strain, then add the lime at the table and watch the colour change.',
-    },
-    {
-      name: 'Roselle Iced Tea',
-      tagline: 'Tart, ruby red and refreshing',
-      ingredients: ['2 tbsp dried roselle (krajeab)', '500 ml water', '1–2 tbsp palm sugar', 'Ice and mint to serve'],
-      method: 'Simmer the roselle for 5 minutes, stir in the palm sugar until it dissolves, then cool. Pour over ice with a few mint leaves.',
-    },
-    {
-      name: 'Ginger, Lemongrass & Kaffir Lime',
-      tagline: 'Warm and zesty for cool evenings',
-      ingredients: ['4 thin slices fresh ginger', '1 stalk lemongrass', '2 kaffir lime leaves, torn', '500 ml water'],
-      method: 'Simmer everything for 10 minutes. Strain and enjoy warm. Add a little honey if you like it softer.',
-    },
-    {
-      name: 'Chrysanthemum & Goji',
-      tagline: 'Soft, floral and lightly sweet',
-      ingredients: ['1 tbsp dried chrysanthemum flowers', '1 tsp goji berries', '400 ml hot water', 'Rock sugar to taste (optional)'],
-      method: 'Steep the flowers and goji for 5–7 minutes. Strain, sweeten if you like, and sip slowly.',
-    },
+    { name: "Moon Cycle Soothe", tagline: "Traditional warming brew for women's monthly comfort" },
+    { name: "The End of Numb", tagline: "Thai \"wind\" herbs to warm cold hands and feet" },
+    { name: "Thai Shield Elixir", tagline: "Daily Thai tonic to keep the body warm and strong" },
+    { name: "Siam Sunset Sip", tagline: "Warm spices to settle the belly after a meal" },
+    { name: "Happy Gut Harmony", tagline: "After-meal brew for a light, easy belly" },
+    { name: "Zen Weight Wellness", tagline: "Black ginger for energy, a light cup after meals" },
+    { name: "Siam Sugar Stopper", tagline: "Tart Thai fruits to cool and refresh the body" },
+    { name: "Siam Slim Sip", tagline: "The Thai leaf that tames a sweet tooth" },
+    { name: "Chiang Mai Clarity", tagline: "Thai blue flower tea for a fresh, clear mind" },
+    { name: "Zen Head", tagline: "Cooling Thai herbs to ease a busy, heavy head" },
+    { name: "Golden Peace", tagline: "Golden roots and lemongrass to ground body and mind" },
+    { name: "Kraphao Holy Harmony", tagline: "Holy basil to calm the mind and settle the stomach" },
+    { name: "Siam Floral Whisper", tagline: "Thai flowers to cool the body and soothe the heart" },
   ],
+  recipesPageUrl: RECIPES_PAGE_PATH,
 };
 
 export const LANDING_PAGES: Record<string, LandingPageConfig> = {
