@@ -21,6 +21,25 @@ export interface Recipe {
   method: string;
 }
 
+/**
+ * What a guest gets, chosen by the ?src= of the link/QR they came from
+ * (owner decisions 2026-11-07): a PERSONAL code per guest — one use,
+ * valid 90 days, 10% — minted by /api/leads. Matching is by prefix, in
+ * order; the last offer with sourcePrefixes [] is the default.
+ * Plain data only (this config is passed to a client component).
+ */
+export interface LeadOffer {
+  key: string;
+  sourcePrefixes: string[];     // e.g. ['event'] matches event-nov26
+  tag: string;                  // saved on the lead, used in Admin → Leads and the monthly report
+  couponPrefix: string;         // personal code looks like TEA-7K2F
+  percent: number;
+  packageSlugs: string[] | null; // null = every workshop
+  validDays: number;
+  giftLine: string;             // shown on the page and in the email
+  forFriend?: boolean;          // "share this code with a friend"
+}
+
 export interface LandingPageConfig {
   slug: string;                 // URL path and leads.landing value
   workshopName: string;         // shown in the email
@@ -32,13 +51,19 @@ export interface LandingPageConfig {
   subtitle: string;
   giftTitle: string;            // what the guest gets
   giftPoints: string[];
-  couponCode: string;           // must exist in Admin → Coupons
-  couponText: string;           // e.g. "10% off your tea workshop"
-  couponValidity: string;       // e.g. "Valid for 30 days"
+  offers: LeadOffer[];
   pdfUrl: string;               // public/downloads/...
   recipes: Recipe[];
   defaultSource: string;        // stored when the URL has no ?src=
 }
+
+// Our RedNote (Xiaohongshu) account — shown to Chinese guests (?src=shop-cn).
+// Owner 2026-11-07: guest posts a note about the workshop and tags us, then
+// shows it to staff for a small gift. Framed as "share", never "review".
+export const REDNOTE = { name: 'URI Herbs｜悠理草本', id: '49979919163' };
+
+// Every package that includes the tea workshop.
+const TEA_PACKAGES = ['single-tea', 'combo-tea-inhaler', 'combo-tea-ball', 'journey-full'];
 
 export const TEA_RECIPES: LandingPageConfig = {
   slug: 'tea-recipes',
@@ -53,12 +78,32 @@ export const TEA_RECIPES: LandingPageConfig = {
   giftTitle: 'What you get',
   giftPoints: [
     '5 Thai herbal tea recipes (PDF recipe card)',
-    'A discount code for our hands-on tea blending workshop',
+    'A personal 10% code for our workshops (sent with the recipes)',
     'Tips from our instructor on brewing and storing herbs',
   ],
-  couponCode: 'TEA10',
-  couponText: '10% off your Tea Blending workshop',
-  couponValidity: 'Valid for 30 days · applied automatically from the booking link',
+  offers: [
+    {
+      // Shop customers after a workshop — they already came, so the code is for a friend.
+      key: 'shop', sourcePrefixes: ['shop'], tag: 'shop-customer', couponPrefix: 'FRIEND',
+      percent: 10, packageSlugs: null, validDays: 90, forFriend: true,
+      giftLine: 'A personal code for a friend: 10% off any workshop',
+    },
+    {
+      key: 'event', sourcePrefixes: ['event'], tag: 'event', couponPrefix: 'TEA',
+      percent: 10, packageSlugs: TEA_PACKAGES, validDays: 90,
+      giftLine: 'Your personal code: 10% off a tea blending workshop',
+    },
+    {
+      key: 'social', sourcePrefixes: ['instagram', 'facebook', 'fb', 'tiktok', 'rednote', 'ads'], tag: 'social', couponPrefix: 'TEA',
+      percent: 10, packageSlugs: TEA_PACKAGES, validDays: 90,
+      giftLine: 'Your personal code: 10% off a tea blending workshop',
+    },
+    {
+      key: 'default', sourcePrefixes: [], tag: 'website', couponPrefix: 'TEA',
+      percent: 10, packageSlugs: TEA_PACKAGES, validDays: 90,
+      giftLine: 'Your personal code: 10% off a tea blending workshop',
+    },
+  ],
   pdfUrl: '/downloads/uri-herbs-tea-recipes.pdf',
   defaultSource: 'tea-recipes-page',
   recipes: [
@@ -98,3 +143,13 @@ export const TEA_RECIPES: LandingPageConfig = {
 export const LANDING_PAGES: Record<string, LandingPageConfig> = {
   [TEA_RECIPES.slug]: TEA_RECIPES,
 };
+
+/** The offer for a given ?src= value (shop-cn → shop, event-nov26 → event…). */
+export function pickOffer(page: LandingPageConfig, src: string): LeadOffer {
+  const s = src.toLowerCase();
+  return (
+    page.offers.find((o) => o.sourcePrefixes.some((p) => s === p || s.startsWith(`${p}-`) || s.startsWith(p))) ||
+    page.offers.find((o) => o.sourcePrefixes.length === 0) ||
+    page.offers[page.offers.length - 1]
+  );
+}

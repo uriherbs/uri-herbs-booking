@@ -17,10 +17,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { LandingPageConfig } from '@/lib/landing-pages';
+import { REDNOTE, type LandingPageConfig } from '@/lib/landing-pages';
+import { EMAIL_RE, suggestEmail } from '@/lib/email-typos';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CONSENT_TEXT =
   'Send me the recipes and occasional news and offers from Uri Herbs Workshop. I can unsubscribe at any time.';
 const MAPS_URL =
@@ -38,6 +38,9 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<Record<string, string>>({});
+  const [sentTo, setSentTo] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState(false); // guest kept an address we flagged as a possible typo
+  const typoHint = !confirmEmail ? suggestEmail(email.trim()) : null;
 
   // ?src=event-nov26&utm_source=... from the QR code / link.
   useEffect(() => {
@@ -52,7 +55,7 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
     } catch { /* ignore */ }
   }, []);
 
-  const bookHref = `${config.bookUrl}?code=${encodeURIComponent(config.couponCode)}&utm_source=landing&utm_medium=web&utm_campaign=${config.slug}`;
+  const bookHref = `${config.bookUrl}?utm_source=landing&utm_medium=web&utm_campaign=${config.slug}`;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,11 +69,12 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          landing: config.slug, name, email, phone, country, consent, consentText: CONSENT_TEXT, company, ...tracking,
+          landing: config.slug, name, email, phone, country, consent, consentText: CONSENT_TEXT, company, confirmEmail, ...tracking,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+      setSentTo(data.email || email.trim().toLowerCase());
       setStatus('done');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
@@ -123,8 +127,15 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
 
           {/* Form or gift (phone: right after the headline; desktop: right column) */}
           <div className="lp-form" style={{ background: C.white, borderRadius: 22, padding: '24px 20px', boxShadow: '0 10px 30px rgba(45,70,57,0.08)', border: `1px solid ${C.sand}` }}>
+            {(tracking.src || '').toLowerCase().startsWith('shop-cn') && <RedNoteBox />}
             {status === 'done' ? (
-              <Gift config={config} bookHref={bookHref} firstName={name.trim().split(/\s+/)[0]} />
+              <Gift
+                config={config}
+                bookHref={bookHref}
+                firstName={name.trim().split(/\s+/)[0]}
+                sentTo={sentTo}
+                onFix={() => { setStatus('idle'); setConfirmEmail(false); setTimeout(() => document.getElementById('lp-email')?.focus(), 50); }}
+              />
             ) : (
               <form onSubmit={submit} noValidate>
                 <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, margin: '0 0 6px' }}>{config.giftTitle}</h2>
@@ -141,7 +152,15 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
                     <input id="lp-name" className="lp-input" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
                   </Field>
                   <Field label="Email (we send the recipes here)" id="lp-email">
-                    <input id="lp-email" className="lp-input" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <input id="lp-email" className="lp-input" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setConfirmEmail(false); }} />
+                    {typoHint && (
+                      <div style={{ fontSize: 13.5, marginTop: 6, color: C.bark }}>
+                        Did you mean{' '}
+                        <button type="button" onClick={() => setEmail(typoHint)} style={{ background: 'none', border: 'none', padding: 0, color: C.sageDark, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 13.5 }}>{typoHint}</button>
+                        ?{' '}
+                        <button type="button" onClick={() => setConfirmEmail(true)} style={{ background: 'none', border: 'none', padding: 0, color: C.barkLight, textDecoration: 'underline', cursor: 'pointer', fontSize: 12.5 }}>No, mine is correct</button>
+                      </div>
+                    )}
                   </Field>
                   <Field label="WhatsApp (optional)" id="lp-phone">
                     <input id="lp-phone" className="lp-input" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -222,26 +241,47 @@ function Field({ label, id, children }: { label: string; id: string; children: R
   );
 }
 
-function Gift({ config, bookHref, firstName }: { config: LandingPageConfig; bookHref: string; firstName: string }) {
+function Gift({ config, bookHref, firstName, sentTo, onFix }: { config: LandingPageConfig; bookHref: string; firstName: string; sentTo: string; onFix: () => void }) {
   return (
     <div style={{ textAlign: 'center', display: 'grid', gap: 12 }}>
       <div style={{ fontSize: 34 }} aria-hidden>🌿</div>
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, margin: 0 }}>Thank you{firstName ? `, ${firstName}` : ''}!</h2>
-      <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: C.bark }}>
-        Your recipes are on the way to your inbox. You can also download them right now.
+      <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: C.bark }}>
+        We sent your {config.recipes.length} tea recipes and your personal 10% code to
       </p>
-      <a href={config.pdfUrl} target="_blank" rel="noopener noreferrer" className="lp-btn" style={{ background: C.sageDark, color: C.white }}>
-        Download the recipe card (PDF)
-      </a>
-      <div style={{ background: C.sageLight, borderRadius: 16, padding: '18px 14px', marginTop: 6 }}>
-        <div style={{ fontSize: 12, letterSpacing: 2, color: C.sageDark, fontWeight: 700 }}>YOUR GIFT</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, margin: '4px 0 8px' }}>{config.couponText}</div>
-        <div style={{ display: 'inline-block', fontSize: 26, fontWeight: 700, letterSpacing: 4, border: `2px dashed ${C.sage}`, borderRadius: 12, padding: '8px 18px', background: C.white }}>
-          {config.couponCode}
-        </div>
-        <div style={{ fontSize: 13, color: C.bark, marginTop: 8 }}>{config.couponValidity}</div>
+      <div style={{ fontWeight: 700, fontSize: 16, color: C.forest, wordBreak: 'break-all' }}>{sentTo}</div>
+      <button type="button" onClick={onFix} style={{ background: 'none', border: 'none', color: C.sageDark, textDecoration: 'underline', cursor: 'pointer', fontSize: 14 }}>
+        Not your email? Fix it
+      </button>
+      <div style={{ background: C.sageLight, borderRadius: 16, padding: '14px 14px', fontSize: 14, color: C.bark, lineHeight: 1.5 }}>
+        It arrives within a minute. Can't see it? Check the <strong>Promotions</strong> or <strong>Spam</strong> folder.
       </div>
-      <Link href={bookHref} className="lp-btn" style={{ background: C.forest, color: C.white }}>Book your tea workshop</Link>
+      <Link href={bookHref} className="lp-btn" style={{ background: C.forest, color: C.white }}>See our workshops</Link>
+    </div>
+  );
+}
+
+/** Chinese guests in the shop (?src=shop-cn): share on RedNote, tag us, get a small gift. */
+function RedNoteBox() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(REDNOTE.id); setCopied(true); } catch { /* ignore */ }
+  };
+  return (
+    <div lang="zh-CN" style={{ background: '#FFF4F4', border: '1px solid #F3C9C9', borderRadius: 16, padding: '16px 16px', marginBottom: 18, color: C.bark, fontSize: 15, lineHeight: 1.6 }}>
+      <div style={{ fontWeight: 700, fontSize: 17, color: '#C0392B', marginBottom: 6 }}>🎁 小红书分享礼</div>
+      <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 4 }}>
+        <li>在小红书发一篇笔记，分享你今天的手作体验（照片或视频都可以）</li>
+        <li>标记 <strong>@{REDNOTE.name}</strong></li>
+        <li>把笔记给我们的工作人员看，即可领取一份小礼物 🌿</li>
+      </ol>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+        <span>小红书号：<strong>{REDNOTE.id}</strong></span>
+        <button type="button" onClick={copy} style={{ border: '1px solid #C0392B', background: C.white, color: '#C0392B', borderRadius: 999, padding: '4px 12px', fontSize: 13, cursor: 'pointer' }}>
+          {copied ? '已复制 ✓' : '复制'}
+        </button>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 14 }}>下面留下邮箱，我们会把 5 款泰式草本茶配方和一张送给朋友的 9 折优惠码发给你。</div>
     </div>
   );
 }
