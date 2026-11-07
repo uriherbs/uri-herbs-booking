@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { LandingPageConfig } from '@/lib/landing-pages';
+import { REDNOTE, type LandingPageConfig } from '@/lib/landing-pages';
 import { EMAIL_RE, suggestEmail } from '@/lib/email-typos';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 
@@ -127,6 +127,7 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
 
           {/* Form or gift (phone: right after the headline; desktop: right column) */}
           <div className="lp-form" style={{ background: C.white, borderRadius: 22, padding: '24px 20px', boxShadow: '0 10px 30px rgba(45,70,57,0.08)', border: `1px solid ${C.sand}` }}>
+            {(tracking.src || '').toLowerCase().startsWith('shop-cn') && <RedNoteBox />}
             {status === 'done' ? (
               <Gift
                 config={config}
@@ -256,6 +257,31 @@ function Gift({ config, bookHref, firstName, sentTo, onFix }: { config: LandingP
         It arrives within a minute. Can't see it? Check the <strong>Promotions</strong> or <strong>Spam</strong> folder.
       </div>
       <Link href={bookHref} className="lp-btn" style={{ background: C.forest, color: C.white }}>See our workshops</Link>
+    </div>
+  );
+}
+
+/** Chinese guests in the shop (?src=shop-cn): share on RedNote, tag us, get a small gift. */
+function RedNoteBox() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(REDNOTE.id); setCopied(true); } catch { /* ignore */ }
+  };
+  return (
+    <div lang="zh-CN" style={{ background: '#FFF4F4', border: '1px solid #F3C9C9', borderRadius: 16, padding: '16px 16px', marginBottom: 18, color: C.bark, fontSize: 15, lineHeight: 1.6 }}>
+      <div style={{ fontWeight: 700, fontSize: 17, color: '#C0392B', marginBottom: 6 }}>🎁 小红书分享礼</div>
+      <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 4 }}>
+        <li>在小红书发一篇笔记，分享你今天的手作体验（照片或视频都可以）</li>
+        <li>标记 <strong>@{REDNOTE.name}</strong></li>
+        <li>把笔记给我们的工作人员看，即可领取一份小礼物 🌿</li>
+      </ol>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+        <span>小红书号：<strong>{REDNOTE.id}</strong></span>
+        <button type="button" onClick={copy} style={{ border: '1px solid #C0392B', background: C.white, color: '#C0392B', borderRadius: 999, padding: '4px 12px', fontSize: 13, cursor: 'pointer' }}>
+          {copied ? '已复制 ✓' : '复制'}
+        </button>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 14 }}>下面留下邮箱，我们会把 5 款泰式草本茶配方和一张送给朋友的 9 折优惠码发给你。</div>
     </div>
   );
 }

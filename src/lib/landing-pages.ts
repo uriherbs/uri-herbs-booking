@@ -57,6 +57,11 @@ export interface LandingPageConfig {
   defaultSource: string;        // stored when the URL has no ?src=
 }
 
+// Our RedNote (Xiaohongshu) account — shown to Chinese guests (?src=shop-cn).
+// Owner 2026-11-07: guest posts a note about the workshop and tags us, then
+// shows it to staff for a small gift. Framed as "share", never "review".
+export const REDNOTE = { name: 'URI Herbs｜悠理草本', id: '49979919163' };
+
 // Every package that includes the tea workshop.
 const TEA_PACKAGES = ['single-tea', 'combo-tea-inhaler', 'combo-tea-ball', 'journey-full'];
 
