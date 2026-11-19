@@ -48,6 +48,7 @@ export interface WorkshopPageData {
       hero_video_url: string | null; // detail-page top video (YouTube link or uploaded file URL)
       intro_paragraph: string | null;
       price_thb: number | null;
+      package_slug: string | null;  // the single-workshop package (for promotions)
       content_blocks: WorkshopContentBlock[];
       gallery: WorkshopGalleryItem[];
 }
@@ -99,11 +100,12 @@ export async function getWorkshopPageData(slug: string): Promise<WorkshopPageDat
             .order('sort_order'),
           publicClient
             .from('package_workshops')
-            .select('package_id, packages(price_thb)')
+            .select('package_id, packages(price_thb, slug)')
             .eq('workshop_id', workshop.id),
         ]);
 
   let price_thb: number | null = null;
+  let package_slug: string | null = null;
       if (pkgLinks && pkgLinks.length > 0) {
               const packageIds = pkgLinks.map((p) => p.package_id);
               const { data: allLinks } = await publicClient
@@ -119,12 +121,14 @@ export async function getWorkshopPageData(slug: string): Promise<WorkshopPageDat
         const singlePkg = pkgLinks.find((p) => counts[p.package_id] === 1);
               if (singlePkg) {
                         price_thb = (singlePkg as any).packages?.price_thb ?? null;
+                        package_slug = (singlePkg as any).packages?.slug ?? null;
               }
       }
 
   return {
           ...workshop,
           price_thb,
+          package_slug,
           content_blocks: blocks ?? [],
           gallery: gallery ?? [],
   };
