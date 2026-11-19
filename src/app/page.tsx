@@ -22,6 +22,7 @@ import { ReviewsSection } from '@/components/home/ReviewsSection';
 import { GetInTouch } from '@/components/home/GetInTouch';
 import { C, FONT_IMPORT, FONT_BODY } from '@/lib/theme';
 import { LocalBusinessJsonLd } from '@/components/seo/LocalBusinessJsonLd';
+import PromoBanner from '@/components/PromoBanner';
 import type { Metadata } from 'next';
 
 // Title/description come from the root layout defaults.
@@ -53,6 +54,7 @@ export default function Home() {
 
       <LocalBusinessJsonLd />
       <SiteHeader />
+      <PromoBanner />
       <main>
         <Hero />
         <WorkshopCircles />

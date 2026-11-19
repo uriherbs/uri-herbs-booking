@@ -4,6 +4,7 @@ import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getPackages, confirmPayLaterBooking, cancelBooking, applyCoupon } from "@/lib/booking-service";
+import { promoFor, promoPrice, promoUntilLabel } from "@/lib/promotions";
 import { useAvailableSlots, useCalendarAvailability, useCreateBooking } from "@/lib/hooks";
 import { StripeCardForm } from "@/components/payments/StripeCardForm";
 import { PayPalCheckoutButtons } from "@/components/payments/PayPalCheckoutButtons";
@@ -369,6 +370,9 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
   const isSelected = selected === pkg.slug;
   const charged = chargedParticipants(participants, isPrivate);
   const totalPrice = pkg.price * charged;
+  // Website promotion (lib/promotions): struck-through price + badge.
+  const promo = promoFor(pkg.slug, { isPrivate });
+  const promoTotal = promo ? promoPrice(pkg.price, promo) * charged : null;
   return (
     <button
       onClick={() => onSelect(pkg.slug)}
@@ -404,7 +408,19 @@ function PackageCard({ pkg, selected, onSelect, participants, isPrivate }) {
             <div style={{
               fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.gold,
               lineHeight: 1,
-            }}>฿{totalPrice.toLocaleString()}</div>
+            }}>
+              {promoTotal != null && (
+                <span style={{ fontSize: 14, fontWeight: 400, color: C.barkLight, textDecoration: "line-through", marginRight: 6 }}>
+                  ฿{totalPrice.toLocaleString()}
+                </span>
+              )}
+              ฿{(promoTotal ?? totalPrice).toLocaleString()}
+            </div>
+            {promo && (
+              <div style={{ fontFamily: "'DM Sans'", fontSize: 10.5, fontWeight: 700, color: C.white, background: C.sage, borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 4 }}>
+                {promo.percent}% off until {promoUntilLabel(promo)}
+              </div>
+            )}
             {charged !== participants ? (
               <div style={{ fontFamily: "'DM Sans'", fontSize: 10, color: C.barkLight }}>
                 ฿{pkg.price.toLocaleString()} × {charged} (min. for private)
@@ -591,7 +607,9 @@ function PrivateInfoSheet({ open, onClose, onBook, isPrivate }) {
 }
 
 function ModeCards({ pkg, participants, isPrivate, onChange, onInfo }) {
-  const groupTotal = pkg.price * participants;
+  const groupPromo = promoFor(pkg.slug);
+  const groupFull = pkg.price * participants;
+  const groupTotal = groupPromo ? promoPrice(pkg.price, groupPromo) * participants : groupFull;
   const privCharged = chargedParticipants(participants, true);
   const privTotal = pkg.price * privCharged;
   const groupDisabled = participants > maxGuestsFor(pkg.calendar, false); // group: up to 12 per booking (4 for aromatherapy)
@@ -616,6 +634,11 @@ function ModeCards({ pkg, participants, isPrivate, onChange, onInfo }) {
           {groupDisabled ? `Up to ${maxGuestsFor(pkg.calendar, false)} guests per booking` : "Share the session with other travellers"}
         </div>
         <div style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.sageDark, marginTop: 8 }}>
+          {groupPromo && (
+            <span style={{ fontSize: 14, fontWeight: 400, color: C.barkLight, textDecoration: "line-through", marginRight: 6 }}>
+              ฿{groupFull.toLocaleString()}
+            </span>
+          )}
           ฿{groupTotal.toLocaleString()}
         </div>
         <div style={{ fontSize: 10.5, color: C.gold, fontWeight: 700 }}>฿{pkg.price.toLocaleString()} × {participants}</div>
@@ -810,7 +833,7 @@ function PackageStep({ packages, selected, onSelect, participants, onParticipant
               Total
             </span>
             <span style={{ fontFamily: "'Crimson Pro'", fontSize: 20, fontWeight: 700, color: C.sageDark }}>
-              ฿{(selectedPkg.price * chargedParticipants(participants, isPrivate)).toLocaleString()}
+              ฿{((promoFor(selectedPkg.slug, { isPrivate }) ? promoPrice(selectedPkg.price, promoFor(selectedPkg.slug, { isPrivate })) : selectedPkg.price) * chargedParticipants(participants, isPrivate)).toLocaleString()}
             </span>
           </div>
 
@@ -1102,7 +1125,8 @@ function DateTimeStep({ selectedDate, onSelectDate, selectedTime, onSelectTime, 
             {pkg.name}{isPrivate && " · Private"}
           </div>
           <div style={{ fontFamily: "'DM Sans'", fontSize: 12, color: C.barkLight }}>
-            {pkg.duration} min • {participants} guest{participants > 1 ? "s" : ""} • ฿{(priceOn(pkg, selectedDate) * charged).toLocaleString()}
+            {pkg.duration} min • {participants} guest{participants > 1 ? "s" : ""} • ฿{((promoFor(pkg.slug, { workshopDate: selectedDate, isPrivate }) ? promoPrice(priceOn(pkg, selectedDate), promoFor(pkg.slug, { workshopDate: selectedDate, isPrivate })) : priceOn(pkg, selectedDate)) * charged).toLocaleString()}
+            {selectedDate && promoFor(pkg.slug, { isPrivate }) && !promoFor(pkg.slug, { workshopDate: selectedDate, isPrivate }) && ` (the ${promoFor(pkg.slug, { isPrivate })!.percent}% offer is for workshops until ${promoUntilLabel(promoFor(pkg.slug, { isPrivate })!)})`}
             {charged !== participants && ` (min. ${charged})`}
           </div>
         </div>
@@ -2235,7 +2259,7 @@ export default function BookingFlow() {
           paymentMethod={paymentMethod} onSelectMethod={handleSelectPaymentMethod}
           agreedToTerms={agreedToTerms} onToggleTerms={() => setAgreedToTerms(a => !a)}
           errors={errors} booking={result} onOnlinePaymentSuccess={handleOnlinePaymentSuccess}
-          onApplyCoupon={handleApplyCoupon} autoCoupon={linkCoupon}
+          onApplyCoupon={handleApplyCoupon} autoCoupon={linkCoupon || promoFor(selectedPkg, { workshopDate: selectedDate, isPrivate })?.code || null}
         />
       )}
       {(step === 2 || step === 3) && errors.submit && (

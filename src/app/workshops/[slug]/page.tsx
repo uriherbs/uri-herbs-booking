@@ -32,6 +32,8 @@ import SiteFooter from '@/components/SiteFooter';
 import { LeafFrame } from '@/components/LeafFrame';
 import { PillButton } from '@/components/PillButton';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
+import PromoBanner from '@/components/PromoBanner';
+import { promoFor, promoPrice } from '@/lib/promotions';
 
 const ArrowLeftSVG = () => (
   <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,6 +63,8 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
   // Top of the detail page: the workshop video if one is set (admin →
   // Content → "Detail page video"), otherwise the photo as before.
   const heroVideo = parseVideoUrl(w.hero_video_url);
+  // Website promotion on this workshop's single package (lib/promotions).
+  const promo = promoFor(w.package_slug);
 
   return (
     <div style={{ background: C.parchment, minHeight: '100vh' }}>
@@ -80,6 +84,7 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
       />
 
       <SiteHeader />
+      {promo && <PromoBanner slug={w.package_slug ?? undefined} />}
 
       <main style={{ maxWidth: 880, margin: '0 auto', padding: '40px 20px 80px' }}>
         <Link
@@ -247,7 +252,20 @@ export default async function WorkshopPage({ params }: { params: { slug: string 
             gap: 20,
           }}
         >
-          {w.price_thb != null ? (
+          {w.price_thb != null && promo ? (
+            <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 30, color: C.forest }}>
+              <span style={{ textDecoration: 'line-through', color: C.barkLight, fontSize: 22, fontWeight: 400, marginRight: 10 }}>
+                ฿{w.price_thb.toLocaleString()}
+              </span>
+              ฿{promoPrice(w.price_thb, promo).toLocaleString()}
+              <span style={{ marginLeft: 8, fontFamily: FONT_BODY, fontWeight: 400, fontSize: 14, color: C.barkLight }}>
+                per person{w.duration_minutes ? `, ${w.duration_minutes} min` : ''}
+              </span>
+              <div style={{ fontFamily: FONT_BODY, fontWeight: 700, fontSize: 14, color: C.gold, marginTop: 4 }}>
+                {promo.percent}% off · {promo.detail} · no code needed
+              </div>
+            </div>
+          ) : w.price_thb != null ? (
             <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 30, color: C.forest }}>
               ฿{w.price_thb.toLocaleString()}
               <span style={{ marginLeft: 8, fontFamily: FONT_BODY, fontWeight: 400, fontSize: 14, color: C.barkLight }}>
