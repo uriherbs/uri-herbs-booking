@@ -29,7 +29,7 @@ export interface SitePromo {
 export const SITE_PROMOS: SitePromo[] = [
   {
     code: 'TEATIME20',
-    packageSlugs: ['tea-blending'],
+    packageSlugs: ['single-tea'],
     percent: 20,
     from: '2026-11-20',
     until: '2026-12-15',
