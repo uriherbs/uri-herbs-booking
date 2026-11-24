@@ -68,6 +68,12 @@ export default function SiteFooter() {
           >
             Travel Agencies &amp; Guides
           </Link>
+          <Link
+            href="/creators"
+            style={{ fontFamily: FONT_BODY, fontSize: 11.5, color: C.barkLight, opacity: 0.7, textDecoration: 'none' }}
+          >
+            Creators
+          </Link>
           {/* Small and muted on purpose — for staff use, not a public CTA. */}
           <Link
             href="/admin/login"
