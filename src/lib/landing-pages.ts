@@ -17,17 +17,24 @@
 export interface Recipe {
   name: string;
   tagline: string;              // the "benefit" line from the recipe card menu page
+  videoFresh?: string;          // YouTube Short id: fresh-herb version (button shows only when set)
+  videoTeaBag?: string;         // YouTube Short id: dried tea-bag version (button shows only when set)
 }
 
 /**
  * Recipes page (/tea-recipes/full), linked from the gift email.
- * Paste the YouTube video id (the part after watch?v=) and the playlist
- * link here when the videos are up; until then the page shows
- * "video coming soon" and no playlist button.
+ * All videos are VERTICAL (9:16, YouTube Shorts — owner 2026-11-07).
+ * When a video is up, paste its id here — the id is the part after
+ * /shorts/ (youtube.com/shorts/AbC123xyz → 'AbC123xyz') or after watch?v=.
+ *   - overviewYoutubeId: the general "how we make Thai herbal tea" video
+ *     (until set, the page shows "video coming soon")
+ *   - playlistUrl: link to the full playlist (button hidden until set)
+ *   - per recipe: add videoFresh and/or videoTeaBag to that recipe in TEA_RECIPES.recipes
+ *     (id = the part after /shorts/ in the YouTube link)
  */
 export const RECIPE_VIDEOS: { overviewYoutubeId: string | null; playlistUrl: string | null } = {
-  overviewYoutubeId: null,
-  playlistUrl: null,
+  overviewYoutubeId: 'VQddM8reutU', // recipe 01 (Moon Cycle Soothe), until a general video exists
+  playlistUrl: 'https://www.youtube.com/playlist?list=PLIBv1dcPXAvg', // "Tea Recipes Reel Video" (unlisted)
 };
 export const RECIPES_PAGE_PATH = '/tea-recipes/full';
 
@@ -120,19 +127,19 @@ export const TEA_RECIPES: LandingPageConfig = {
   // The 13 workshop recipes (owner-approved PDF, 2026-11-07). Taglines =
   // the "Main benefits" column of the PDF menu page; keep them in sync.
   recipes: [
-    { name: "Moon Cycle Soothe", tagline: "Traditional warming brew for women's monthly comfort" },
-    { name: "The End of Numb", tagline: "Thai \"wind\" herbs to warm cold hands and feet" },
-    { name: "Thai Shield Elixir", tagline: "Daily Thai tonic to keep the body warm and strong" },
-    { name: "Siam Sunset Sip", tagline: "Warm spices to settle the belly after a meal" },
-    { name: "Happy Gut Harmony", tagline: "After-meal brew for a light, easy belly" },
-    { name: "Zen Weight Wellness", tagline: "Black ginger for energy, a light cup after meals" },
-    { name: "Siam Sugar Stopper", tagline: "Tart Thai fruits to cool and refresh the body" },
-    { name: "Siam Slim Sip", tagline: "The Thai leaf that tames a sweet tooth" },
-    { name: "Chiang Mai Clarity", tagline: "Thai blue flower tea for a fresh, clear mind" },
-    { name: "Zen Head", tagline: "Cooling Thai herbs to ease a busy, heavy head" },
-    { name: "Golden Peace", tagline: "Golden roots and lemongrass to ground body and mind" },
-    { name: "Kraphao Holy Harmony", tagline: "Holy basil to calm the mind and settle the stomach" },
-    { name: "Siam Floral Whisper", tagline: "Thai flowers to cool the body and soothe the heart" },
+    { name: "Moon Cycle Soothe", tagline: "Traditional warming brew for women's monthly comfort", videoFresh: "VQddM8reutU" },
+    { name: "The End of Numb", tagline: "Thai \"wind\" herbs to warm cold hands and feet", videoFresh: "603Y1FRLjzQ" },
+    { name: "Thai Shield Elixir", tagline: "Daily Thai tonic to keep the body warm and strong", videoFresh: "t0bIC11tetI" },
+    { name: "Siam Sunset Sip", tagline: "Warm spices to settle the belly after a meal", videoFresh: "WjJMu5r6rPw" },
+    { name: "Happy Gut Harmony", tagline: "After-meal brew for a light, easy belly", videoFresh: "dgMoKgWTyTU" },
+    { name: "Zen Weight Wellness", tagline: "Black ginger for energy, a light cup after meals", videoFresh: "SU7WlOApyF8" },
+    { name: "Siam Sugar Stopper", tagline: "Tart Thai fruits to cool and refresh the body", videoFresh: "qkzFH-4aKHs" },
+    { name: "Siam Slim Sip", tagline: "The Thai leaf that tames a sweet tooth", videoFresh: "f5XoMHAgggE" },
+    { name: "Chiang Mai Clarity", tagline: "Thai blue flower tea for a fresh, clear mind", videoFresh: "7M6ZlCk1Ivc" },
+    { name: "Zen Head", tagline: "Cooling Thai herbs to ease a busy, heavy head", videoFresh: "L3-j00UgrUM" },
+    { name: "Golden Peace", tagline: "Golden roots and lemongrass to ground body and mind", videoFresh: "9-P_Kthnc7w" },
+    { name: "Kraphao Holy Harmony", tagline: "Holy basil to calm the mind and settle the stomach", videoFresh: "O4XCNET-LeE" },
+    { name: "Siam Floral Whisper", tagline: "Thai flowers to cool the body and soothe the heart", videoFresh: "mZiGHsV1jPs" },
   ],
   recipesPageUrl: RECIPES_PAGE_PATH,
 };

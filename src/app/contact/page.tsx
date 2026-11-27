@@ -32,7 +32,7 @@ const SHOP_ADDRESS = '44, 3 Si Phum Soi 9, Tambon Si Phum, Mueang, Chiang Mai 50
 const SHOP_PHONE_DISPLAY = '+66 64 334 9890';
 const SHOP_PHONE_TEL = '+66643349890';
 const SHOP_EMAIL = 'uherbhouse@gmail.com';
-const SHOP_HOURS = 'Mon – Sat · 09:00 – 17:00';
+const SHOP_HOURS = 'Daily · 09:00 – 17:00';
 
 // Verified directly against Google Maps (place: "Uri Herbs Workshop").
 // Geocoding the free-text address above used to send the pin to a

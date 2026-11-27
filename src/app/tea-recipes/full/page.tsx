@@ -3,8 +3,9 @@
 // ============================================================
 // The recipes page the gift email links to (owner 2026-11-07):
 //   - download button for the 13-recipe PDF
-//   - one overview video (YouTube, loads only when tapped) and a link
-//     to the full playlist — set both in RECIPE_VIDEOS
+//   - one overview video and a link to the full playlist (RECIPE_VIDEOS),
+//     plus up to two videos per recipe (Recipe.videoFresh / Recipe.videoTeaBag).
+//     All videos are vertical (9:16 Shorts) and load only when tapped.
 //   - the 13 recipe names with their one-line tagline
 //   - a teaser for the tea recipe book (50+ recipes, coming soon)
 //   - the workshop booking pitch
@@ -16,6 +17,7 @@ import Link from 'next/link';
 import { TEA_RECIPES, RECIPE_VIDEOS } from '@/lib/landing-pages';
 import { C, FONT_DISPLAY, FONT_BODY, FONT_IMPORT } from '@/lib/theme';
 import YouTubeLite from './YouTubeLite';
+import RecipeList from './RecipeList';
 
 export const metadata: Metadata = {
   title: 'Your 13 Thai Herbal Tea Recipes',
@@ -64,12 +66,12 @@ export default function TeaRecipesFullPage() {
         <div className="rp-wrap" style={{ paddingTop: 30, paddingBottom: 30 }}>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, margin: '0 0 6px' }}>Watch how we brew them</h2>
           <p style={{ margin: '0 0 16px', fontSize: 15, color: C.barkLight, lineHeight: 1.55 }}>
-            Mali shows the herbs, the cuts and the timing, so your tea tastes like the one in the workshop.
+            Our team shows the herbs, the cuts and the timing, so your tea tastes like the one in the workshop. Every recipe below has its own short video.
           </p>
           {overviewYoutubeId ? (
-            <YouTubeLite id={overviewYoutubeId} title="Thai herbal tea recipes with Uri Herbs Workshop" />
+            <YouTubeLite id={overviewYoutubeId} title="How we make Thai herbal tea at Uri Herbs Workshop" />
           ) : (
-            <div style={{ aspectRatio: '16/9', borderRadius: 18, background: C.sageLight, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20, color: C.bark }}>
+            <div style={{ aspectRatio: '9/16', width: '100%', maxWidth: 240, margin: '0 auto', boxSizing: 'border-box', borderRadius: 18, background: C.sageLight, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20, color: C.bark }}>
               <div>
                 <div style={{ fontSize: 36 }} aria-hidden>🎬</div>
                 <div style={{ fontWeight: 700, marginTop: 6 }}>Video coming soon</div>
@@ -78,9 +80,11 @@ export default function TeaRecipesFullPage() {
             </div>
           )}
           {playlistUrl && (
+            <div style={{ textAlign: 'center' }}>
             <a href={playlistUrl} target="_blank" rel="noopener noreferrer" className="rp-btn" style={{ marginTop: 14, background: 'transparent', color: C.forest, border: `1.5px solid ${C.forest}` }}>
               ▶ All recipe videos on YouTube
             </a>
+            </div>
           )}
         </div>
       </section>
@@ -88,17 +92,7 @@ export default function TeaRecipesFullPage() {
       {/* The 13 recipes */}
       <section className="rp-wrap" style={{ paddingTop: 30, paddingBottom: 30 }}>
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, margin: '0 0 16px' }}>Inside the book</h2>
-        <ol className="rp-list">
-          {page.recipes.map((r, i) => (
-            <li key={r.name} style={{ background: C.white, border: `1px solid ${C.sand}`, borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'baseline' }}>
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 700, color: C.sage, minWidth: 30 }}>{String(i + 1).padStart(2, '0')}</span>
-              <span>
-                <span style={{ display: 'block', fontWeight: 700, fontSize: 16 }}>{r.name}</span>
-                <span style={{ display: 'block', fontSize: 14, color: C.barkLight, marginTop: 2 }}>{r.tagline}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <RecipeList recipes={page.recipes} />
         <p style={{ fontSize: 13, color: C.barkLight, margin: '14px 0 0', lineHeight: 1.5 }}>
           Traditional Thai recipes, shared for enjoyment. Please read the note on each recipe if you are pregnant or take regular medication.
         </p>

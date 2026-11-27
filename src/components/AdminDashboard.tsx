@@ -827,6 +827,20 @@ export default function AdminDashboard({ adminName, onSignOut }) {
             Coupons
           </Link>
           <Link
+            href="/admin/customers"
+            title="Customers — everyone who booked or signed up"
+            style={{
+              background: "rgba(255,255,255,0.12)", borderRadius: 20,
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'DM Sans'", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap",
+            }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><path d="M16 4.5a3.5 3.5 0 010 7" /><path d="M18 14.8c1.9.7 3.1 2.5 3.5 5.2" />
+            </svg>
+            Customers
+          </Link>
+          <Link
             href="/admin/leads"
             title="Leads from landing pages"
             style={{
