@@ -27,6 +27,11 @@ const MAPS_URL =
   'https://www.google.com/maps/search/?api=1&query=Uri%20Herbs%20Workshop&query_place_id=ChIJxecF1bQ72jAREMxTp8PDykE';
 
 type Status = 'idle' | 'sending' | 'done';
+type GiftData = {
+  recipesUrl: string;
+  pdfUrl: string;
+  coupon: { code: string; percent: number; forFriend: boolean; validUntil: string; line: string } | null;
+};
 
 export default function LeadLandingPage({ config }: { config: LandingPageConfig }) {
   const [name, setName] = useState('');
@@ -39,6 +44,7 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<Record<string, string>>({});
   const [sentTo, setSentTo] = useState('');
+  const [gift, setGift] = useState<GiftData | null>(null);
   const [confirmEmail, setConfirmEmail] = useState(false); // guest kept an address we flagged as a possible typo
   const typoHint = !confirmEmail ? suggestEmail(email.trim()) : null;
 
@@ -75,6 +81,7 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
       setSentTo(data.email || email.trim().toLowerCase());
+      setGift(data.gift || null);
       setStatus('done');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
@@ -134,6 +141,7 @@ export default function LeadLandingPage({ config }: { config: LandingPageConfig 
                 bookHref={bookHref}
                 firstName={name.trim().split(/\s+/)[0]}
                 sentTo={sentTo}
+                gift={gift}
                 onFix={() => { setStatus('idle'); setConfirmEmail(false); setTimeout(() => document.getElementById('lp-email')?.focus(), 50); }}
               />
             ) : (
@@ -241,22 +249,31 @@ function Field({ label, id, children }: { label: string; id: string; children: R
   );
 }
 
-function Gift({ config, bookHref, firstName, sentTo, onFix }: { config: LandingPageConfig; bookHref: string; firstName: string; sentTo: string; onFix: () => void }) {
+function Gift({ config, bookHref, firstName, sentTo, gift, onFix }: { config: LandingPageConfig; bookHref: string; firstName: string; sentTo: string; gift: GiftData | null; onFix: () => void }) {
+  const recipesUrl = gift?.recipesUrl || config.recipesPageUrl;
+  const pdfUrl = gift?.pdfUrl || config.pdfUrl;
+  const coupon = gift?.coupon || null;
+  const bookWithCode = coupon ? `${config.bookUrl}?code=${encodeURIComponent(coupon.code)}&utm_source=landing&utm_medium=web&utm_campaign=${config.slug}` : bookHref;
+  const until = coupon ? new Date(`${coupon.validUntil}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   return (
     <div style={{ textAlign: 'center', display: 'grid', gap: 12 }}>
       <div style={{ fontSize: 34 }} aria-hidden>🌿</div>
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, margin: 0 }}>Thank you{firstName ? `, ${firstName}` : ''}!</h2>
-      <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: C.bark }}>
-        We sent your {config.recipes.length} tea recipes and your personal 10% code to
+      <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.5, color: C.bark }}>Your {config.recipes.length} tea recipes are ready.</p>
+      <Link href={recipesUrl} className="lp-btn" style={{ background: C.forest, color: C.white }}>▶ Watch the {config.recipes.length} tea videos</Link>
+      <a href={pdfUrl} download className="lp-btn" style={{ background: 'transparent', color: C.forest, border: `1.5px solid ${C.forest}` }}>⬇ Download the recipe book (PDF)</a>
+      {coupon && (
+        <div style={{ background: C.parchment, border: `1.5px dashed ${C.gold}`, borderRadius: 16, padding: '14px 12px', display: 'grid', gap: 4 }}>
+          <span style={{ fontSize: 14, color: C.bark }}>{coupon.forFriend ? `A ${coupon.percent}% code for a friend` : `Your ${coupon.percent}% workshop code`}</span>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 700, letterSpacing: 2, color: C.forest }}>{coupon.code}</span>
+          <span style={{ fontSize: 12.5, color: C.barkLight }}>One use · valid until {until}</span>
+        </div>
+      )}
+      <Link href={bookWithCode} className="lp-btn" style={{ background: C.sageLight, color: C.forest }}>{coupon && !coupon.forFriend ? 'Book with my code' : 'See our workshops'}</Link>
+      <p style={{ margin: '4px 0 0', fontSize: 13.5, color: C.barkLight, lineHeight: 1.5 }}>
+        We also sent everything to <strong style={{ wordBreak: 'break-all' }}>{sentTo}</strong>{' '}
+        <button type="button" onClick={onFix} style={{ background: 'none', border: 'none', color: C.sageDark, textDecoration: 'underline', cursor: 'pointer', fontSize: 13.5, padding: 0 }}>(wrong email?)</button>
       </p>
-      <div style={{ fontWeight: 700, fontSize: 16, color: C.forest, wordBreak: 'break-all' }}>{sentTo}</div>
-      <button type="button" onClick={onFix} style={{ background: 'none', border: 'none', color: C.sageDark, textDecoration: 'underline', cursor: 'pointer', fontSize: 14 }}>
-        Not your email? Fix it
-      </button>
-      <div style={{ background: C.sageLight, borderRadius: 16, padding: '14px 14px', fontSize: 14, color: C.bark, lineHeight: 1.5 }}>
-        It arrives within a minute. Can't see it? Check the <strong>Promotions</strong> or <strong>Spam</strong> folder.
-      </div>
-      <Link href={bookHref} className="lp-btn" style={{ background: C.forest, color: C.white }}>See our workshops</Link>
     </div>
   );
 }
