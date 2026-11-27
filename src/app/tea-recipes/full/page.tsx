@@ -69,7 +69,7 @@ export default function TeaRecipesFullPage() {
             Our team shows the herbs, the cuts and the timing, so your tea tastes like the one in the workshop. Every recipe below has its own short video.
           </p>
           {overviewYoutubeId ? (
-            <YouTubeLite id={overviewYoutubeId} title="How we make Thai herbal tea at Uri Herbs Workshop" />
+            <YouTubeLite id={overviewYoutubeId} title="Welcome to Uri Herbs Workshop" />
           ) : (
             <div style={{ aspectRatio: '9/16', width: '100%', maxWidth: 240, margin: '0 auto', boxSizing: 'border-box', borderRadius: 18, background: C.sageLight, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20, color: C.bark }}>
               <div>
