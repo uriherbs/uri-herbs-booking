@@ -13,7 +13,9 @@ export interface ListPrices { single: number; combo: number; journey: number; ar
 
 const PRICE_LISTS: { from: string; prices: ListPrices }[] = [
   { from: '2000-01-01', prices: { single: 920, combo: 1670, journey: 2320, aroma: 2700 } },
-  { from: '2027-01-01', prices: { single: 1150, combo: 2090, journey: 2900, aroma: 3380 } },
+  // 2027 price rise (+25%: 1150 / 2090 / 2900 / 3380) is ON HOLD — owner
+  // decision 2026-11-19 (low season). To bring it back, add the row here
+  // AND the matching package_prices rows in the database.
 ];
 
 /** Today's date in Chiang Mai as YYYY-MM-DD. */

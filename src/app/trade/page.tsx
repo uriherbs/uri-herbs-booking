@@ -291,7 +291,7 @@ export default function TradePage() {
 
       {/* ══════════ PARTNER RATE CARD ══════════ */}
       <div className="trade-section">
-        <Eyebrow>2026 &amp; 2027 Rates</Eyebrow>
+        <Eyebrow>Partner Rates</Eyebrow>
         <h2 style={{ fontFamily: "'Crimson Pro'", fontSize: 26, fontWeight: 700, color: C.forest, marginBottom: 12 }}>Agency Rate Card</h2>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: C.sageLight, borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
@@ -307,18 +307,11 @@ export default function TradePage() {
             <div style={{ flex: 1, fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: C.sageDark, textAlign: 'right' }}>Retail</div>
             <div style={{ flex: 1, fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: C.sageDark, textAlign: 'right' }}>You Pay</div>
           </div>
-          <div style={{ padding: '8px 16px', background: C.goldLight, fontSize: 11.5, fontWeight: 700, color: C.bark, letterSpacing: '0.04em' }}>WORKSHOPS UNTIL DEC 31, 2026</div>
           <RateRow label="1 Hour" retail="฿920" partner="฿736" />
           <RateRow label="2 Hours" retail="฿1,670" partner="฿1,336" />
           <RateRow label="3 Hours" retail="฿2,320" partner="฿1,856" />
           <RateRow label="Aromatherapy & Skincare (2h)" retail="฿2,700" partner="฿2,160" />
-          {/* 2027 price list — owner decision 2026-10-01 (+25%), same as
-              package_prices in the database. Partner = retail − 20%. */}
-          <div style={{ padding: '8px 16px', background: C.goldLight, fontSize: 11.5, fontWeight: 700, color: C.bark, letterSpacing: '0.04em' }}>WORKSHOPS FROM JAN 1, 2027</div>
-          <RateRow label="1 Hour" retail="฿1,150" partner="฿920" />
-          <RateRow label="2 Hours" retail="฿2,090" partner="฿1,672" />
-          <RateRow label="3 Hours" retail="฿2,900" partner="฿2,320" />
-          <RateRow label="Aromatherapy & Skincare (2h)" retail="฿3,380" partner="฿2,704" />
+          {/* 2027 price list (+25%) on hold — owner decision 2026-11-19. */}
         </div>
         <p style={{ fontSize: 12, color: C.barkLight, lineHeight: 1.6, margin: '10px 2px 0' }}>
           Per participant, inclusive of materials, instruction, welcome drink &amp; the final handcrafted product. The rate is set by the date of the workshop.
