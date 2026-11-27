@@ -33,7 +33,7 @@ export interface Recipe {
  *     (id = the part after /shorts/ in the YouTube link)
  */
 export const RECIPE_VIDEOS: { overviewYoutubeId: string | null; playlistUrl: string | null } = {
-  overviewYoutubeId: 'VQddM8reutU', // recipe 01 (Moon Cycle Soothe), until a general video exists
+  overviewYoutubeId: 'sU0rUo1jhMQ', // owner's welcome video, 2026-11-27
   playlistUrl: 'https://www.youtube.com/playlist?list=PLIBv1dcPXAvg', // "Tea Recipes Reel Video" (unlisted)
 };
 export const RECIPES_PAGE_PATH = '/tea-recipes/full';
