@@ -173,6 +173,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // The gift itself is NOT returned — it only travels by email.
-  return NextResponse.json({ success: true, email });
+  // Owner 2026-11-27: open the gift on screen right away (videos, PDF, code);
+  // the email is a copy the guest can come back to.
+  return NextResponse.json({
+    success: true,
+    email,
+    gift: {
+      recipesUrl: page.recipesPageUrl,
+      pdfUrl: page.pdfUrl,
+      coupon: couponCode
+        ? { code: couponCode, percent: offer.percent, forFriend: !!offer.forFriend, validUntil, line: offer.giftLine }
+        : null,
+    },
+  });
 }

@@ -13,6 +13,10 @@ import YouTubeLite from './YouTubeLite';
 type Kind = 'fresh' | 'teabag';
 const LABEL: Record<Kind, string> = { fresh: '▶ Fresh herbs video', teabag: '▶ Tea bag video' };
 
+/** Recipe card image (one PDF page per recipe), e.g. /tea-recipes/05-happy-gut-harmony.webp */
+const cardSrc = (i: number, name: string) =>
+  `/tea-recipes/${String(i + 1).padStart(2, '0')}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.webp`;
+
 export default function RecipeList({ recipes }: { recipes: Recipe[] }) {
   const [open, setOpen] = useState<{ name: string; kind: Kind } | null>(null);
   return (
@@ -55,6 +59,14 @@ export default function RecipeList({ recipes }: { recipes: Recipe[] }) {
                   id={current[1]}
                   title={`How to make ${r.name} (${current[0] === 'fresh' ? 'fresh herbs' : 'tea bag'})`}
                   maxWidth={320}
+                />
+                <img
+                  src={cardSrc(i, r.name)}
+                  alt={`${r.name} recipe card`}
+                  width={900}
+                  height={1273}
+                  loading="lazy"
+                  style={{ display: 'block', width: '100%', maxWidth: 520, height: 'auto', margin: '14px auto 0', borderRadius: 12, border: `1px solid ${C.sand}` }}
                 />
               </div>
             )}
